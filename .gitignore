@@ -1,0 +1,21 @@
+# Xmake cache
+.xmake/
+build/
+vsxmake*/
+CMakeLists.txt
+/.vscode
+
+# MacOS Cache
+.DS_Store
+
+compile.*
+
+*.dll
+*.so
+*.pdb
+*.lib
+/.vscode
+*.a
+*.*~
+
+*.spv
