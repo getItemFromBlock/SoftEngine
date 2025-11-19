@@ -16,6 +16,7 @@ public:
     bool SendToGPU(RHIRenderer* renderer) override;
     void Unload() override;
     
+    RHITexture* GetBuffer() const { return m_buffer.get(); }
 private:
     ImageLoader::Image m_image = {};
     std::unique_ptr<RHITexture> m_buffer;

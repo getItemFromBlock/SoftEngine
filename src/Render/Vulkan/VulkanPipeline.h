@@ -25,7 +25,8 @@ public:
 
     VkPipeline GetPipeline() const { return m_pipeline; }
     VkPipelineLayout GetPipelineLayout() const { return m_pipelineLayout; }
-
+    VkDescriptorSetLayout GetDescriptorSetLayout() const { return m_descriptorSetLayout; }
+    
     void Bind(VkCommandBuffer commandBuffer);
 
 private:

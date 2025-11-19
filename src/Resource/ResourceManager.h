@@ -31,6 +31,17 @@ public:
         }
         return nullptr;
     }
+    
+    template <typename T>
+    std::shared_ptr<T> GetResource(uint64_t hash)
+    {
+        auto it = m_resources.find(hash);
+        if (it !=  m_resources.end())
+        {
+            return std::dynamic_pointer_cast<T>(it->second);
+        }
+        return nullptr;
+    }
 
     template<typename T>
     SafePtr<T> AddResource(std::shared_ptr<T> resource)
@@ -69,19 +80,7 @@ public:
             if (resource->Load(this))
             {
                 resource->SetLoaded();
-                if (m_renderer->MultiThreadSendToGPU())
-                {
-                    ThreadPool::Enqueue([resource, this]() {
-                        if (resource->SendToGPU(m_renderer))
-                        {
-                            resource->SetSentToGPU();
-                        }
-                    });
-                }
-                else
-                {
-                    AddResourceToSend(hash);
-                }
+                AddResourceToSend(hash);
             }
         });
         AddResource(resource);
@@ -112,7 +111,26 @@ public:
     
     void AddResourceToSend(uint64_t hash)
     {
-        m_resourceToSend.push(hash);
+        if (m_renderer->MultiThreadSendToGPU())
+        {
+            std::shared_ptr<IResource> resource = GetResource<IResource>(hash);
+            ThreadPool::Enqueue([resource, this]() {
+                if (resource->SendToGPU(m_renderer))
+                {
+                    resource->SetSentToGPU();
+                }
+            });
+        }
+        else
+        {
+            m_resourceToSend.push(hash);
+        }
+    }
+    
+    void AddResourceToSend(const IResource* resource)
+    {
+        uint64_t hash = GetHash(resource->GetPath());
+        AddResourceToSend(hash);
     }
     
     void Clear()

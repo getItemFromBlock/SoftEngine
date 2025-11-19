@@ -1,13 +1,15 @@
 ﻿#pragma once
-
 #include <vector>
 #include <memory>
 #include <array>
+
 #include <galaxymath/Maths.h>
 
 #include "IResource.h"
-#include "Render/RHI/RHIBuffer.h"
+
 #include "Render/RHI/RHIVertex.h"
+#include "Render/RHI/RHIVertexBuffer.h"
+#include "Render/RHI/RHIIndexBuffer.h"
 
 struct Vertex
 {
@@ -35,17 +37,17 @@ struct Vertex
         attributeDescriptions[0].format = RHIFormat::R32G32B32_F;
         attributeDescriptions[0].offset = offsetof(Vertex, position);
 
-        // Texture coordinates
+        // Normal
         attributeDescriptions[1].binding = 0;
         attributeDescriptions[1].location = 1;
-        attributeDescriptions[1].format = RHIFormat::R32G32_F;
-        attributeDescriptions[1].offset = offsetof(Vertex, texCoord);
+        attributeDescriptions[1].format = RHIFormat::R32G32B32_F;
+        attributeDescriptions[1].offset = offsetof(Vertex, normal);
 
-        // Normal
+        // Texture coordinates
         attributeDescriptions[2].binding = 0;
         attributeDescriptions[2].location = 2;
-        attributeDescriptions[2].format = RHIFormat::R32G32B32_F;
-        attributeDescriptions[2].offset = offsetof(Vertex, normal);
+        attributeDescriptions[2].format = RHIFormat::R32G32_F;
+        attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
         
         // Tangent
         attributeDescriptions[3].binding = 0;
@@ -55,6 +57,12 @@ struct Vertex
 
         return attributeDescriptions;
     }
+};
+
+struct SubMesh
+{
+    uint32_t startIndex;
+    uint32_t count;
 };
 
 class Mesh : public IResource
@@ -70,11 +78,16 @@ public:
     bool SendToGPU(RHIRenderer* renderer) override;
     void Unload() override;
 
+    RHIVertexBuffer* GetVertexBuffer() const { return m_vertexBuffer.get(); }
+    RHIIndexBuffer* GetIndexBuffer() const { return m_indexBuffer.get(); }
 private:
     friend class Model;
-    std::vector<Vertex> m_vertices;
+    
+    
+    std::vector<float> m_vertices;
     std::vector<uint32_t> m_indices;
+    std::vector<SubMesh> m_subMeshes;
 
-    std::unique_ptr<RHIBuffer> m_vertexBuffer;
-    std::unique_ptr<RHIBuffer> m_indexBuffer;
+    std::unique_ptr<RHIVertexBuffer> m_vertexBuffer;
+    std::unique_ptr<RHIIndexBuffer> m_indexBuffer;
 };

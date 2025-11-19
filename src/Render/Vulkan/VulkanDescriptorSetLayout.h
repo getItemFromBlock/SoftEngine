@@ -5,14 +5,6 @@
 #include <vector>
 #include <stdexcept>
 
-struct DescriptorBindingInfo
-{
-    uint32_t binding;
-    VkDescriptorType type;
-    VkShaderStageFlags stageFlags;
-    uint32_t descriptorCount = 1;
-};
-
 class VulkanDescriptorSetLayout
 {
 public:
@@ -21,7 +13,7 @@ public:
 
     ~VulkanDescriptorSetLayout();
 
-    void Create(const std::vector<DescriptorBindingInfo>& bindingsInfo);
+    void Create(const std::vector<VkDescriptorSetLayoutBinding>& bindingsInfo);
 
     void Cleanup();
 

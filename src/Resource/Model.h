@@ -18,6 +18,7 @@ public:
     bool SendToGPU(RHIRenderer* renderer) override;
     void Unload() override;
     
+    std::vector<Mesh*> GetMeshes() const { return m_meshes; }
 private:
     std::vector<Mesh*> m_meshes;
 };

@@ -3,6 +3,7 @@
 #include "Core/Window.h"
 
 #include "Render/RHI/RHIRenderer.h"
+#include "Render/Vulkan/VulkanRenderer.h"
 
 #include "Resource/ResourceManager.h"
 #include "Resource/Model.h"
@@ -19,7 +20,7 @@ int Run(int argc, char** argv, char** envp)
     WindowConfig config;
     config.title = "Window Test";
     config.size = Vec2i(1280, 720);
-    std::unique_ptr<Window> window = Window::Create(WindowAPI::SDL, RenderAPI::Vulkan, config);
+    std::unique_ptr<Window> window = Window::Create(WindowAPI::GLFW, RenderAPI::Vulkan, config);
 
     if (!window)
     {
@@ -43,6 +44,9 @@ int Run(int argc, char** argv, char** envp)
 
     // window->SetVSync(true);
     // window->SetMouseCursorType(CursorType::Hand);
+    
+    static_cast<VulkanRenderer*>(renderer.get())->SetModel(cubeModel);
+    static_cast<VulkanRenderer*>(renderer.get())->SetTexture(debugTexture);
 
     while (!window->ShouldClose())
     {

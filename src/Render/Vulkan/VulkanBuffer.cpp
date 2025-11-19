@@ -4,6 +4,7 @@
 #include "VulkanDevice.h"
 #include <stdexcept>
 #include <cstring>
+#include <iostream>
 
 VulkanBuffer::~VulkanBuffer()
 {
@@ -25,6 +26,7 @@ bool VulkanBuffer::Initialize(VulkanDevice* device, VkDeviceSize size,
 
     if (vkCreateBuffer(m_device->GetDevice(), &bufferInfo, nullptr, &m_buffer) != VK_SUCCESS)
     {
+        std::cerr << "Failed to create buffer!" << std::endl;
         return false;
     }
 

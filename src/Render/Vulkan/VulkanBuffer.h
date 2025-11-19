@@ -19,7 +19,7 @@ public:
     void CopyData(const void* data, VkDeviceSize size);
     void CopyFrom(VkCommandBuffer commandBuffer, VulkanBuffer* srcBuffer, VkDeviceSize size);
 
-    VkDeviceMemory GetDeviceMemory() const { return m_bufferMemory; }
+    VkDeviceMemory GetBufferMemory() const { return m_bufferMemory; }
     VkBuffer GetBuffer() const { return m_buffer; }
     VkDeviceSize GetSize() const { return m_size; }
 

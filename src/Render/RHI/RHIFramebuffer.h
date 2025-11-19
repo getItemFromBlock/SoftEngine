@@ -7,6 +7,6 @@ public:
     RHIFramebuffer& operator=(const RHIFramebuffer& other) = default;
     RHIFramebuffer(const RHIFramebuffer&) = default;
     RHIFramebuffer(RHIFramebuffer&&) noexcept = default;
-    ~RHIFramebuffer() = default;
+    virtual ~RHIFramebuffer() = default;
     
 };

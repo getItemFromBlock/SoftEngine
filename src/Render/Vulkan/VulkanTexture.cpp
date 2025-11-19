@@ -319,12 +319,12 @@ void VulkanTexture::CopyBufferToImage(VkCommandPool commandPool, VkQueue graphic
 bool VulkanTexture::CopyDataToBuffer(VulkanBuffer& buffer, const void* data, VkDeviceSize size)
 {
     void* mappedData;
-    if (vkMapMemory(m_device->GetDevice(), buffer.GetDeviceMemory(), 0, size, 0, &mappedData) != VK_SUCCESS) {
+    if (vkMapMemory(m_device->GetDevice(), buffer.GetBufferMemory(), 0, size, 0, &mappedData) != VK_SUCCESS) {
         return false;
     }
     
     memcpy(mappedData, data, static_cast<size_t>(size));
-    vkUnmapMemory(m_device->GetDevice(), buffer.GetDeviceMemory());
+    vkUnmapMemory(m_device->GetDevice(), buffer.GetBufferMemory());
     
     return true;
 }

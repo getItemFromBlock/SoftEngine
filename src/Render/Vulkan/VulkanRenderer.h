@@ -1,10 +1,20 @@
 ﻿#pragma once
-#ifdef RENDER_API_VULKAN
-
-#include <vulkan/vulkan.h>
 #include <memory>
 
+#include "VulkanDescriptorSetLayout.h"
 #include "Render/RHI/RHIRenderer.h"
+#include "Resource/Material.h"
+#include "Resource/Model.h"
+#include "Resource/Texture.h"
+#include "Utils/Type.h"
+
+#ifdef RENDER_API_VULKAN
+
+#include <galaxymath/Maths.h>
+#include <vulkan/vulkan.h>
+#include <memory>
+#include <glm/glm.hpp>
+
 #include "VulkanContext.h"
 #include "VulkanDevice.h"
 #include "VulkanSwapChain.h"
@@ -13,9 +23,19 @@
 #include "VulkanFramebuffer.h"
 #include "VulkanCommandBuffer.h"
 #include "VulkanDepthBuffer.h"
+#include "VulkanDescriptorPool.h"
+#include "VulkanDescriptorSet.h"
 #include "VulkanSyncObjects.h"
+#include "VulkanUniformBuffer.h"
 
 class Window;
+
+struct UniformBufferObject
+{
+    glm::mat4 Model;
+    glm::mat4 View;
+    glm::mat4 Projection;
+};
 
 class VulkanRenderer : public RHIRenderer
 {
@@ -31,16 +51,21 @@ public:
 
     void BeginFrame();
     void EndFrame();
+    void UpdateUniformBuffer();
     void DrawFrame();
 
     bool IsInitialized() const { return m_initialized; }
     
     bool MultiThreadSendToGPU() override { return false; }
     std::unique_ptr<RHITexture> CreateTexture(const ImageLoader::Image& image) override;
+    std::unique_ptr<RHIVertexBuffer> CreateVertexBuffer(const float* data, uint32_t size, uint32_t floatPerVertex) override;
+    std::unique_ptr<RHIIndexBuffer> CreateIndexBuffer(const uint32_t* data, uint32_t size) override;
+
+    void SetModel(const SafePtr<Model>& model);
+    void SetTexture(const SafePtr<Texture>& texture);
 private:
     void RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
     void RecreateSwapChain();
-
 
 private:
     Window* m_window = nullptr;
@@ -56,6 +81,18 @@ private:
     std::unique_ptr<VulkanCommandBuffer> m_commandBuffer;
     std::unique_ptr<VulkanSyncObjects> m_syncObjects;
     std::unique_ptr<VulkanDepthBuffer> m_depthBuffer;
+    std::unique_ptr<VulkanUniformBuffer> m_uniformBuffer;
+    std::unique_ptr<VulkanDescriptorPool> m_descriptorPool;
+    std::unique_ptr<VulkanDescriptorSet> m_descriptorSet;
+    std::unique_ptr<VulkanDescriptorSetLayout> m_descriptorSetLayout;
+    
+    RHIVertexBuffer* m_currentVertexBuffer = nullptr;
+    RHIIndexBuffer* m_currentIndexBuffer = nullptr;
+    RHITexture* m_currentTexture = nullptr;
+    uint32_t m_indexCount = 0;
+    
+    SafePtr<Texture> m_texture;
+    SafePtr<Model> m_model;
 
     static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
     uint32_t m_currentFrame = 0;

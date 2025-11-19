@@ -5,22 +5,10 @@ VulkanDescriptorSetLayout::~VulkanDescriptorSetLayout()
     Cleanup();
 }
 
-void VulkanDescriptorSetLayout::Create(const std::vector<DescriptorBindingInfo>& bindingsInfo)
+void VulkanDescriptorSetLayout::Create(const std::vector<VkDescriptorSetLayoutBinding>& bindingsInfo)
 {
-    Cleanup();
-
-    m_bindings.clear();
-    for (auto& info : bindingsInfo)
-    {
-        VkDescriptorSetLayoutBinding binding{};
-        binding.binding = info.binding;
-        binding.descriptorType = info.type;
-        binding.descriptorCount = info.descriptorCount;
-        binding.stageFlags = info.stageFlags;
-        binding.pImmutableSamplers = nullptr;
-        m_bindings.push_back(binding);
-    }
-
+    m_bindings = bindingsInfo;
+    
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = static_cast<uint32_t>(m_bindings.size());

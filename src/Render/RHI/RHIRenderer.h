@@ -1,10 +1,16 @@
 ﻿#pragma once
 #include <memory>
 
+#include "RHIIndexBuffer.h"
 #include "RHITexture.h"
-#include "Resource/Loader/ImageLoader.h"
+#include "RHIVertexBuffer.h"
 
 class Window;
+
+namespace ImageLoader
+{
+    struct Image;
+}
 
 enum class RenderAPI
 {
@@ -28,7 +34,10 @@ public:
     
     virtual void DrawFrame() = 0;
     virtual bool MultiThreadSendToGPU() = 0;
+    
     virtual std::unique_ptr<RHITexture> CreateTexture(const ImageLoader::Image& image) = 0;
+    virtual std::unique_ptr<RHIVertexBuffer> CreateVertexBuffer(const float* data, uint32_t size, uint32_t floatPerVertex) = 0;
+    virtual std::unique_ptr<RHIIndexBuffer> CreateIndexBuffer(const uint32_t* data, uint32_t size) = 0;
     
 private:
     RenderAPI m_renderAPI;
