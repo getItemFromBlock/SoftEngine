@@ -3,12 +3,15 @@
 #include <stdexcept>
 #include <iostream>
 
+#include "Debug/Log.h"
+
 VulkanDescriptorPool::~VulkanDescriptorPool()
 {
     Cleanup();
 }
 
-bool VulkanDescriptorPool::Initialize(VulkanDevice* device, const std::vector<VkDescriptorPoolSize>& poolSizes, uint32_t maxSets)
+bool VulkanDescriptorPool::Initialize(VulkanDevice* device, const std::vector<VkDescriptorPoolSize>& poolSizes,
+                                      uint32_t maxSets)
 {
     m_device = device;
 
@@ -21,11 +24,11 @@ bool VulkanDescriptorPool::Initialize(VulkanDevice* device, const std::vector<Vk
 
     if (vkCreateDescriptorPool(m_device->GetDevice(), &poolInfo, nullptr, &m_descriptorPool) != VK_SUCCESS)
     {
-        std::cerr << "Failed to create descriptor pool!" << std::endl;
+        PrintError("Failed to create descriptor pool!");
         return false;
     }
 
-    std::cout << "Descriptor pool created successfully!" << std::endl;
+    PrintLog("Descriptor pool created successfully!");
     return true;
 }
 
@@ -35,6 +38,6 @@ void VulkanDescriptorPool::Cleanup()
     {
         vkDestroyDescriptorPool(m_device->GetDevice(), m_descriptorPool, nullptr);
         m_descriptorPool = VK_NULL_HANDLE;
-        std::cout << "Descriptor pool destroyed" << std::endl;
+        PrintLog("Descriptor pool destroyed");
     }
 }

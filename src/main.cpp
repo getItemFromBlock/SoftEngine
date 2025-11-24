@@ -1,6 +1,7 @@
 ﻿#include <iostream>
 
 #include "Core/Window.h"
+#include "Debug/Log.h"
 
 #include "Render/RHI/RHIRenderer.h"
 #include "Render/Vulkan/VulkanRenderer.h"
@@ -40,7 +41,7 @@ int Run(int argc, char** argv, char** envp)
     std::unique_ptr<ResourceManager> resourceManager = std::make_unique<ResourceManager>();
     resourceManager->Initialize(renderer.get());
     SafePtr<Model> cubeModel = resourceManager->Load<Model>("resources/models/Cube.obj");
-    SafePtr<Texture> debugTexture = resourceManager->Load<Texture>("resources/textures/debug.jpeg");
+    // SafePtr<Texture> debugTexture = resourceManager->Load<Texture>("resources/textures/debug.jpeg");
 
     // window->SetVSync(true);
     // window->SetMouseCursorType(CursorType::Hand);

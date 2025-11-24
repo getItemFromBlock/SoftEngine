@@ -6,6 +6,7 @@
 #include <algorithm>
 
 #include "VulkanCommandBuffer.h"
+#include "Debug/Log.h"
 
 VulkanDepthBuffer::~VulkanDepthBuffer()
 {
@@ -34,12 +35,12 @@ bool VulkanDepthBuffer::Initialize(VulkanDevice* device, VkExtent2D extent)
         m_depthImageView = CreateImageView(device, m_depthImage, m_depthFormat,
                                           VK_IMAGE_ASPECT_DEPTH_BIT);
 
-        std::cout << "Depth buffer initialized successfully!" << std::endl;
+        PrintLog("Depth buffer initialized successfully!");
         return true;
     }
     catch (const std::exception& e)
     {
-        std::cerr << "Failed to initialize depth buffer: " << e.what() << std::endl;
+        PrintError("Failed to initialize depth buffer: %s", e.what());
         Cleanup();
         return false;
     }

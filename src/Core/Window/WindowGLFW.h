@@ -22,6 +22,7 @@ public:
     WindowGLFW() = default;
     ~WindowGLFW() override;
 
+    bool InitializeAPI() override;
     bool Initialize(RenderAPI renderAPI, const WindowConfig& config) override;
     void PollEvents() override;
     void Terminate() override;

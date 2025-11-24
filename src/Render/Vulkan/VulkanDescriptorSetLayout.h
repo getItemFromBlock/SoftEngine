@@ -13,7 +13,7 @@ public:
 
     ~VulkanDescriptorSetLayout();
 
-    void Create(const std::vector<VkDescriptorSetLayoutBinding>& bindingsInfo);
+    void Create(VkDevice device, const std::vector<VkDescriptorSetLayoutBinding>& bindingsInfo);
 
     void Cleanup();
 

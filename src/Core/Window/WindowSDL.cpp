@@ -4,32 +4,41 @@
 #include <filesystem>
 #include <iostream>
 
+#include "Debug/Log.h"
 #include "Resource/Loader/ImageLoader.h"
 
 #ifdef RENDER_API_VULKAN
 #include <SDL2/SDL_vulkan.h>
 #endif
 
+#include <SDL2/SDL_syswm.h>
+
 WindowSDL::~WindowSDL()
 {
     Terminate();
+}
+
+bool WindowSDL::InitializeAPI()
+{
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) < 0)
+    {
+        PrintError("Failed to initialize SDL: %s", SDL_GetError());
+        return false;
+    }
+    else
+    {
+        SDL_version version;
+        SDL_GetVersion(&version);
+        PrintLog("SDL version: %d.%d.%d", static_cast<int>(version.major), static_cast<int>(version.minor), static_cast<int>(version.patch));
+    }
+    return true;
 }
 
 bool WindowSDL::Initialize(RenderAPI renderAPI, const WindowConfig& config)
 {
     if (s_windowCount == 0)
     {
-        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) < 0)
-        {
-            std::cerr << "Failed to initialize SDL: " << SDL_GetError() << std::endl;
-            return false;
-        }
-        else
-        {
-            SDL_version version;
-            SDL_GetVersion(&version);
-            std::cout << "SDL version: " << static_cast<int>(version.major) << "." << static_cast<int>(version.minor) << "." << static_cast<int>(version.patch) << std::endl;
-        }
+        InitializeAPI();
     }
 
     Uint32 windowFlags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE;
@@ -48,7 +57,6 @@ bool WindowSDL::Initialize(RenderAPI renderAPI, const WindowConfig& config)
             windowFlags |= SDL_WINDOW_VULKAN;
             break;
         case RenderAPI::DirectX:
-            // DirectX typically requires platform-specific setup
             break;
         default:
             break;
@@ -65,8 +73,9 @@ bool WindowSDL::Initialize(RenderAPI renderAPI, const WindowConfig& config)
 
     if (!p_windowHandle)
     {
-        std::cerr << "Failed to create SDL window: " << SDL_GetError() << std::endl;
-        if (s_windowCount == 0) SDL_Quit();
+        PrintError("Failed to create SDL windows: ", SDL_GetError());
+        if (s_windowCount == 0) 
+            SDL_Quit();
         return false;
     }
 
@@ -77,11 +86,12 @@ bool WindowSDL::Initialize(RenderAPI renderAPI, const WindowConfig& config)
         m_glContext = SDL_GL_CreateContext(GetHandle());
         if (!m_glContext)
         {
-            std::cerr << "Failed to create OpenGL context: " << SDL_GetError() << std::endl;
+            PrintError("Failed to create OpenGL context: ", SDL_GetError());
             SDL_DestroyWindow(GetHandle());
             p_windowHandle = nullptr;
             s_windowCount--;
-            if (s_windowCount == 0) SDL_Quit();
+            if (s_windowCount == 0) 
+                SDL_Quit();
             return false;
         }
         SDL_GL_MakeCurrent(GetHandle(), m_glContext);
@@ -124,7 +134,7 @@ VkSurfaceKHR WindowSDL::CreateSurface(VkInstance instance)
     VkSurfaceKHR surface;
     if (!SDL_Vulkan_CreateSurface(GetHandle(), instance, &surface))
     {
-        throw std::runtime_error("Failed to create Vulkan surface with SDL2!");
+        PrintError("Failed to create Vulkan surface with SDL2!");
     }
     return surface;
 }
@@ -176,7 +186,7 @@ void WindowSDL::SetIcon(const std::filesystem::path& icon)
     ImageLoader::Image image;
     if (!ImageLoader::Load(icon.generic_string(), image))
     {
-        std::cerr << "Failed to load icon " << icon.generic_string() << std::endl;
+        PrintError("Failed to load icon %s", icon.generic_string().c_str());
         return;
     }
     
@@ -210,7 +220,7 @@ void WindowSDL::SetVSync(bool enabled)
     }
     else
     {
-        std::cerr << "VSync is not supported for this render API" << std::endl;
+        PrintWarning("VSync is not supported for this render API");
     }
 }
 
@@ -328,7 +338,9 @@ std::vector<const char*> WindowSDL::GetRequiredExtensions() const
 
 void* WindowSDL::GetNativeHandle() const
 {
-    throw std::runtime_error("Not implemented");
+    SDL_SysWMinfo wmInfo;
+    SDL_GetWindowWMInfo(static_cast<SDL_Window*>(p_windowHandle), &wmInfo);
+    return wmInfo.info.win.window;
 }
 
 void WindowSDL::PollEvents()

@@ -33,10 +33,8 @@ private:
         VkDebugUtilsMessageTypeFlagsEXT messageType,
         const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
         void* pUserData);
-    
-    void LogError(const std::string& message) const;
-    void LogInfo(const std::string& message) const;
-    std::string VkResultToString(VkResult result) const;
+
+    static const char* VkResultToString(VkResult result);
 
     bool CreateDebugMessenger();
     void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo) const;

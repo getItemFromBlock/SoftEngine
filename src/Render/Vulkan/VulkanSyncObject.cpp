@@ -6,6 +6,8 @@
 #include <stdexcept>
 #include <string>
 
+#include "Debug/Log.h"
+
 VulkanSyncObjects::~VulkanSyncObjects()
 {
     Cleanup();
@@ -62,12 +64,12 @@ bool VulkanSyncObjects::Initialize(VulkanDevice* device, uint32_t maxFramesInFli
             }
         }
 
-        std::cout << "Created synchronization objects for " << maxFramesInFlight << " frames" << std::endl;
+        PrintLog("Created synchronization objects for %d frames", maxFramesInFlight);
         return true;
     }
     catch (const std::exception& e)
     {
-        std::cerr << "Sync objects initialization failed: " << e.what() << std::endl;
+        PrintError("Sync objects initialization failed: %s", e.what());
         Cleanup();
         return false;
     }

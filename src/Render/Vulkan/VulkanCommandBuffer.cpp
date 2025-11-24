@@ -6,6 +6,8 @@
 #include <stdexcept>
 #include <string>
 
+#include "Debug/Log.h"
+
 VulkanCommandBuffer::~VulkanCommandBuffer()
 {
     Cleanup();
@@ -15,7 +17,7 @@ bool VulkanCommandBuffer::Initialize(VulkanDevice* device, uint32_t imageCount)
 {
     if (!device || imageCount == 0)
     {
-        std::cerr << "Invalid parameters for command buffer initialization!" << std::endl;
+        PrintError("Invalid parameters for command buffer initialization!");
         return false;
     }
 
@@ -55,12 +57,12 @@ bool VulkanCommandBuffer::Initialize(VulkanDevice* device, uint32_t imageCount)
                                      std::to_string(result));
         }
 
-        std::cout << "Created command pool and allocated " << imageCount << " command buffers" << std::endl;
+        PrintLog("Created command pool and allocated %d command buffers", imageCount);
         return true;
     }
     catch (const std::exception& e)
     {
-        std::cerr << "Command buffer initialization failed: " << e.what() << std::endl;
+        PrintError("Command buffer initialization failed: %s", e.what());
         Cleanup();
         return false;
     }

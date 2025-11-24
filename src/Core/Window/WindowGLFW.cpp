@@ -4,6 +4,7 @@
 #include <iostream>
 #include <GLFW/glfw3native.h>
 
+#include "Debug/Log.h"
 #include "Resource/Loader/ImageLoader.h"
 
 // #define STB_IMAGE_IMPLEMENTATION
@@ -14,22 +15,28 @@ WindowGLFW::~WindowGLFW()
     Terminate();
 }
 
+bool WindowGLFW::InitializeAPI()
+{
+    if (!glfwInit())
+    {
+        PrintError("Failed to initialize GLFW");
+        return false;
+    }
+    else
+    {
+        int major, minor, rev;
+        glfwGetVersion(&major, &minor, &rev);
+        PrintLog("GLFW version: %d.%d.%d", major, minor, rev);
+    }
+    glfwSetErrorCallback(ErrorCallback);
+    return true;
+}
+
 bool WindowGLFW::Initialize(RenderAPI renderAPI, const WindowConfig& config)
 {
     if (s_windowCount == 0)
     {
-        if (!glfwInit())
-        {
-            std::cerr << "Failed to initialize GLFW" << std::endl;
-            return false;
-        }
-        else
-        {
-            int major, minor, rev;
-            glfwGetVersion(&major, &minor, &rev);
-            std::cout << "GLFW version: " << major << "." << minor << "." << rev << std::endl;
-        }
-        glfwSetErrorCallback(ErrorCallback);
+        InitializeAPI();
     }
 
     // Configure GLFW based on render API
@@ -56,8 +63,9 @@ bool WindowGLFW::Initialize(RenderAPI renderAPI, const WindowConfig& config)
     p_windowHandle = glfwCreateWindow(config.size.x, config.size.y, config.title.c_str(), nullptr, nullptr);
     if (!p_windowHandle)
     {
-        std::cerr << "Failed to create GLFW window" << std::endl;
-        if (s_windowCount == 0) glfwTerminate();
+        PrintError("Failed to create GLFW window");
+        if (s_windowCount == 0) 
+            glfwTerminate();
         return false;
     }
 
@@ -115,7 +123,7 @@ VkSurfaceKHR WindowGLFW::CreateSurface(VkInstance instance)
     VkSurfaceKHR surface;
     if (glfwCreateWindowSurface(instance, GetHandle(), nullptr, &surface) != VK_SUCCESS)
     {
-        throw std::runtime_error("Failed to create Vulkan surface with GLFW!");
+        PrintError("Failed to create window surface");
     }
     return surface;
 }
@@ -173,7 +181,7 @@ void WindowGLFW::SetIcon(const std::filesystem::path& icon)
     ImageLoader::Image image;
     if (!ImageLoader::Load(icon.generic_string(), image))
     {
-        std::cerr << "Failed to load icon " << icon.generic_string() << std::endl;
+        PrintError("Failed to load icon %s", icon.generic_string().c_str());
         return;
     }
 
@@ -190,7 +198,7 @@ void WindowGLFW::SetVSync(bool enabled)
 {
     if (p_renderAPI == RenderAPI::Vulkan)
     {
-        std::cerr << "VSync is not supported for Vulkan" << std::endl;
+        PrintWarning("VSync is not supported for Vulkan");
         return;
     }
     m_vsync = enabled;
@@ -306,7 +314,7 @@ std::vector<const char*> WindowGLFW::GetRequiredExtensions() const
 
 void WindowGLFW::ErrorCallback(int error, const char* description)
 {
-    std::cerr << "GLFW Error (" << error << "): " << description << std::endl;
+    PrintError("GLFW Error (%d): %s", error, description);
 }
 
 void WindowGLFW::FramebufferSizeCallback(GLFWwindow* window, int width, int height)

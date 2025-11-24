@@ -8,6 +8,8 @@
 #include <limits>
 #include <stdexcept>
 
+#include "Debug/Log.h"
+
 VulkanSwapChain::~VulkanSwapChain()
 {
     Cleanup();
@@ -59,11 +61,11 @@ void VulkanSwapChain::Recreate(Window* window)
     {
         CreateSwapChain(window);
         CreateImageViews();
-        std::cout << "Swap chain recreated successfully" << std::endl;
+        PrintLog("Swap chain recreated successfully");
     }
     catch (const std::exception& e)
     {
-        std::cerr << "Swap chain recreation failed: " << e.what() << std::endl;
+        PrintError("Swap chain recreation failed: %s", e.what());
         throw;
     }
 }

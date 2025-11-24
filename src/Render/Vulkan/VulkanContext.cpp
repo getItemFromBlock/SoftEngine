@@ -8,6 +8,8 @@
 #include <string>
 #include <algorithm>
 
+#include "Debug/Log.h"
+
 VulkanContext::~VulkanContext()
 {
     Cleanup();
@@ -17,7 +19,7 @@ bool VulkanContext::Initialize(Window* window)
 {
     if (!window)
     {
-        LogError("Invalid window pointer!");
+        PrintError("Invalid window pointer!");
         return false;
     }
 
@@ -41,12 +43,12 @@ bool VulkanContext::Initialize(Window* window)
             return false;
         }
 
-        LogInfo("Vulkan context initialized successfully");
+        PrintLog("Vulkan context initialized successfully");
         return true;
     }
     catch (const std::exception& e)
     {
-        LogError(std::string("VulkanContext initialization failed: ") + e.what());
+        PrintError("VulkanContext initialization failed: %s", e.what());
         Cleanup();
         return false;
     }
@@ -68,10 +70,10 @@ bool VulkanContext::CreateInstance(Window* window)
 {
     if (m_enableValidationLayers && !CheckValidationLayerSupport())
     {
-        LogError("Validation layers requested, but not available!");
+        PrintError("Validation layers requested, but not available!");
         return false;
     }
-    
+
     std::string appName = window->GetTitle();
 
     VkApplicationInfo appInfo{};
@@ -87,10 +89,10 @@ bool VulkanContext::CreateInstance(Window* window)
     createInfo.pApplicationInfo = &appInfo;
 
     std::vector<const char*> extensions = GetRequiredExtensions(window);
-    
+
     if (!CheckExtensionSupport(extensions))
     {
-        LogError("Required Vulkan extensions not available!");
+        PrintError("Required Vulkan extensions not available!");
         return false;
     }
 
@@ -119,7 +121,7 @@ bool VulkanContext::CreateInstance(Window* window)
     VkResult result = vkCreateInstance(&createInfo, nullptr, &m_instance);
     if (result != VK_SUCCESS)
     {
-        LogError("Failed to create Vulkan instance! Error code: " + VkResultToString(result));
+        PrintError("Failed to create Vulkan instance! Error code: %s", VkResultToString(result));
         return false;
     }
 
@@ -130,7 +132,7 @@ bool VulkanContext::CreateSurface(Window* window)
 {
     if (m_instance == VK_NULL_HANDLE)
     {
-        LogError("Cannot create surface: instance is null!");
+        PrintError("Cannot create surface: instance is null!");
         return false;
     }
 
@@ -138,7 +140,7 @@ bool VulkanContext::CreateSurface(Window* window)
 
     if (m_surface == VK_NULL_HANDLE)
     {
-        LogError("Failed to create Vulkan surface!");
+        PrintError("Failed to create Vulkan surface!");
         return false;
     }
 
@@ -157,17 +159,17 @@ bool VulkanContext::CreateDebugMessenger()
 
     auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
         vkGetInstanceProcAddr(m_instance, "vkCreateDebugUtilsMessengerEXT"));
-    
+
     if (!func)
     {
-        LogError("Failed to load vkCreateDebugUtilsMessengerEXT function!");
+        PrintError("Failed to load vkCreateDebugUtilsMessengerEXT function!");
         return false;
     }
 
     VkResult result = func(m_instance, &createInfo, nullptr, &m_debugMessenger);
     if (result != VK_SUCCESS)
     {
-        LogError("Failed to set up debug messenger! Error code: " + VkResultToString(result));
+        PrintError("Failed to set up debug messenger! Error code: %s", VkResultToString(result));
         return false;
     }
 
@@ -190,7 +192,7 @@ void VulkanContext::DestroyDebugMessenger()
 
     auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
         vkGetInstanceProcAddr(m_instance, "vkDestroyDebugUtilsMessengerEXT"));
-    
+
     if (func != nullptr)
     {
         func(m_instance, m_debugMessenger, nullptr);
@@ -209,7 +211,7 @@ std::vector<const char*> VulkanContext::GetRequiredExtensions(Window* window) co
     {
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
-    
+
     return extensions;
 }
 
@@ -220,7 +222,7 @@ bool VulkanContext::CheckExtensionSupport(const std::vector<const char*>& requir
 
     if (extensionCount == 0)
     {
-        LogError("No Vulkan extensions available!");
+        PrintError("No Vulkan extensions available!");
         return false;
     }
 
@@ -229,14 +231,15 @@ bool VulkanContext::CheckExtensionSupport(const std::vector<const char*>& requir
 
     for (const char* required : requiredExtensions)
     {
-        bool found = std::any_of(availableExtensions.begin(), availableExtensions.end(),
-            [required](const VkExtensionProperties& ext) {
-                return strcmp(required, ext.extensionName) == 0;
-            });
-        
+        bool found = std::ranges::any_of(availableExtensions,
+                                         [required](const VkExtensionProperties& ext)
+                                         {
+                                             return strcmp(required, ext.extensionName) == 0;
+                                         });
+
         if (!found)
         {
-            LogError(std::string("Required extension not available: ") + required);
+            PrintError((std::string("Required extension not available: ") + required).c_str());
             return false;
         }
     }
@@ -260,16 +263,17 @@ bool VulkanContext::CheckValidationLayerSupport() const
     for (const char* layerName : m_validationLayers)
     {
         bool layerFound = std::any_of(availableLayers.begin(), availableLayers.end(),
-            [layerName](const VkLayerProperties& layer) {
-                return strcmp(layerName, layer.layerName) == 0;
-            });
-        
+                                      [layerName](const VkLayerProperties& layer)
+                                      {
+                                          return strcmp(layerName, layer.layerName) == 0;
+                                      });
+
         if (!layerFound)
         {
             return false;
         }
     }
-    
+
     return true;
 }
 
@@ -293,68 +297,54 @@ VkBool32 VulkanContext::DebugCallback(
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
     void* pUserData)
 {
-    (void)messageType;
-    (void)pUserData;
-    
-    const char* severityStr = "";
+    UNUSED(messageType);
+    UNUSED(pUserData);
+
     if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
     {
-        severityStr = "[ERROR] ";
+        PrintError("Validation layer: %s", pCallbackData->pMessage);
     }
     else if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
     {
-        severityStr = "[WARNING] ";
+        PrintWarning("Validation layer: %s", pCallbackData->pMessage);
     }
     else if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
     {
-        severityStr = "[INFO] ";
+        PrintLog("Validation layer: %s", pCallbackData->pMessage);
     }
 
-    std::cerr << severityStr << "Validation layer: " << pCallbackData->pMessage << std::endl;
-    
     return VK_FALSE;
 }
 
-// Private helper methods
-void VulkanContext::LogError(const std::string& message) const
-{
-    std::cerr << "[VulkanContext ERROR] " << message << std::endl;
-}
-
-void VulkanContext::LogInfo(const std::string& message) const
-{
-    std::cout << "[VulkanContext INFO] " << message << std::endl;
-}
-
-std::string VulkanContext::VkResultToString(VkResult result) const
+const char* VulkanContext::VkResultToString(VkResult result)
 {
     switch (result)
     {
-        case VK_SUCCESS: return "VK_SUCCESS";
-        case VK_NOT_READY: return "VK_NOT_READY";
-        case VK_TIMEOUT: return "VK_TIMEOUT";
-        case VK_EVENT_SET: return "VK_EVENT_SET";
-        case VK_EVENT_RESET: return "VK_EVENT_RESET";
-        case VK_INCOMPLETE: return "VK_INCOMPLETE";
-        case VK_ERROR_OUT_OF_HOST_MEMORY: return "VK_ERROR_OUT_OF_HOST_MEMORY";
-        case VK_ERROR_OUT_OF_DEVICE_MEMORY: return "VK_ERROR_OUT_OF_DEVICE_MEMORY";
-        case VK_ERROR_INITIALIZATION_FAILED: return "VK_ERROR_INITIALIZATION_FAILED";
-        case VK_ERROR_DEVICE_LOST: return "VK_ERROR_DEVICE_LOST";
-        case VK_ERROR_MEMORY_MAP_FAILED: return "VK_ERROR_MEMORY_MAP_FAILED";
-        case VK_ERROR_LAYER_NOT_PRESENT: return "VK_ERROR_LAYER_NOT_PRESENT";
-        case VK_ERROR_EXTENSION_NOT_PRESENT: return "VK_ERROR_EXTENSION_NOT_PRESENT";
-        case VK_ERROR_FEATURE_NOT_PRESENT: return "VK_ERROR_FEATURE_NOT_PRESENT";
-        case VK_ERROR_INCOMPATIBLE_DRIVER: return "VK_ERROR_INCOMPATIBLE_DRIVER";
-        case VK_ERROR_TOO_MANY_OBJECTS: return "VK_ERROR_TOO_MANY_OBJECTS";
-        case VK_ERROR_FORMAT_NOT_SUPPORTED: return "VK_ERROR_FORMAT_NOT_SUPPORTED";
-        case VK_ERROR_FRAGMENTED_POOL: return "VK_ERROR_FRAGMENTED_POOL";
-        case VK_ERROR_SURFACE_LOST_KHR: return "VK_ERROR_SURFACE_LOST_KHR";
-        case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR: return "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR";
-        case VK_SUBOPTIMAL_KHR: return "VK_SUBOPTIMAL_KHR";
-        case VK_ERROR_OUT_OF_DATE_KHR: return "VK_ERROR_OUT_OF_DATE_KHR";
-        case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR: return "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR";
-        case VK_ERROR_VALIDATION_FAILED_EXT: return "VK_ERROR_VALIDATION_FAILED_EXT";
-        case VK_ERROR_INVALID_SHADER_NV: return "VK_ERROR_INVALID_SHADER_NV";
-        default: return "UNKNOWN_ERROR (" + std::to_string(result) + ")";
+    case VK_SUCCESS: return "VK_SUCCESS";
+    case VK_NOT_READY: return "VK_NOT_READY";
+    case VK_TIMEOUT: return "VK_TIMEOUT";
+    case VK_EVENT_SET: return "VK_EVENT_SET";
+    case VK_EVENT_RESET: return "VK_EVENT_RESET";
+    case VK_INCOMPLETE: return "VK_INCOMPLETE";
+    case VK_ERROR_OUT_OF_HOST_MEMORY: return "VK_ERROR_OUT_OF_HOST_MEMORY";
+    case VK_ERROR_OUT_OF_DEVICE_MEMORY: return "VK_ERROR_OUT_OF_DEVICE_MEMORY";
+    case VK_ERROR_INITIALIZATION_FAILED: return "VK_ERROR_INITIALIZATION_FAILED";
+    case VK_ERROR_DEVICE_LOST: return "VK_ERROR_DEVICE_LOST";
+    case VK_ERROR_MEMORY_MAP_FAILED: return "VK_ERROR_MEMORY_MAP_FAILED";
+    case VK_ERROR_LAYER_NOT_PRESENT: return "VK_ERROR_LAYER_NOT_PRESENT";
+    case VK_ERROR_EXTENSION_NOT_PRESENT: return "VK_ERROR_EXTENSION_NOT_PRESENT";
+    case VK_ERROR_FEATURE_NOT_PRESENT: return "VK_ERROR_FEATURE_NOT_PRESENT";
+    case VK_ERROR_INCOMPATIBLE_DRIVER: return "VK_ERROR_INCOMPATIBLE_DRIVER";
+    case VK_ERROR_TOO_MANY_OBJECTS: return "VK_ERROR_TOO_MANY_OBJECTS";
+    case VK_ERROR_FORMAT_NOT_SUPPORTED: return "VK_ERROR_FORMAT_NOT_SUPPORTED";
+    case VK_ERROR_FRAGMENTED_POOL: return "VK_ERROR_FRAGMENTED_POOL";
+    case VK_ERROR_SURFACE_LOST_KHR: return "VK_ERROR_SURFACE_LOST_KHR";
+    case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR: return "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR";
+    case VK_SUBOPTIMAL_KHR: return "VK_SUBOPTIMAL_KHR";
+    case VK_ERROR_OUT_OF_DATE_KHR: return "VK_ERROR_OUT_OF_DATE_KHR";
+    case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR: return "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR";
+    case VK_ERROR_VALIDATION_FAILED_EXT: return "VK_ERROR_VALIDATION_FAILED_EXT";
+    case VK_ERROR_INVALID_SHADER_NV: return "VK_ERROR_INVALID_SHADER_NV";
+    default: return ("UNKNOWN_ERROR (" + std::to_string(result) + ")").c_str();
     }
 }

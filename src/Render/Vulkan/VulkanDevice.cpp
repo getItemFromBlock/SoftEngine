@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <string>
 
+#include "Debug/Log.h"
+
 VulkanDevice::~VulkanDevice()
 {
     Cleanup();
@@ -145,7 +147,7 @@ bool VulkanDevice::PickPhysicalDevice(VkInstance instance, VkSurfaceKHR surface)
     
     VkPhysicalDeviceProperties deviceProperties;
     vkGetPhysicalDeviceProperties(m_physicalDevice, &deviceProperties);
-    std::cout << "Using GPU: " << deviceProperties.deviceName << std::endl;
+    PrintLog("Using GPU: %s", deviceProperties.deviceName);
 
     m_queueFamilies = FindQueueFamilies(m_physicalDevice, surface);
 

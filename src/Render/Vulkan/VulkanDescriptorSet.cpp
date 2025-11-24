@@ -5,6 +5,8 @@
 #include <stdexcept>
 #include <iostream>
 
+#include "Debug/Log.h"
+
 VulkanDescriptorSet::~VulkanDescriptorSet()
 {
     Cleanup();
@@ -26,11 +28,11 @@ bool VulkanDescriptorSet::Initialize(VulkanDevice* device, VkDescriptorPool pool
 
     if (vkAllocateDescriptorSets(m_device->GetDevice(), &allocInfo, m_descriptorSets.data()) != VK_SUCCESS)
     {
-        std::cerr << "Failed to allocate descriptor sets!" << std::endl;
+        PrintError("Failed to allocate descriptor sets!");
         return false;
     }
 
-    std::cout << "Descriptor sets allocated successfully! Count: " << count << std::endl;
+    PrintLog("Descriptor sets allocated successfully! Count: %d", count);
     return true;
 }
 
@@ -52,29 +54,26 @@ void VulkanDescriptorSet::UpdateDescriptorSet(uint32_t index, VulkanUniformBuffe
     std::vector<VkWriteDescriptorSet> descriptorWrites;
 
     // Update uniform buffer descriptor
-    for (size_t i = 0; i < uniformBuffer->GetFrameCount(); i++)
-    {
-        VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = uniformBuffer->GetBuffer(i);
-        bufferInfo.offset = 0;
-        bufferInfo.range = uniformBuffer->GetSize();
+    VkDescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = uniformBuffer->GetBuffer(index);
+    bufferInfo.offset = 0;
+    bufferInfo.range = uniformBuffer->GetSize();
 
-        VkWriteDescriptorSet uniformWrite{};
-        uniformWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        uniformWrite.dstSet = m_descriptorSets[index];
-        uniformWrite.dstBinding = 0;
-        uniformWrite.dstArrayElement = 0;
-        uniformWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        uniformWrite.descriptorCount = 1;
-        uniformWrite.pBufferInfo = &bufferInfo;
+    VkWriteDescriptorSet uniformWrite{};
+    uniformWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    uniformWrite.dstSet = m_descriptorSets[index];
+    uniformWrite.dstBinding = 0;
+    uniformWrite.dstArrayElement = 0;
+    uniformWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uniformWrite.descriptorCount = 1;
+    uniformWrite.pBufferInfo = &bufferInfo;
 
-        descriptorWrites.push_back(uniformWrite);
-    }
+    descriptorWrites.push_back(uniformWrite);
 
-    // Update texture sampler descriptor
+    // Update texture sampler descriptor (if provided)
+    VkDescriptorImageInfo imageInfo{};
     if (texture)
     {
-        VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imageInfo.imageView = texture->GetImageView();
         imageInfo.sampler = texture->GetSampler();

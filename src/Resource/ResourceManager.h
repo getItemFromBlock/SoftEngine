@@ -4,6 +4,7 @@
 
 #include "Core/UUID.h"
 #include "Core/ThreadPool.h"
+#include "Debug/Log.h"
 #include "Render/RHI/RHIRenderer.h"
 
 #include "Utils/Type.h"
@@ -102,7 +103,7 @@ public:
             {
                 if (it->second->SendToGPU(m_renderer))
                 {
-                    std::cout << "Resource sent to GPU: " << it->second->GetPath() << '\n';
+                    PrintLog("Resource sent to GPU: %s", it->second->GetPath().generic_string().c_str());
                     it->second->SetSentToGPU();
                 }
             }

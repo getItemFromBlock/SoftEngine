@@ -7,6 +7,7 @@
 #include <array>
 
 #include "VulkanDepthBuffer.h"
+#include "Debug/Log.h"
 
 VulkanRenderPass::~VulkanRenderPass()
 {
@@ -81,12 +82,12 @@ bool VulkanRenderPass::Initialize(VulkanDevice* device, VkFormat swapChainImageF
             throw std::runtime_error("failed to create render pass!");
         }
 
-        std::cout << "Render pass created successfully" << std::endl;
+        PrintLog("Render pass created successfully");
         return true;
     }
     catch (const std::exception& e)
     {
-        std::cerr << "Render pass initialization failed: " << e.what() << std::endl;
+        PrintError("Render pass initialization failed: %s", e.what());
         return false;
     }
 }

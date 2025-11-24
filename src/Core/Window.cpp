@@ -1,4 +1,6 @@
 ﻿#include "Window.h"
+
+#include "Debug/Log.h"
 #include "Window/WindowGLFW.h"
 #include "Window/WindowSDL.h"
 
@@ -27,11 +29,28 @@ std::unique_ptr<Window> Window::Create(WindowAPI windowAPI, RenderAPI renderAPI,
     
     if (window && window->Initialize(renderAPI, config))
     {
-        std::cout << "Window created successfully" << std::endl;
+        PrintLog("Window created successfully");
         return window;
     }
     
     return nullptr;
+}
+
+std::unique_ptr<Window> Window::Create(const WindowConfig& config)
+{
+#ifndef RENDER_API_VULKAN
+    RenderAPI renderAPI = RenderAPI::OpenGL;
+#else
+    RenderAPI renderAPI = RenderAPI::Vulkan;
+#endif
+    
+#ifdef WINDOW_API_GLFW
+    WindowAPI windowAPI = WindowAPI::GLFW;
+#else
+    WindowAPI windowAPI = WindowAPI::SDL;
+#endif
+    
+    return Create(windowAPI, renderAPI, config);
 }
 
 void Window::SetMouseCursorPosition(const Vec2i& position, CoordinateSpace space)

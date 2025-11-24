@@ -4,6 +4,8 @@
 #include "ResourceManager.h"
 #include "Loader/OBJLoader.h"
 
+#include "Debug/Log.h"
+
 bool Model::Load(ResourceManager* resourceManager)
 {
     if (p_path.extension() == ".obj")
@@ -11,7 +13,7 @@ bool Model::Load(ResourceManager* resourceManager)
         OBJLoader::Model model;
         if (!OBJLoader::Load(p_path, model))
         {
-            throw std::runtime_error("Failed to load model");
+            PrintError("Failed to load model %s", p_path.filename().generic_string().c_str());
             return false;
         }
         
@@ -31,17 +33,19 @@ bool Model::Load(ResourceManager* resourceManager)
             meshResource->SetLoaded();
             resourceManager->AddResourceToSend(meshResource.get().get());
         } 
+        PrintLog("Model %s successfully loaded", GetPath().filename().generic_string().c_str());
         return true;
     }
     else
     {
-        throw std::runtime_error("Unsupported file format" + p_path.extension().generic_string());
+        PrintError("Unsupported file format %s", p_path.extension().generic_string().c_str());
         return false;
     }
 }
 
 bool Model::SendToGPU(RHIRenderer* renderer)
 {
+    UNUSED(renderer);
     return true;
 }
 

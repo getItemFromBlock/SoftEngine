@@ -1,14 +1,16 @@
 #include "Texture.h"
 
+#include "Debug/Log.h"
 #include "Loader/ImageLoader.h"
 #include "Render/RHI/RHIRenderer.h"
 
 bool Texture::Load(ResourceManager* resourceManager)
 {    
+    UNUSED(resourceManager);
     m_image = ImageLoader::Image();
     if (!ImageLoader::Load(p_path, m_image))
     {
-        throw std::runtime_error("Failed to load image " + p_path.string());
+        PrintError("Failed to load image %s", p_path.generic_string().c_str());
         return false;
     }
     return true;

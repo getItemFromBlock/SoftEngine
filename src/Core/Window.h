@@ -38,6 +38,9 @@ public:
     virtual ~Window() = default;
 
     static std::unique_ptr<Window> Create(WindowAPI windowAPI, RenderAPI renderAPI, const WindowConfig& config);
+    static std::unique_ptr<Window> Create(const WindowConfig& config);
+    
+    virtual bool InitializeAPI() = 0;
     
     virtual bool Initialize(RenderAPI renderAPI, const WindowConfig& config) = 0;
     virtual void PollEvents() = 0;

@@ -26,6 +26,7 @@
 #include "VulkanIndexBuffer.h"
 #include "VulkanTexture.h"
 #include "VulkanVertexBuffer.h"
+#include "Debug/Log.h"
 #include "Resource/Mesh.h"
 #include "Resource/Model.h"
 #include "Resource/Texture.h"
@@ -37,7 +38,7 @@ bool VulkanRenderer::Initialize(Window* window)
 {
     if (!window)
     {
-        std::cerr << "Invalid window pointer!" << std::endl;
+        PrintError("Invalid window pointer");
         return false;
     }
 
@@ -48,28 +49,28 @@ bool VulkanRenderer::Initialize(Window* window)
         m_context = std::make_unique<VulkanContext>();
         if (!m_context->Initialize(window))
         {
-            std::cerr << "Failed to initialize Vulkan context!" << std::endl;
+            PrintError("Failed to initialize Vulkan context!");
             return false;
         }
 
         m_device = std::make_unique<VulkanDevice>();
         if (!m_device->Initialize(m_context->GetInstance(), m_context->GetSurface()))
         {
-            std::cerr << "Failed to initialize Vulkan device!" << std::endl;
+            PrintError("Failed to initialize Vulkan device!");
             return false;
         }
 
         m_swapChain = std::make_unique<VulkanSwapChain>();
         if (!m_swapChain->Initialize(m_device.get(), m_context->GetSurface(), window))
         {
-            std::cerr << "Failed to initialize swap chain!" << std::endl;
+            PrintError("Failed to initialize swap chain!");
             return false;
         }
 
         m_renderPass = std::make_unique<VulkanRenderPass>();
         if (!m_renderPass->Initialize(m_device.get(), m_swapChain->GetImageFormat()))
         {
-            std::cerr << "Failed to initialize render pass!" << std::endl;
+            PrintError("Failed to initialize render pass!");
             return false;
         }
 
@@ -87,9 +88,8 @@ bool VulkanRenderer::Initialize(Window* window)
         samplerLayoutBinding.pImmutableSamplers = nullptr;
         samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        m_descriptorSetLayout = std::make_unique<VulkanDescriptorSetLayout>(
-            m_device->GetDevice());
-        m_descriptorSetLayout->Create({uboLayoutBinding, samplerLayoutBinding});
+        m_descriptorSetLayout = std::make_unique<VulkanDescriptorSetLayout>(m_device->GetDevice());
+        m_descriptorSetLayout->Create(m_device->GetDevice(), {uboLayoutBinding, samplerLayoutBinding});
 
         m_pipeline = std::make_unique<VulkanPipeline>();
         if (!m_pipeline->Initialize(m_device.get(), m_renderPass->GetRenderPass(),
@@ -98,14 +98,14 @@ bool VulkanRenderer::Initialize(Window* window)
                                     {m_descriptorSetLayout->GetLayout()},
                                     {uboLayoutBinding, samplerLayoutBinding}))
         {
-            std::cerr << "Failed to initialize pipeline!" << std::endl;
+            PrintError("Failed to initialize pipeline!");
             return false;
         }
 
         m_depthBuffer = std::make_unique<VulkanDepthBuffer>();
         if (!m_depthBuffer->Initialize(m_device.get(), m_swapChain->GetExtent()))
         {
-            std::cerr << "Failed to initialize depth buffer!" << std::endl;
+            PrintError("Failed to initialize depth buffer!");
             return false;
         }
 
@@ -114,14 +114,14 @@ bool VulkanRenderer::Initialize(Window* window)
                                        m_swapChain->GetImageViews(),
                                        m_swapChain->GetExtent(), m_depthBuffer.get()))
         {
-            std::cerr << "Failed to initialize framebuffers!" << std::endl;
+            PrintError("Failed to initialize framebuffers!");
             return false;
         }
 
         m_uniformBuffer = std::make_unique<VulkanUniformBuffer>();
         if (!m_uniformBuffer->Initialize(m_device.get(), sizeof(UniformBufferObject), MAX_FRAMES_IN_FLIGHT))
         {
-            std::cerr << "Failed to initialize uniform buffer!" << std::endl;
+            PrintError("Failed to initialize uniform buffer!");
             return false;
         }
         m_uniformBuffer->MapAll();
@@ -134,7 +134,7 @@ bool VulkanRenderer::Initialize(Window* window)
         };
         if (!m_descriptorPool->Initialize(m_device.get(), poolSizes, MAX_FRAMES_IN_FLIGHT))
         {
-            std::cerr << "Failed to initialize descriptor pool!" << std::endl;
+            PrintError("Failed to initialize descriptor pool!");
             return false;
         }
 
@@ -144,21 +144,25 @@ bool VulkanRenderer::Initialize(Window* window)
                                          m_pipeline->GetDescriptorSetLayout(),
                                          MAX_FRAMES_IN_FLIGHT))
         {
-            std::cerr << "Failed to initialize descriptor sets!" << std::endl;
+            PrintError("Failed to initialize descriptor sets!");
             return false;
+        }
+        for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        {
+            m_descriptorSet->UpdateDescriptorSet(i, m_uniformBuffer.get(), nullptr);
         }
 
         m_commandBuffer = std::make_unique<VulkanCommandBuffer>();
         if (!m_commandBuffer->Initialize(m_device.get(), MAX_FRAMES_IN_FLIGHT))
         {
-            std::cerr << "Failed to initialize command buffers!" << std::endl;
+            PrintError("Failed to initialize command buffers!");
             return false;
         }
 
         m_syncObjects = std::make_unique<VulkanSyncObjects>();
         if (!m_syncObjects->Initialize(m_device.get(), MAX_FRAMES_IN_FLIGHT))
         {
-            std::cerr << "Failed to initialize sync objects!" << std::endl;
+            PrintError("Failed to initialize sync objects!");
             return false;
         }
 
@@ -169,12 +173,12 @@ bool VulkanRenderer::Initialize(Window* window)
             m_framebufferResized = true;
         });
 
-        std::cout << "Vulkan renderer initialized successfully!" << std::endl;
+        PrintLog("Vulkan renderer initialized successfully!");
         return true;
     }
     catch (const std::exception& e)
     {
-        std::cerr << "Vulkan renderer initialization failed: " << e.what() << std::endl;
+        PrintError("Vulkan renderer initialization failed: %s", e.what());
         Cleanup();
         return false;
     }
@@ -202,7 +206,7 @@ void VulkanRenderer::Cleanup()
     m_context.reset();
 
     m_initialized = false;
-    std::cout << "Vulkan renderer cleaned up" << std::endl;
+   PrintLog("Vulkan renderer cleaned up");
 }
 
 void VulkanRenderer::SetModel(const SafePtr<Model>& model)
@@ -251,6 +255,7 @@ void VulkanRenderer::SetTexture(const SafePtr<Texture>& texture)
             descriptorWrites[1].descriptorCount = 1;
             descriptorWrites[1].pImageInfo = &imageInfo;
 
+            // IMPORTANT: Call vkUpdateDescriptorSets for EACH frame's descriptor set
             vkUpdateDescriptorSets(m_device->GetDevice(),
                                    static_cast<uint32_t>(descriptorWrites.size()),
                                    descriptorWrites.data(), 0, nullptr);

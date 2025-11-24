@@ -9,6 +9,7 @@
 #include <string>
 
 #include "VulkanDepthBuffer.h"
+#include "Debug/Log.h"
 
 VulkanFramebuffer::~VulkanFramebuffer()
 {
@@ -53,12 +54,12 @@ bool VulkanFramebuffer::Initialize(VulkanDevice* device, VkRenderPass renderPass
             }
         }
 
-        std::cout << "Created " << m_framebuffers.size() << " framebuffers" << std::endl;
+        PrintLog("Created %d framebuffers", m_framebuffers.size());
         return true;
     }
     catch (const std::exception& e)
     {
-        std::cerr << "Framebuffer initialization failed: " << e.what() << std::endl;
+        PrintError("Framebuffer initialization failed: %s", e.what());
         Cleanup();
         return false;
     }

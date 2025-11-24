@@ -5,8 +5,9 @@ VulkanDescriptorSetLayout::~VulkanDescriptorSetLayout()
     Cleanup();
 }
 
-void VulkanDescriptorSetLayout::Create(const std::vector<VkDescriptorSetLayoutBinding>& bindingsInfo)
+void VulkanDescriptorSetLayout::Create(VkDevice device, const std::vector<VkDescriptorSetLayoutBinding>& bindingsInfo)
 {
+    m_device = device;
     m_bindings = bindingsInfo;
     
     VkDescriptorSetLayoutCreateInfo layoutInfo{};

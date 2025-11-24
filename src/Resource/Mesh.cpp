@@ -1,21 +1,21 @@
 ﻿#include "Mesh.h"
 
+#include "Debug/Log.h"
 #include "Render/RHI/RHIRenderer.h"
 #include "Render/Vulkan/VulkanIndexBuffer.h"
 #include "Render/Vulkan/VulkanVertexBuffer.h"
 
 bool Mesh::Load(ResourceManager* resourceManager)
 {
+    UNUSED(resourceManager);
     return true;
 }
 
 bool Mesh::SendToGPU(RHIRenderer* renderer)
 {
-    // Calculate buffer sizes
-    VkDeviceSize vertexBufferSize = m_vertices.size() * sizeof(float);
-    VkDeviceSize indexBufferSize = m_indices.size() * sizeof(uint32_t);
+    // VkDeviceSize vertexBufferSize = m_vertices.size() * sizeof(float);
+    // VkDeviceSize indexBufferSize = m_indices.size() * sizeof(uint32_t);
     
-    // Create vertex buffer
     uint32_t floatsPerVertex = 11;
     m_vertexBuffer = renderer->CreateVertexBuffer(
         m_vertices.data(), 
@@ -25,7 +25,7 @@ bool Mesh::SendToGPU(RHIRenderer* renderer)
     
     if (!m_vertexBuffer)
     {
-        std::cerr << "Failed to create vertex buffer for mesh!" << std::endl;
+        PrintError("Failed to create vertex buffer for mesh %s", p_path.filename().generic_string().c_str());
         return false;
     }
     
@@ -40,7 +40,7 @@ bool Mesh::SendToGPU(RHIRenderer* renderer)
     
     if (!m_indexBuffer)
     {
-        std::cerr << "Failed to create index buffer for mesh!" << std::endl;
+        PrintError("Failed to create index buffer for mesh %s", p_path.generic_string().c_str());
         m_vertexBuffer.reset();
         return false;
     }
