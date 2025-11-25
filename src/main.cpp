@@ -17,7 +17,7 @@ int Run(int argc, char** argv, char** envp)
     (void)argc;
     (void)argv;
     (void)envp;
-    
+
     WindowConfig config;
     config.title = "Window Test";
     config.size = Vec2i(1280, 720);
@@ -37,33 +37,30 @@ int Run(int argc, char** argv, char** envp)
     }
 
     ThreadPool::Initialize();
-    
+
     std::unique_ptr<ResourceManager> resourceManager = std::make_unique<ResourceManager>();
     resourceManager->Initialize(renderer.get());
     SafePtr<Model> cubeModel = resourceManager->Load<Model>("resources/models/Cube.obj");
-    // SafePtr<Texture> debugTexture = resourceManager->Load<Texture>("resources/textures/debug.jpeg");
+    SafePtr<Texture> debugTexture = resourceManager->Load<Texture>("resources/textures/debug.jpeg");
 
-    // window->SetVSync(true);
-    // window->SetMouseCursorType(CursorType::Hand);
-    
-    static_cast<VulkanRenderer*>(renderer.get())->SetModel(cubeModel);
-    static_cast<VulkanRenderer*>(renderer.get())->SetTexture(debugTexture);
+    dynamic_cast<VulkanRenderer*>(renderer.get())->SetModel(cubeModel);
+    dynamic_cast<VulkanRenderer*>(renderer.get())->SetTexture(debugTexture);
 
     while (!window->ShouldClose())
     {
         window->PollEvents();
-        
+
         resourceManager->UpdateResourceToSend();
 
         renderer->DrawFrame();
     }
 
     ThreadPool::Terminate();
-    
+
     resourceManager->Clear();
-    
+
     renderer->Cleanup();
-    
+
     window->Terminate();
 
     return 0;

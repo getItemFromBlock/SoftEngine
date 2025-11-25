@@ -165,6 +165,7 @@ bool VulkanRenderer::Initialize(Window* window)
             PrintError("Failed to initialize sync objects!");
             return false;
         }
+        m_syncObjects->ResizeRenderFinishedSemaphores(m_swapChain->GetImageCount());
 
         m_initialized = true;
 
@@ -217,50 +218,6 @@ void VulkanRenderer::SetModel(const SafePtr<Model>& model)
 void VulkanRenderer::SetTexture(const SafePtr<Texture>& texture)
 {
     m_texture = texture;
-
-    // Update descriptor sets with the texture
-    if (m_texture && m_texture->GetBuffer())
-    {
-        VulkanTexture* vulkanTexture = static_cast<VulkanTexture*>(m_texture->GetBuffer());
-
-        for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-        {
-            // Update uniform buffer descriptor
-            VkDescriptorBufferInfo bufferInfo{};
-            bufferInfo.buffer = m_uniformBuffer->GetBuffer(i);
-            bufferInfo.offset = 0;
-            bufferInfo.range = sizeof(UniformBufferObject);
-
-            // Update texture sampler descriptor
-            VkDescriptorImageInfo imageInfo{};
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = vulkanTexture->GetImageView();
-            imageInfo.sampler = vulkanTexture->GetSampler();
-
-            std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
-
-            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[0].dstSet = m_descriptorSet->GetDescriptorSet(i);
-            descriptorWrites[0].dstBinding = 0;
-            descriptorWrites[0].dstArrayElement = 0;
-            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            descriptorWrites[0].descriptorCount = 1;
-            descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-            descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[1].dstSet = m_descriptorSet->GetDescriptorSet(i);
-            descriptorWrites[1].dstBinding = 1;
-            descriptorWrites[1].dstArrayElement = 0;
-            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            descriptorWrites[1].descriptorCount = 1;
-            descriptorWrites[1].pImageInfo = &imageInfo;
-
-            // IMPORTANT: Call vkUpdateDescriptorSets for EACH frame's descriptor set
-            vkUpdateDescriptorSets(m_device->GetDevice(),
-                                   static_cast<uint32_t>(descriptorWrites.size()),
-                                   descriptorWrites.data(), 0, nullptr);
-        }
-    }
 }
 
 void VulkanRenderer::BeginFrame()
@@ -288,7 +245,7 @@ void VulkanRenderer::UpdateUniformBuffer()
     glm::vec3 camUp    = glm::vec3(0.0f, 1.0f, 0.0f);
 
     // Model: place cube in front of the camera, then rotate it locally around Y
-    float distanceInFront = 1.0f; // tweak this: how far in front of the camera the cube should be
+    float distanceInFront = 5.f; // tweak this: how far in front of the camera the cube should be
     glm::vec3 forward = glm::normalize(camTarget - camPos);           // direction camera is looking
     glm::vec3 cubePosition = camPos + forward * distanceInFront;     // world-space position in front of camera
 
@@ -394,7 +351,49 @@ void VulkanRenderer::DrawFrame()
 std::unique_ptr<RHITexture> VulkanRenderer::CreateTexture(const ImageLoader::Image& image)
 {
     std::unique_ptr<VulkanTexture> texture = std::make_unique<VulkanTexture>();
-    texture->LoadFromImage(image, m_device.get(), m_commandBuffer->GetCommandPool(), m_device->GetGraphicsQueue());
+    texture->CreateFromImage(image, m_device.get(), m_commandBuffer->GetCommandPool(), m_device->GetGraphicsQueue());
+    
+    // Update descriptor sets with the texture
+    if (texture)
+    {
+        for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        {
+            // Update uniform buffer descriptor
+            VkDescriptorBufferInfo bufferInfo{};
+            bufferInfo.buffer = m_uniformBuffer->GetBuffer(i);
+            bufferInfo.offset = 0;
+            bufferInfo.range = sizeof(UniformBufferObject);
+
+            // Update texture sampler descriptor
+            VkDescriptorImageInfo imageInfo{};
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo.imageView = texture->GetImageView();
+            imageInfo.sampler = texture->GetSampler();
+
+            std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+
+            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[0].dstSet = m_descriptorSet->GetDescriptorSet(i);
+            descriptorWrites[0].dstBinding = 0;
+            descriptorWrites[0].dstArrayElement = 0;
+            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrites[0].descriptorCount = 1;
+            descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+            descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[1].dstSet = m_descriptorSet->GetDescriptorSet(i);
+            descriptorWrites[1].dstBinding = 1;
+            descriptorWrites[1].dstArrayElement = 0;
+            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[1].descriptorCount = 1;
+            descriptorWrites[1].pImageInfo = &imageInfo;
+
+            vkUpdateDescriptorSets(m_device->GetDevice(),
+                                   static_cast<uint32_t>(descriptorWrites.size()),
+                                   descriptorWrites.data(), 0, nullptr);
+        }
+    }
+    
     return texture;
 }
 

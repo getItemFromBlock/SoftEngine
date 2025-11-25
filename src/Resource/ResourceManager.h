@@ -80,6 +80,7 @@ public:
                 return;
             if (resource->Load(this))
             {
+                PrintLog("Resource %s loaded", resource->GetPath().generic_string().c_str());
                 resource->SetLoaded();
                 AddResourceToSend(hash);
             }

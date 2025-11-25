@@ -23,7 +23,7 @@ public:
     bool LoadFromFile(VulkanDevice* device, const std::string& filepath,
                       VkCommandPool commandPool, VkQueue graphicsQueue);
 
-    bool LoadFromImage(const ImageLoader::Image& image, VulkanDevice* device,
+    bool CreateFromImage(const ImageLoader::Image& image, VulkanDevice* device,
                        VkCommandPool commandPool, VkQueue graphicsQueue);
 
     bool Create(VulkanDevice* device, uint32_t width, uint32_t height,

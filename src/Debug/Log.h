@@ -135,10 +135,12 @@ namespace Debug
                 WriteToFile(type, calendar_time, messageAndFile.c_str());
             }
             
+#ifndef NDEBUG
             if (type == LogType::L_ERROR)
             {
-                ShouldBreak(message);
+                // ShouldBreak(message);
             }
+#endif
         }
 
     private:

@@ -59,7 +59,7 @@ bool VulkanTexture::LoadFromFile(VulkanDevice* device, const std::string& filepa
     return true;
 }
 
-bool VulkanTexture::LoadFromImage(const ImageLoader::Image& image, VulkanDevice* device, 
+bool VulkanTexture::CreateFromImage(const ImageLoader::Image& image, VulkanDevice* device, 
                                   VkCommandPool commandPool, VkQueue graphicsQueue)
 {
     if (!device) {
@@ -69,21 +69,20 @@ bool VulkanTexture::LoadFromImage(const ImageLoader::Image& image, VulkanDevice*
     m_device = device;
     p_width = image.size.x;
     p_height = image.size.y;
+    auto pixels = image.data;
+    VkDeviceSize imageSize = p_width * p_height * 4;
     
-    if (!CreateImage(p_width, p_height, m_format, VK_IMAGE_TILING_OPTIMAL,
-                     VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+    VulkanBuffer stagingBuffer;
+    if (!stagingBuffer.Initialize(m_device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
     {
         return false;
     }
-    
-    if (!CreateImageView(VK_IMAGE_ASPECT_COLOR_BIT)) {
-        Cleanup();
+    if (!CopyDataToBuffer(stagingBuffer, pixels, imageSize)) {
         return false;
     }
     
-    if (!CreateSampler()) {
-        Cleanup();
+    if (!CreateAndSetupImage(stagingBuffer.GetBuffer(), commandPool, graphicsQueue)) {
         return false;
     }
     

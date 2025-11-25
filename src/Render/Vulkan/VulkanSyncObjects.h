@@ -21,7 +21,8 @@ public:
 
     void WaitForFence(size_t index);
     void ResetFence(size_t index);
-
+    
+    bool ResizeRenderFinishedSemaphores(uint32_t swapChainImageCount);
 private:
     VulkanDevice* m_device = nullptr;
     std::vector<VkSemaphore> m_imageAvailableSemaphores;
