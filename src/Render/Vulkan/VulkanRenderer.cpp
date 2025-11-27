@@ -91,7 +91,7 @@ bool VulkanRenderer::Initialize(Window* window)
         m_pipeline = std::make_unique<VulkanPipeline>();
         if (!m_pipeline->Initialize(m_device.get(), m_renderPass->GetRenderPass(),
                                     m_swapChain->GetExtent(),
-                                    "resources/shaders/vert.spv", "resources/shaders/frag.spv",
+                                    "resources/shaders/shader.vert", "resources/shaders/shader.frag",
                                     {m_descriptorSetLayout->GetLayout()},
                                     {uboLayoutBinding, samplerLayoutBinding}))
         {
@@ -311,7 +311,7 @@ void VulkanRenderer::EndFrame()
     VkCommandBuffer cmdBuffer = m_commandBuffer->GetCommandBuffer(m_currentFrame);
     submitInfo.pCommandBuffers = &cmdBuffer;
 
-    VkSemaphore signalSemaphores[] = {m_syncObjects->GetRenderFinishedSemaphore(m_currentFrame)};
+    VkSemaphore signalSemaphores[] = {m_syncObjects->GetRenderFinishedSemaphore(m_imageIndex)};
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
@@ -324,7 +324,7 @@ void VulkanRenderer::EndFrame()
 
     // Present
     result = m_swapChain->PresentImage(m_device->GetPresentQueue(), m_imageIndex,
-                                       m_syncObjects->GetRenderFinishedSemaphore(m_currentFrame));
+                                       m_syncObjects->GetRenderFinishedSemaphore(m_imageIndex));
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_framebufferResized)
     {
@@ -499,11 +499,18 @@ void VulkanRenderer::RecreateSwapChain()
     // Cleanup old swap chain resources
     m_framebuffer->Cleanup();
     m_swapChain->Cleanup();
+    
+    m_depthBuffer->Cleanup(); // Destroy old resources
 
     // Recreate swap chain
     if (!m_swapChain->Initialize(m_device.get(), m_context->GetSurface(), m_window))
     {
         throw std::runtime_error("Failed to recreate swap chain!");
+    }
+    
+    if (!m_depthBuffer->Initialize(m_device.get(), m_swapChain->GetExtent()))
+    {
+        throw std::runtime_error("Failed to recreate depth buffer!");
     }
 
     // Recreate framebuffers

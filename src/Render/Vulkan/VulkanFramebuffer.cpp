@@ -26,6 +26,7 @@ bool VulkanFramebuffer::Initialize(VulkanDevice* device, VkRenderPass renderPass
     }
 
     m_device = device;
+    m_framebuffers.clear();
     m_framebuffers.resize(imageViews.size());
 
     try

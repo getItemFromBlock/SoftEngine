@@ -16,6 +16,7 @@ VulkanRenderPass::~VulkanRenderPass()
 
 bool VulkanRenderPass::Initialize(VulkanDevice* device, VkFormat swapChainImageFormat)
 {
+    m_swapChainImageFormat = swapChainImageFormat;
     if (!device)
     {
         std::cerr << "Invalid device for render pass initialization!" << std::endl;

@@ -14,6 +14,56 @@
 #include "VulkanUtils.h"
 #include "Resource/Mesh.h"
 
+#include <shaderc/shaderc.hpp>
+
+#include "Debug/Log.h"
+
+std::vector<char> CompileGLSLToSPV(const std::string& source, shaderc_shader_kind kind) {
+    shaderc::Compiler compiler;
+    shaderc::CompileOptions options;
+
+    shaderc::SpvCompilationResult module =
+        compiler.CompileGlslToSpv(source, kind, "shader.glsl", options);
+
+    if (module.GetCompilationStatus() != shaderc_compilation_status_success) {
+        PrintError("Shader compilation failed: %s", module.GetErrorMessage().c_str());;
+        return {};
+    }
+    
+    std::vector<uint32_t> spirv(module.begin(), module.end());
+    
+    const char* begin = reinterpret_cast<const char*>(spirv.data());
+    const char* end = begin + spirv.size() * sizeof(uint32_t);
+    return std::vector<char>(begin, end);
+}
+
+#include "spirv_reflect.h"
+
+int SpirvReflectExample(const void* spirv_code, size_t spirv_nbytes)
+{
+    // Generate reflection data for a shader
+    SpvReflectShaderModule module;
+    SpvReflectResult result = spvReflectCreateShaderModule(spirv_nbytes, spirv_code, &module);
+    assert(result == SPV_REFLECT_RESULT_SUCCESS);
+
+    // Enumerate and extract shader's input variables
+    uint32_t var_count = 0;
+    result = spvReflectEnumerateInputVariables(&module, &var_count, NULL);
+    assert(result == SPV_REFLECT_RESULT_SUCCESS);
+    SpvReflectInterfaceVariable** input_vars =
+      (SpvReflectInterfaceVariable**)malloc(var_count * sizeof(SpvReflectInterfaceVariable*));
+    result = spvReflectEnumerateInputVariables(&module, &var_count, input_vars);
+    assert(result == SPV_REFLECT_RESULT_SUCCESS);
+
+    // Output variables, descriptor bindings, descriptor sets, and push constants
+    // can be enumerated and extracted using a similar mechanism.
+
+    // Destroy the reflection data when no longer required.
+    spvReflectDestroyShaderModule(&module);
+    
+    return 0;
+}
+
 VulkanPipeline::~VulkanPipeline()
 {
     Cleanup();
@@ -27,7 +77,8 @@ bool VulkanPipeline::Initialize(VulkanDevice* device,
                                 const std::vector<VkDescriptorSetLayout>& setLayouts /*= {}*/,
                                 const std::vector<VkDescriptorSetLayoutBinding>& bindings /*= {}*/,
                                 VkSampleCountFlagBits msaaSamples /*= VK_SAMPLE_COUNT_1_BIT*/
-                                , bool enableDepth /*= true*/)
+                                , bool enableDepth /*= true*/
+                                , bool compiled /*= false*/)
 {
     if (!device || renderPass == VK_NULL_HANDLE)
         return false;
@@ -50,8 +101,23 @@ bool VulkanPipeline::Initialize(VulkanDevice* device,
 
     try
     {
-        vertShaderCode = ReadFile(vertShaderPath);
-        fragShaderCode = ReadFile(fragShaderPath);
+        if (compiled)
+        {
+            vertShaderCode = ReadFileBin(vertShaderPath);
+            fragShaderCode = ReadFileBin(fragShaderPath);
+        }
+        else
+        {
+        
+            std::string vert = ReadFile(vertShaderPath);
+            std::string frag = ReadFile(fragShaderPath);
+        
+            vertShaderCode = CompileGLSLToSPV(vert, shaderc_vertex_shader);
+            fragShaderCode = CompileGLSLToSPV(frag, shaderc_fragment_shader);
+        }
+        
+        SpirvReflectExample(vertShaderCode.data(), vertShaderCode.size());
+        SpirvReflectExample(fragShaderCode.data(), fragShaderCode.size());
 
         if (vertShaderCode.empty() || fragShaderCode.empty())
             throw std::runtime_error("Shader file is empty");
@@ -102,7 +168,7 @@ bool VulkanPipeline::Initialize(VulkanDevice* device,
         viewport.maxDepth = 1.0f;
 
         VkRect2D scissor{};
-        scissor.offset = { 0, 0 };
+        scissor.offset = { .x=0, .y= 0 };
         scissor.extent = extent;
 
         VkPipelineViewportStateCreateInfo viewportState{};
@@ -268,7 +334,7 @@ VkShaderModule VulkanPipeline::CreateShaderModule(const std::vector<char>& code)
     return shaderModule;
 }
 
-std::vector<char> VulkanPipeline::ReadFile(const std::string& filename)
+std::vector<char> VulkanPipeline::ReadFileBin(const std::string& filename)
 {
     namespace fs = std::filesystem;
 
@@ -288,6 +354,15 @@ std::vector<char> VulkanPipeline::ReadFile(const std::string& filename)
     file.read(buffer.data(), static_cast<std::streamsize>(fileSize));
     file.close();
     return buffer;
+}
+
+std::string VulkanPipeline::ReadFile(const std::string& filename)
+{
+    std::ifstream t(filename);
+    std::stringstream buffer;
+    buffer << t.rdbuf();
+
+    return buffer.str();
 }
 
 #endif

@@ -2,8 +2,6 @@
 #include "IResource.h"
 #include "Utils/Type.h"
 
-#include "Render/RHI/RHIUniformBuffer.h"
-
 class FragmentShader;
 class VertexShader;
 
@@ -16,12 +14,11 @@ public:
     BaseShader& operator=(const BaseShader&) = delete;
     virtual ~BaseShader() override = default;
     
-    bool Load(ResourceManager* resourceManager) override;
-    bool SendToGPU(RHIRenderer* renderer) override;
-    void Unload() override;
+    virtual bool Load(ResourceManager* resourceManager) override;
+    virtual bool SendToGPU(RHIRenderer* renderer) override;
+    virtual void Unload() override {}
     
 private:
-    std::unique_ptr<RHIUniformBuffer> m_uniformBuffer;
 };
 
 class Shader : public IResource

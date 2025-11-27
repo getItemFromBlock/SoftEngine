@@ -20,7 +20,8 @@ public:
                     const std::string& fragShaderPath,
                     const std::vector<VkDescriptorSetLayout>& setLayouts = {},
                     const std::vector<VkDescriptorSetLayoutBinding>& bindings = {},
-                    VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT, bool enableDepth = true);
+                    VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT, 
+                    bool enableDepth = true, bool compiled = false);
     void Cleanup();
 
     VkPipeline GetPipeline() const { return m_pipeline; }
@@ -31,7 +32,8 @@ public:
 
 private:
     VkShaderModule CreateShaderModule(const std::vector<char>& code) const;
-    std::vector<char> ReadFile(const std::string& filename);
+    std::vector<char> ReadFileBin(const std::string& filename);
+    std::string ReadFile(const std::string& filename);
 
     VulkanDevice* m_device = nullptr;
     VkPipeline m_pipeline = VK_NULL_HANDLE;

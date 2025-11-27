@@ -1,6 +1,10 @@
 add_rules("plugin.vsxmake.autoupdate")
 add_rules("mode.debug", "mode.release")
 
+if is_plat("windows") then
+   set_runtimes(is_mode("debug") and "MDd" or "MD")
+end
+
 -- Window API Options
 option("glfw")
     set_default(true)
@@ -38,6 +42,7 @@ add_repositories("galaxy-repo https://github.com/GalaxyEngine/xmake-repo")
 -- Add required packages based on options
 if has_config("vulkan") then
     add_requires("vulkansdk")
+    add_requires("spirv-reflect")
 end
 
 if has_config("glfw") then
@@ -106,6 +111,8 @@ target("Vulkan_Test")
     
     if has_config("vulkan") then
         add_packages("vulkansdk")
+        add_packages("spirv-reflect")
+        add_links(is_mode("debug") and "shaderc_combinedd" or "shaderc_combined")
         add_defines("RENDER_API_VULKAN")
         if is_plat("windows") then
             add_links("vulkan-1")

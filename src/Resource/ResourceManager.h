@@ -2,7 +2,6 @@
 #include <memory>
 #include <unordered_map>
 
-#include "Core/UUID.h"
 #include "Core/ThreadPool.h"
 #include "Debug/Log.h"
 #include "Render/RHI/RHIRenderer.h"
@@ -10,9 +9,9 @@
 #include "Utils/Type.h"
 
 #include "Resource/IResource.h"
-#include "Resource/Model.h"
 
 
+class Shader;
 class Texture;
 class RHIRenderer;
 
@@ -160,7 +159,10 @@ public:
         m_resources.clear();
     }
     
-    void LoadDefaultTexture(const std::filesystem::path& resourcePath);
+    void LoadDefaultShader(const std::filesystem::path& shaderPath);
+    void LoadDefaultTexture(const std::filesystem::path& texturePath);
+    
+    std::shared_ptr<Shader> GetDefaultShader() const;
     std::shared_ptr<Texture> GetDefaultTexture() const;
 
 private:
@@ -172,5 +174,7 @@ private:
     RHIRenderer* m_renderer;
     std::unordered_map<uint64_t, std::shared_ptr<IResource>> m_resources;
     std::queue<uint64_t> m_resourceToSend;
+    
     uint64_t m_defaultTexture;
+    uint64_t m_defaultShader;
 };

@@ -138,7 +138,7 @@ namespace Debug
 #ifndef NDEBUG
             if (type == LogType::L_ERROR)
             {
-                // ShouldBreak(message);
+                ShouldBreak(message);
             }
 #endif
         }

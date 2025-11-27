@@ -35,7 +35,6 @@ bool VulkanDepthBuffer::Initialize(VulkanDevice* device, VkExtent2D extent)
         m_depthImageView = CreateImageView(device, m_depthImage, m_depthFormat,
                                           VK_IMAGE_ASPECT_DEPTH_BIT);
 
-        PrintLog("Depth buffer initialized successfully!");
         return true;
     }
     catch (const std::exception& e)
