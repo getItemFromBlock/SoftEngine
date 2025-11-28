@@ -33,7 +33,7 @@ jobs:
         uses: humbletim/setup-vulkan-sdk@v1.2.1
         with:
           vulkan-query-version: 1.4.328.1
-          vulkan-components: Vulkan-Headers, Vulkan-Loader
+          vulkan-components: Vulkan-Headers, Vulkan-Loader, Glslang, SPIRV-Reflect
           vulkan-use-cache: true
 
       - name: Set xmake env
@@ -62,7 +62,7 @@ jobs:
           key: MSVC-${{ matrix.arch }}-${{ matrix.mode }}-${{ steps.dep_hash.outputs.hash }}-W${{ steps.cache_key.outputs.key }}
 
       - name: Configure xmake and install dependencies
-        run: xmake config -v --arch=${{ matrix.arch }} --mode=${{ matrix.mode }} --ccache=n --yes
+        run: xmake config --arch=${{ matrix.arch }} --mode=${{ matrix.mode }} --ccache=n --yes
 
       - name: Save cached xmake dependencies
         if: ${{ !steps.restore-depcache.outputs.cache-hit }}
