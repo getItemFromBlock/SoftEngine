@@ -8,10 +8,11 @@ void ThreadPool::Initialize()
     s_instance = std::make_unique<ThreadPool>();
     s_instance->m_threadPool = std::make_unique<BS::thread_pool<>>(std::thread::hardware_concurrency());
 
-    std::vector<std::jthread::id> ids = s_instance->m_threadPool->get_thread_ids();
+    auto ids = s_instance->m_threadPool->get_thread_ids();
     for (size_t i = 0; i < std::thread::hardware_concurrency(); i++)
     {
-        Platform::SetThreadName(ids[i]._Get_underlying_id(), ("ThreadPool #" + std::to_string(i)).c_str());
+        uint32_t threadId = static_cast<uint32_t>(std::hash<std::thread::id>{}(ids[i]));
+        Platform::SetThreadName(threadId, ("ThreadPool #" + std::to_string(i)).c_str());
     }
 }
 

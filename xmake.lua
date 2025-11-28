@@ -42,6 +42,7 @@ add_repositories("galaxy-repo https://github.com/GalaxyEngine/xmake-repo")
 -- Add required packages based on options
 if has_config("vulkan") then
     add_requires("vulkansdk")
+    add_requires("shaderc")
     add_requires("spirv-reflect")
 end
 
