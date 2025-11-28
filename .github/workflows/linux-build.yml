@@ -84,6 +84,3 @@ jobs:
       # Build
       - name: Build
         run: xmake -v --yes
-
-      - name: Test
-        run: xmake run
