@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <string>
 
+#include "VulkanCommandPool.h"
 #include "Debug/Log.h"
 
 VulkanDevice::~VulkanDevice()
@@ -45,11 +46,11 @@ void VulkanDevice::Cleanup()
         vkDestroyDevice(m_device, nullptr);
         m_device = VK_NULL_HANDLE;
     }
-    
+
     // Reset other handles
     m_physicalDevice = VK_NULL_HANDLE;
-    m_graphicsQueue = VK_NULL_HANDLE;
-    m_presentQueue = VK_NULL_HANDLE;
+    m_graphicsQueue.handle = VK_NULL_HANDLE;
+    m_presentQueue.handle = VK_NULL_HANDLE;
     m_queueFamilies = QueueFamilyIndices{};
 }
 
@@ -70,27 +71,27 @@ uint32_t VulkanDevice::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags
     throw std::runtime_error("Failed to find suitable memory type!");
 }
 
-VkCommandBuffer VulkanDevice::BeginSingleTimeCommands(VkCommandPool commandPool)
+VkCommandBuffer VulkanDevice::BeginSingleTimeCommands(VulkanCommandPool* commandPool)
 {
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = commandPool;
+    allocInfo.commandPool = commandPool->GetTransferCommandPool();
     allocInfo.commandBufferCount = 1;
 
-    VkCommandBuffer commandBuffer;
-    vkAllocateCommandBuffers(m_device, &allocInfo, &commandBuffer);
+    VkCommandBuffer newCommandBuffer;
+    vkAllocateCommandBuffers(m_device, &allocInfo, &newCommandBuffer);
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+    vkBeginCommandBuffer(newCommandBuffer, &beginInfo);
 
-    return commandBuffer;
+    return newCommandBuffer;
 }
 
-void VulkanDevice::EndSingleTimeCommands(VkCommandPool commandPool, VkQueue queue, 
+void VulkanDevice::EndSingleTimeCommands(VulkanCommandPool* commandPool, VulkanQueue& queue,
                                          VkCommandBuffer commandBuffer)
 {
     vkEndCommandBuffer(commandBuffer);
@@ -100,10 +101,15 @@ void VulkanDevice::EndSingleTimeCommands(VkCommandPool commandPool, VkQueue queu
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
 
-    vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(queue);
-
-    vkFreeCommandBuffers(m_device, commandPool, 1, &commandBuffer);
+    {
+        std::scoped_lock lock(*queue.mutex);
+        vkQueueSubmit(queue.handle, 1, &submitInfo, VK_NULL_HANDLE);
+        vkQueueWaitIdle(queue.handle);
+    }
+    
+    {
+        vkFreeCommandBuffers(m_device, commandPool->GetTransferCommandPool(), 1, &commandBuffer);
+    }
 }
 
 bool VulkanDevice::PickPhysicalDevice(VkInstance instance, VkSurfaceKHR surface)
@@ -113,7 +119,7 @@ bool VulkanDevice::PickPhysicalDevice(VkInstance instance, VkSurfaceKHR surface)
 
     if (deviceCount == 0)
     {
-        std::cerr << "Failed to find GPUs with Vulkan support!" << std::endl;
+        PrintError("Failed to find suitable GPU for Vulkan");
         return false;
     }
 
@@ -134,7 +140,6 @@ bool VulkanDevice::PickPhysicalDevice(VkInstance instance, VkSurfaceKHR surface)
                 bestScore = score;
                 selectedDevice = device;
             }
-            break;
         }
     }
 
@@ -145,7 +150,7 @@ bool VulkanDevice::PickPhysicalDevice(VkInstance instance, VkSurfaceKHR surface)
     }
 
     m_physicalDevice = selectedDevice;
-    
+
     VkPhysicalDeviceProperties deviceProperties;
     vkGetPhysicalDeviceProperties(m_physicalDevice, &deviceProperties);
     PrintLog("Using GPU: %s", deviceProperties.deviceName);
@@ -184,17 +189,17 @@ bool VulkanDevice::IsDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surfac
 {
     QueueFamilyIndices indices = FindQueueFamilies(device, surface);
     bool extensionsSupported = CheckDeviceExtensionSupport(device);
-    
+
     bool swapChainAdequate = false;
     if (extensionsSupported)
     {
         // Check if swap chain support is adequate
         uint32_t formatCount = 0;
         vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
-        
+
         uint32_t presentModeCount = 0;
         vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
-        
+
         swapChainAdequate = formatCount > 0 && presentModeCount > 0;
     }
 
@@ -277,7 +282,7 @@ void VulkanDevice::CreateLogicalDevice(VkSurfaceKHR surface)
 
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     queueCreateInfos.reserve(uniqueQueueFamilies.size());
-    
+
     float queuePriority = 1.0f;
 
     for (uint32_t family : uniqueQueueFamilies)
@@ -311,8 +316,19 @@ void VulkanDevice::CreateLogicalDevice(VkSurfaceKHR surface)
         throw std::runtime_error("Failed to create logical device! Error code: " + std::to_string(result));
     }
 
-    vkGetDeviceQueue(m_device, indices.graphicsFamily.value(), 0, &m_graphicsQueue);
-    vkGetDeviceQueue(m_device, indices.presentFamily.value(), 0, &m_presentQueue);
+    vkGetDeviceQueue(m_device, indices.graphicsFamily.value(), 0, &m_graphicsQueue.handle);
+    vkGetDeviceQueue(m_device, indices.presentFamily.value(), 0, &m_presentQueue.handle);
+    
+    m_graphicsQueue.mutex = &m_graphicsQueueMutex;
+    
+    if (indices.graphicsFamily == indices.presentFamily)
+    {
+        m_presentQueue.mutex = &m_graphicsQueueMutex;
+    }
+    else
+    {
+        m_presentQueue.mutex = &m_presentQueueMutex;
+    }
 }
 
 #endif

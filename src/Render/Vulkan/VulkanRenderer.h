@@ -20,7 +20,7 @@
 #include "VulkanRenderPass.h"
 #include "VulkanPipeline.h"
 #include "VulkanFramebuffer.h"
-#include "VulkanCommandBuffer.h"
+#include "VulkanCommandPool.h"
 #include "VulkanDepthBuffer.h"
 #include "VulkanDescriptorPool.h"
 #include "VulkanDescriptorSet.h"
@@ -56,7 +56,7 @@ public:
     
     void DrawFrame() override;
     
-    bool MultiThreadSendToGPU() override { return false; }
+    bool MultiThreadSendToGPU() override { return true; }
     
     std::unique_ptr<RHITexture> CreateTexture(const ImageLoader::Image& image) override;
     std::unique_ptr<RHIVertexBuffer> CreateVertexBuffer(const float* data, uint32_t size, uint32_t floatPerVertex) override;
@@ -80,7 +80,7 @@ private:
     std::unique_ptr<VulkanRenderPass> m_renderPass;
     std::unique_ptr<VulkanPipeline> m_pipeline;
     std::unique_ptr<VulkanFramebuffer> m_framebuffer;
-    std::unique_ptr<VulkanCommandBuffer> m_commandBuffer;
+    std::unique_ptr<VulkanCommandPool> m_commandPool;
     std::unique_ptr<VulkanSyncObjects> m_syncObjects;
     std::unique_ptr<VulkanDepthBuffer> m_depthBuffer;
     std::unique_ptr<VulkanUniformBuffer> m_uniformBuffer;

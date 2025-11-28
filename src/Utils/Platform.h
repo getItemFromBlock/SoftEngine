@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include <iostream>
 
 namespace Platform
 {
@@ -35,4 +36,6 @@ namespace Platform
     ErrorDialogResult CreateErrorDialog(const char* title, const char* message, DialogOption option = DialogOption::OkCancel);
     
     void Break();
+    
+    void SetThreadName(uint32_t threadId, const char* name);
 };

@@ -6,6 +6,7 @@
 #include "VulkanBuffer.h"
 #include <vulkan/vulkan.h>
 
+class VulkanCommandPool;
 class VulkanDevice;
 
 class VulkanVertexBuffer : public RHIVertexBuffer
@@ -14,7 +15,7 @@ public:
     VulkanVertexBuffer() = default;
     ~VulkanVertexBuffer() override;
 
-    bool Initialize(VulkanDevice* device, const void* vertices, VkDeviceSize size, VkCommandPool commandPool);
+    bool Initialize(VulkanDevice* device, const void* vertices, VkDeviceSize size, VulkanCommandPool* commandBuffer);
     
     bool Initialize(VulkanDevice* device, VkDeviceSize size);
     
@@ -31,7 +32,7 @@ public:
     void SetVertexCount(uint32_t count) { m_vertexCount = count; }
 
 private:
-    bool CreateVertexBuffer(VulkanDevice* device, const void* vertices, VkDeviceSize size, VkCommandPool commandPool);
+    bool CreateVertexBuffer(VulkanDevice* device, const void* vertices, VkDeviceSize size, VulkanCommandPool* commandPool);
     
 private:
     VulkanDevice* m_device = nullptr;

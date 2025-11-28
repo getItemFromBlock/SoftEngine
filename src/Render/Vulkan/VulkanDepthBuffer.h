@@ -3,7 +3,7 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
-class VulkanCommandBuffer;
+class VulkanCommandPool;
 class VulkanDevice;
 
 class VulkanDepthBuffer
@@ -34,9 +34,6 @@ private:
     
     VkImageView CreateImageView(VulkanDevice* device, VkImage image,
                                 VkFormat format, VkImageAspectFlags aspectFlags);
-    
-    void TransitionImageLayout(VkCommandPool cmdPool, VkImage image, VkFormat format,
-                               VkImageLayout oldLayout, VkImageLayout newLayout);
 
 private:
     VulkanDevice* m_device = nullptr;

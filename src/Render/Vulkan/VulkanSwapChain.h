@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "VulkanDevice.h"
 #ifdef RENDER_API_VULKAN
 
 #include <vulkan/vulkan.h>
@@ -26,7 +27,7 @@ public:
     uint32_t GetImageCount() const { return static_cast<uint32_t>(m_images.size()); }
 
     VkResult AcquireNextImage(VkSemaphore semaphore, uint32_t* imageIndex);
-    VkResult PresentImage(VkQueue presentQueue, uint32_t imageIndex, VkSemaphore waitSemaphore);
+    VkResult PresentImage(VulkanQueue& presentQueue, uint32_t imageIndex, VkSemaphore waitSemaphore);
 
 private:
     struct SwapChainSupportDetails

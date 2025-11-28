@@ -4,12 +4,14 @@
 #include "VulkanDevice.h"
 #include <iostream>
 
+#include "VulkanCommandPool.h"
+
 VulkanIndexBuffer::~VulkanIndexBuffer()
 {
     Cleanup();
 }
 
-bool VulkanIndexBuffer::Initialize(VulkanDevice* device, const void* indices, VkDeviceSize size, VkIndexType indexType, VkCommandPool commandPool)
+bool VulkanIndexBuffer::Initialize(VulkanDevice* device, const void* indices, VkDeviceSize size, VkIndexType indexType, VulkanCommandPool* commandPool)
 {
     m_device = device;
     m_size = size;
@@ -84,7 +86,7 @@ void VulkanIndexBuffer::Bind(VkCommandBuffer commandBuffer)
     vkCmdBindIndexBuffer(commandBuffer, m_buffer->GetBuffer(), 0, m_indexType);
 }
 
-bool VulkanIndexBuffer::CreateIndexBuffer(VulkanDevice* device, const void* indices, VkDeviceSize size, VkCommandPool commandPool)
+bool VulkanIndexBuffer::CreateIndexBuffer(VulkanDevice* device, const void* indices, VkDeviceSize size, VulkanCommandPool* commandPool)
 {
     // Create staging buffer
     VulkanBuffer stagingBuffer;
@@ -113,9 +115,9 @@ bool VulkanIndexBuffer::CreateIndexBuffer(VulkanDevice* device, const void* indi
     }
     
     // Copy from staging buffer to index buffer
-    VkCommandBuffer commandBuffer = device->BeginSingleTimeCommands(commandPool);
-    m_buffer->CopyFrom(commandBuffer, &stagingBuffer, size);
-    device->EndSingleTimeCommands(commandPool, device->GetGraphicsQueue(), commandBuffer);
+    VkCommandBuffer commandBufferResult = device->BeginSingleTimeCommands(commandPool);
+    m_buffer->CopyFrom(commandBufferResult, &stagingBuffer, size);
+    device->EndSingleTimeCommands(commandPool, device->GetGraphicsQueue(), commandBufferResult);
     
     // Cleanup staging buffer
     stagingBuffer.Cleanup();

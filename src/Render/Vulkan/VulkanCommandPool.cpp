@@ -1,4 +1,4 @@
-﻿#include "VulkanCommandBuffer.h"
+﻿#include "VulkanCommandPool.h"
 #ifdef RENDER_API_VULKAN
 
 #include "VulkanDevice.h"
@@ -8,12 +8,12 @@
 
 #include "Debug/Log.h"
 
-VulkanCommandBuffer::~VulkanCommandBuffer()
+VulkanCommandPool::~VulkanCommandPool()
 {
     Cleanup();
 }
 
-bool VulkanCommandBuffer::Initialize(VulkanDevice* device, uint32_t imageCount)
+bool VulkanCommandPool::Initialize(VulkanDevice* device, uint32_t imageCount)
 {
     if (!device || imageCount == 0)
     {
@@ -39,6 +39,16 @@ bool VulkanCommandBuffer::Initialize(VulkanDevice* device, uint32_t imageCount)
         {
             throw std::runtime_error("Failed to create command pool! Error code: " + 
                                      std::to_string(result));
+        }
+        
+        poolInfo = {};
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        // Use TRANSIENT for short-lived commands
+        poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT; 
+        poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value(); // Or transfer family
+
+        if (vkCreateCommandPool(m_device->GetDevice(), &poolInfo, nullptr, &m_transferCommandPool) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create transfer command pool!");
         }
 
         // Allocate command buffers
@@ -68,7 +78,7 @@ bool VulkanCommandBuffer::Initialize(VulkanDevice* device, uint32_t imageCount)
     }
 }
 
-void VulkanCommandBuffer::Cleanup()
+void VulkanCommandPool::Cleanup()
 {
     if (m_device && m_commandPool != VK_NULL_HANDLE)
     {
@@ -81,11 +91,12 @@ void VulkanCommandBuffer::Cleanup()
         }
 
         vkDestroyCommandPool(m_device->GetDevice(), m_commandPool, nullptr);
+        vkDestroyCommandPool(m_device->GetDevice(), m_transferCommandPool, nullptr);
         m_commandPool = VK_NULL_HANDLE;
     }
 }
 
-void VulkanCommandBuffer::BeginRecording(size_t index)
+void VulkanCommandPool::BeginRecording(size_t index)
 {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -100,7 +111,7 @@ void VulkanCommandBuffer::BeginRecording(size_t index)
     }
 }
 
-void VulkanCommandBuffer::EndRecording(size_t index)
+void VulkanCommandPool::EndRecording(size_t index)
 {
     VkResult result = vkEndCommandBuffer(m_commandBuffers[index]);
     if (result != VK_SUCCESS)
@@ -108,9 +119,9 @@ void VulkanCommandBuffer::EndRecording(size_t index)
         throw std::runtime_error("Failed to end recording command buffer! Error code: " + 
                                  std::to_string(result));
     }
-}
+}   
 
-void VulkanCommandBuffer::Reset(size_t index)
+void VulkanCommandPool::Reset(size_t index)
 {
     vkResetCommandBuffer(m_commandBuffers[index], 0);
 }

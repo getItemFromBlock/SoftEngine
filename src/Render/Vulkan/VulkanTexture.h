@@ -1,5 +1,6 @@
 #pragma once
 #include "VulkanBuffer.h"
+#include "VulkanDevice.h"
 #ifdef RENDER_API_VULKAN
 
 #include <vulkan/vulkan.h>
@@ -8,6 +9,7 @@
 #include "Render/RHI/RHITexture.h"
 #include "Resource/Loader/ImageLoader.h"
 
+class VulkanCommandPool;
 class VulkanDevice;
 
 class VulkanTexture : public RHITexture
@@ -21,10 +23,10 @@ public:
     
  
     bool LoadFromFile(VulkanDevice* device, const std::string& filepath,
-                      VkCommandPool commandPool, VkQueue graphicsQueue);
+                      VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);
 
     bool CreateFromImage(const ImageLoader::Image& image, VulkanDevice* device,
-                       VkCommandPool commandPool, VkQueue graphicsQueue);
+                         VulkanCommandPool* commandBuffer, VulkanQueue& graphicsQueue);
 
     bool Create(VulkanDevice* device, uint32_t width, uint32_t height,
                 VkFormat format, VkImageUsageFlags usage, VkCommandPool commandPool,
@@ -43,12 +45,12 @@ private:
                      VkMemoryPropertyFlags properties);
     bool CreateImageView(VkImageAspectFlags aspectFlags);
     bool CreateSampler();
-    void TransitionImageLayout(VkCommandPool commandPool, VkQueue graphicsQueue,
+    void TransitionImageLayout(VulkanCommandPool* _commandBuffer, VulkanQueue& graphicsQueue,
                                VkImageLayout oldLayout, VkImageLayout newLayout);
-    void CopyBufferToImage(VkCommandPool commandPool, VkQueue graphicsQueue,
+    void CopyBufferToImage(VulkanCommandPool* _commandBuffer, VulkanQueue& graphicsQueue,
                            VkBuffer buffer, uint32_t width, uint32_t height);
     bool CopyDataToBuffer(VulkanBuffer& buffer, const void* data, VkDeviceSize size);
-    bool CreateAndSetupImage(VkBuffer stagingBuffer, VkCommandPool commandPool, VkQueue graphicsQueue);
+    bool CreateAndSetupImage(VkBuffer stagingBuffer, VulkanCommandPool* commandBuffer, VulkanQueue& graphicsQueue);
 
     VulkanDevice* m_device = nullptr;
     VkImage m_image = VK_NULL_HANDLE;

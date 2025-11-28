@@ -82,7 +82,7 @@ VkResult VulkanSwapChain::AcquireNextImage(VkSemaphore semaphore, uint32_t* imag
     );
 }
 
-VkResult VulkanSwapChain::PresentImage(VkQueue presentQueue, uint32_t imageIndex, VkSemaphore waitSemaphore)
+VkResult VulkanSwapChain::PresentImage(VulkanQueue& presentQueue, uint32_t imageIndex, VkSemaphore waitSemaphore)
 {
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -93,7 +93,12 @@ VkResult VulkanSwapChain::PresentImage(VkQueue presentQueue, uint32_t imageIndex
     presentInfo.pImageIndices = &imageIndex;
     presentInfo.pResults = nullptr;
 
-    return vkQueuePresentKHR(presentQueue, &presentInfo);
+    VkResult result;
+    {
+        std::scoped_lock lock(*presentQueue.mutex);
+        result = vkQueuePresentKHR(presentQueue.handle, &presentInfo);
+    }
+    return result;
 }
 
 VulkanSwapChain::SwapChainSupportDetails VulkanSwapChain::QuerySwapChainSupport(

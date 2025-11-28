@@ -1,10 +1,26 @@
 ﻿#pragma once
 #ifdef RENDER_API_VULKAN
+#include <mutex>
 #include <vulkan/vulkan_core.h>
 #include <optional>
 #include <vector>
+#include <memory>
 
+class VulkanCommandPool;
 class VulkanTexture;
+
+struct VulkanQueue
+{
+    VulkanQueue(VkQueue _queue) : handle(_queue) {}
+    ~VulkanQueue()
+    {
+        delete mutex;
+    }
+    
+    VkQueue handle;
+    std::mutex* mutex = new std::mutex();
+};
+
 
 class VulkanDevice {
 public:
@@ -17,8 +33,8 @@ public:
     // Getters
     VkDevice GetDevice() const { return m_device; }
     VkPhysicalDevice GetPhysicalDevice() const { return m_physicalDevice; }
-    VkQueue GetGraphicsQueue() const { return m_graphicsQueue; }
-    VkQueue GetPresentQueue() const { return m_presentQueue; }
+    VulkanQueue& GetGraphicsQueue() { return m_graphicsQueue; }
+    VulkanQueue& GetPresentQueue() { return m_presentQueue; }
     uint32_t GetGraphicsQueueFamily() const { return m_queueFamilies.graphicsFamily.value(); }
     uint32_t GetPresentQueueFamily() const { return m_queueFamilies.presentFamily.value(); }
 
@@ -33,8 +49,8 @@ public:
     
     QueueFamilyIndices GetQueueFamilyIndices() const { return m_queueFamilies; }
     
-    VkCommandBuffer BeginSingleTimeCommands(VkCommandPool commandPool);
-    void EndSingleTimeCommands(VkCommandPool commandPool, VkQueue queue, VkCommandBuffer commandBuffer);
+    VkCommandBuffer BeginSingleTimeCommands(VulkanCommandPool* commandPool);
+    void EndSingleTimeCommands(VulkanCommandPool* commandPool, VulkanQueue& queue, VkCommandBuffer commandBuffer);
 
     void SetDefaultTexture(VulkanTexture* texture) { m_defaultTexture = texture; }
     VulkanTexture* GetDefaultTexture() const { return m_defaultTexture; }
@@ -48,8 +64,12 @@ private:
 private:
     VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
     VkDevice m_device = VK_NULL_HANDLE;
-    VkQueue m_graphicsQueue = VK_NULL_HANDLE;
-    VkQueue m_presentQueue = VK_NULL_HANDLE;
+    VulkanQueue m_graphicsQueue = VK_NULL_HANDLE;
+    VulkanQueue m_presentQueue = VK_NULL_HANDLE;
+    
+    std::mutex m_graphicsQueueMutex;
+    std::mutex m_presentQueueMutex;
+    std::mutex m_mutex;
     
     VulkanTexture* m_defaultTexture = nullptr;
 

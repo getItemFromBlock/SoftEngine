@@ -7,7 +7,7 @@
 #include "VulkanRenderPass.h"
 #include "VulkanPipeline.h"
 #include "VulkanFramebuffer.h"
-#include "VulkanCommandBuffer.h"
+#include "VulkanCommandPool.h"
 #include "VulkanSyncObjects.h"
 #include "VulkanDescriptorPool.h"
 #include "VulkanDescriptorSet.h"
@@ -149,8 +149,8 @@ bool VulkanRenderer::Initialize(Window* window)
             m_descriptorSet->UpdateDescriptorSet(i, m_uniformBuffer.get(), nullptr);
         }
 
-        m_commandBuffer = std::make_unique<VulkanCommandBuffer>();
-        if (!m_commandBuffer->Initialize(m_device.get(), MAX_FRAMES_IN_FLIGHT))
+        m_commandPool = std::make_unique<VulkanCommandPool>();
+        if (!m_commandPool->Initialize(m_device.get(), MAX_FRAMES_IN_FLIGHT))
         {
             PrintError("Failed to initialize command buffers!");
             return false;
@@ -193,7 +193,7 @@ void VulkanRenderer::WaitForGPU()
 void VulkanRenderer::Cleanup()
 {
     m_syncObjects.reset();
-    m_commandBuffer.reset();
+    m_commandPool.reset();
     m_descriptorSet.reset();
     m_descriptorPool.reset();
     m_uniformBuffer.reset();
@@ -282,20 +282,20 @@ bool VulkanRenderer::BeginFrame()
 
     m_syncObjects->ResetFence(m_currentFrame);
 
-    m_commandBuffer->Reset(m_currentFrame);
-    m_commandBuffer->BeginRecording(m_currentFrame);
+    m_commandPool->Reset(m_currentFrame);
+    m_commandPool->BeginRecording(m_currentFrame);
     
     return true;
 }
 
 void VulkanRenderer::DrawFrame()
 {
-    RecordCommandBuffer(m_commandBuffer->GetCommandBuffer(m_currentFrame), m_imageIndex);
+    RecordCommandBuffer(m_commandPool->GetCommandBuffer(m_currentFrame), m_imageIndex);
 }
 
 void VulkanRenderer::EndFrame()
 {
-    m_commandBuffer->EndRecording(m_currentFrame);
+    m_commandPool->EndRecording(m_currentFrame);
 
     // Submit command buffer
     VkSubmitInfo submitInfo{};
@@ -308,15 +308,19 @@ void VulkanRenderer::EndFrame()
     submitInfo.pWaitDstStageMask = waitStages;
 
     submitInfo.commandBufferCount = 1;
-    VkCommandBuffer cmdBuffer = m_commandBuffer->GetCommandBuffer(m_currentFrame);
+    VkCommandBuffer cmdBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
     submitInfo.pCommandBuffers = &cmdBuffer;
 
     VkSemaphore signalSemaphores[] = {m_syncObjects->GetRenderFinishedSemaphore(m_imageIndex)};
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
-
-    VkResult result = vkQueueSubmit(m_device->GetGraphicsQueue(), 1, &submitInfo,
-                           m_syncObjects->GetInFlightFence(m_currentFrame));
+    VkResult result;
+    {        
+        std::scoped_lock lock(*m_device->GetGraphicsQueue().mutex);
+        result = vkQueueSubmit(m_device->GetGraphicsQueue().handle, 1, &submitInfo,
+                               m_syncObjects->GetInFlightFence(m_currentFrame));
+    }
+    
     if (result != VK_SUCCESS)
     {
         throw std::runtime_error("Failed to submit draw command buffer!");
@@ -342,7 +346,7 @@ void VulkanRenderer::EndFrame()
 std::unique_ptr<RHITexture> VulkanRenderer::CreateTexture(const ImageLoader::Image& image)
 {
     std::unique_ptr<VulkanTexture> texture = std::make_unique<VulkanTexture>();
-    texture->CreateFromImage(image, m_device.get(), m_commandBuffer->GetCommandPool(), m_device->GetGraphicsQueue());
+    texture->CreateFromImage(image, m_device.get(), m_commandPool.get(), m_device->GetGraphicsQueue());
 
     // Update descriptor sets with the texture
     if (texture)
@@ -394,7 +398,7 @@ std::unique_ptr<RHIVertexBuffer> VulkanRenderer::CreateVertexBuffer(const float*
     std::unique_ptr<VulkanVertexBuffer> vertexBuffer = std::make_unique<VulkanVertexBuffer>();
 
     VkDeviceSize bufferSize = sizeof(data[0]) * size;
-    vertexBuffer->Initialize(m_device.get(), data, bufferSize, m_commandBuffer->GetCommandPool());
+    vertexBuffer->Initialize(m_device.get(), data, bufferSize, m_commandPool.get());
     vertexBuffer->SetVertexCount(size / floatPerVertex);
 
     return std::move(vertexBuffer);
@@ -405,7 +409,7 @@ std::unique_ptr<RHIIndexBuffer> VulkanRenderer::CreateIndexBuffer(const uint32_t
     std::unique_ptr<VulkanIndexBuffer> indexBuffer = std::make_unique<VulkanIndexBuffer>();
 
     VkDeviceSize bufferSize = sizeof(data[0]) * size;
-    indexBuffer->Initialize(m_device.get(), data, bufferSize, VK_INDEX_TYPE_UINT32, m_commandBuffer->GetCommandPool());
+    indexBuffer->Initialize(m_device.get(), data, bufferSize, VK_INDEX_TYPE_UINT32, m_commandPool.get());
     indexBuffer->SetIndexCount(size);
 
     return std::move(indexBuffer);
@@ -422,6 +426,7 @@ void VulkanRenderer::SetDefaultTexture(const SafePtr<Texture>& texture)
 
 void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
 {
+    std::scoped_lock lock(m_commandPool->GetMutex());
     // Begin render pass
     std::vector<VkClearValue> clearValues(2);
     clearValues[0].color = {{0.0f, 0.0f, 0.0f, 0.0f}};

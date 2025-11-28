@@ -4,17 +4,19 @@
 #include "VulkanDevice.h"
 #include <iostream>
 
+#include "VulkanCommandPool.h"
+
 VulkanVertexBuffer::~VulkanVertexBuffer()
 {
     Cleanup();
 }
 
-bool VulkanVertexBuffer::Initialize(VulkanDevice* device, const void* vertices, VkDeviceSize size, VkCommandPool commandPool)
+bool VulkanVertexBuffer::Initialize(VulkanDevice* device, const void* vertices, VkDeviceSize size, VulkanCommandPool* commandBuffer)
 {
     m_device = device;
     m_size = size;
     
-    return CreateVertexBuffer(device, vertices, size, commandPool);
+    return CreateVertexBuffer(device, vertices, size, commandBuffer);
 }
 
 bool VulkanVertexBuffer::Initialize(VulkanDevice* device, VkDeviceSize size)
@@ -22,7 +24,6 @@ bool VulkanVertexBuffer::Initialize(VulkanDevice* device, VkDeviceSize size)
     m_device = device;
     m_size = size;
     
-    // Create vertex buffer with HOST_VISIBLE memory for dynamic updates
     m_buffer = new VulkanBuffer();
     if (!m_buffer->Initialize(device, size,
                               VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -84,9 +85,8 @@ void VulkanVertexBuffer::Bind(VkCommandBuffer commandBuffer, uint32_t binding)
     vkCmdBindVertexBuffers(commandBuffer, binding, 1, &buffer, &offset);
 }
 
-bool VulkanVertexBuffer::CreateVertexBuffer(VulkanDevice* device, const void* vertices, VkDeviceSize size, VkCommandPool commandPool)
+bool VulkanVertexBuffer::CreateVertexBuffer(VulkanDevice* device, const void* vertices, VkDeviceSize size, VulkanCommandPool* commandPool)
 {
-    // Create staging buffer
     VulkanBuffer stagingBuffer;
     if (!stagingBuffer.Initialize(device, size,
                                   VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -96,10 +96,8 @@ bool VulkanVertexBuffer::CreateVertexBuffer(VulkanDevice* device, const void* ve
         return false;
     }
     
-    // Copy vertex data to staging buffer
     stagingBuffer.CopyData(vertices, size);
     
-    // Create vertex buffer on device local memory
     m_buffer = new VulkanBuffer();
     if (!m_buffer->Initialize(device, size,
                               VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -112,12 +110,10 @@ bool VulkanVertexBuffer::CreateVertexBuffer(VulkanDevice* device, const void* ve
         return false;
     }
     
-    // Copy from staging buffer to vertex buffer
-    VkCommandBuffer commandBuffer = device->BeginSingleTimeCommands(commandPool);
-    m_buffer->CopyFrom(commandBuffer, &stagingBuffer, size);
-    device->EndSingleTimeCommands(commandPool, device->GetGraphicsQueue(), commandBuffer);
+    VkCommandBuffer newCommandBuffer = device->BeginSingleTimeCommands(commandPool);
+    m_buffer->CopyFrom(newCommandBuffer, &stagingBuffer, size);
+    device->EndSingleTimeCommands(commandPool, device->GetGraphicsQueue(), newCommandBuffer);
     
-    // Cleanup staging buffer
     stagingBuffer.Cleanup();
     return true;
 }

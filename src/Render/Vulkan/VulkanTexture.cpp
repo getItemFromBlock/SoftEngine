@@ -7,13 +7,15 @@
 #include <stdexcept>
 #include <cstring>
 
+#include "VulkanCommandPool.h"
+
 VulkanTexture::~VulkanTexture()
 {
     Cleanup();
 }
 
 bool VulkanTexture::LoadFromFile(VulkanDevice* device, const std::string& filepath,
-                                 VkCommandPool commandPool, VkQueue graphicsQueue)
+                                 VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue)
 {
     if (!device) {
         return false;
@@ -59,8 +61,8 @@ bool VulkanTexture::LoadFromFile(VulkanDevice* device, const std::string& filepa
     return true;
 }
 
-bool VulkanTexture::CreateFromImage(const ImageLoader::Image& image, VulkanDevice* device, 
-                                  VkCommandPool commandPool, VkQueue graphicsQueue)
+bool VulkanTexture::CreateFromImage(const ImageLoader::Image& image, VulkanDevice* device,
+                                    VulkanCommandPool* commandBuffer, VulkanQueue& graphicsQueue)
 {
     if (!device) {
         return false;
@@ -82,7 +84,7 @@ bool VulkanTexture::CreateFromImage(const ImageLoader::Image& image, VulkanDevic
         return false;
     }
     
-    if (!CreateAndSetupImage(stagingBuffer.GetBuffer(), commandPool, graphicsQueue)) {
+    if (!CreateAndSetupImage(stagingBuffer.GetBuffer(), commandBuffer, graphicsQueue)) {
         return false;
     }
     
@@ -248,10 +250,10 @@ bool VulkanTexture::CreateSampler()
     return true;
 }
 
-void VulkanTexture::TransitionImageLayout(VkCommandPool commandPool, VkQueue graphicsQueue,
+void VulkanTexture::TransitionImageLayout(VulkanCommandPool* _commandBuffer, VulkanQueue& graphicsQueue,
                                           VkImageLayout oldLayout, VkImageLayout newLayout)
 {
-    VkCommandBuffer commandBuffer = m_device->BeginSingleTimeCommands(commandPool);
+    VkCommandBuffer commandBuffer = m_device->BeginSingleTimeCommands(_commandBuffer);
     
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -289,13 +291,13 @@ void VulkanTexture::TransitionImageLayout(VkCommandPool commandPool, VkQueue gra
     vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0,
                         0, nullptr, 0, nullptr, 1, &barrier);
     
-    m_device->EndSingleTimeCommands(commandPool, graphicsQueue, commandBuffer);
+    m_device->EndSingleTimeCommands(_commandBuffer, graphicsQueue, commandBuffer);
 }
 
-void VulkanTexture::CopyBufferToImage(VkCommandPool commandPool, VkQueue graphicsQueue,
+void VulkanTexture::CopyBufferToImage(VulkanCommandPool* _commandBuffer, VulkanQueue& graphicsQueue,
                                       VkBuffer buffer, uint32_t width, uint32_t height)
 {
-    VkCommandBuffer commandBuffer = m_device->BeginSingleTimeCommands(commandPool);
+    VkCommandBuffer commandBuffer = m_device->BeginSingleTimeCommands(_commandBuffer);
     
     VkBufferImageCopy region{};
     region.bufferOffset = 0;
@@ -311,7 +313,7 @@ void VulkanTexture::CopyBufferToImage(VkCommandPool commandPool, VkQueue graphic
     vkCmdCopyBufferToImage(commandBuffer, buffer, m_image, 
                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
     
-    m_device->EndSingleTimeCommands(commandPool, graphicsQueue, commandBuffer);
+    m_device->EndSingleTimeCommands(_commandBuffer, graphicsQueue, commandBuffer);
 }
 
 // Private helper methods
@@ -328,7 +330,7 @@ bool VulkanTexture::CopyDataToBuffer(VulkanBuffer& buffer, const void* data, VkD
     return true;
 }
 
-bool VulkanTexture::CreateAndSetupImage(VkBuffer stagingBuffer, VkCommandPool commandPool, VkQueue graphicsQueue)
+bool VulkanTexture::CreateAndSetupImage(VkBuffer stagingBuffer, VulkanCommandPool* commandBuffer, VulkanQueue& graphicsQueue)
 {
     // Create image
     if (!CreateImage(p_width, p_height, m_format, VK_IMAGE_TILING_OPTIMAL,
@@ -339,11 +341,11 @@ bool VulkanTexture::CreateAndSetupImage(VkBuffer stagingBuffer, VkCommandPool co
     }
     
     // Transition image layout and copy buffer to image
-    TransitionImageLayout(commandPool, graphicsQueue, VK_IMAGE_LAYOUT_UNDEFINED, 
-                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    CopyBufferToImage(commandPool, graphicsQueue, stagingBuffer, p_width, p_height);
-    TransitionImageLayout(commandPool, graphicsQueue, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    TransitionImageLayout(commandBuffer, graphicsQueue, VK_IMAGE_LAYOUT_UNDEFINED, 
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    CopyBufferToImage(commandBuffer, graphicsQueue, stagingBuffer, p_width, p_height);
+    TransitionImageLayout(commandBuffer, graphicsQueue, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     
     // Create image view and sampler
     if (!CreateImageView(VK_IMAGE_ASPECT_COLOR_BIT)) {

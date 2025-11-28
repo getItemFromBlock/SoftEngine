@@ -14,6 +14,7 @@ public:
     ~ThreadPool() = default;
 
     static void Initialize();
+    static void WaitUntilAllTasksFinished();
     static void Terminate();
 
     template <typename F, typename R = std::invoke_result_t<std::decay_t<F>>>
