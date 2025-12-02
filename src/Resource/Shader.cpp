@@ -94,11 +94,19 @@ bool Shader::SendToGPU(RHIRenderer* renderer)
     }
     
     m_uniforms = renderer->GetUniforms(this);
+    
+    m_pipeline = renderer->CreatePipeline(m_vertexShader.get().get(), m_fragmentShader.get().get(), m_uniforms);
+    
     return true;
 }
 
 void Shader::Unload()
 {
+}
+
+void Shader::SendValue(void* value, uint32_t size, RHIRenderer* renderer)
+{
+    renderer->SendValue(value, size, this);
 }
 
 void Shader::OnShaderSent()

@@ -3,11 +3,14 @@
 #include <vector>
 
 #include "RHIIndexBuffer.h"
+#include "RHIPipeline.h"
 #include "RHIShaderBuffer.h"
 #include "RHITexture.h"
 #include "RHIVertexBuffer.h"
 #include "Utils/Type.h"
 
+class VertexShader;
+class FragmentShader;
 class Shader;
 struct Uniform;
 enum class ShaderType;
@@ -47,6 +50,8 @@ public:
     virtual void Update() = 0;
     virtual void EndFrame() = 0;
     virtual bool MultiThreadSendToGPU() = 0;
+    virtual void ClearColor() const = 0;
+    virtual void DrawVertex(RHIVertexBuffer* _vertexBuffer, RHIIndexBuffer* indexBuffer) = 0;
     
     virtual void DrawFrame() {}
     
@@ -54,9 +59,12 @@ public:
     virtual std::unique_ptr<RHIVertexBuffer> CreateVertexBuffer(const float* data, uint32_t size, uint32_t floatPerVertex) = 0;
     virtual std::unique_ptr<RHIIndexBuffer> CreateIndexBuffer(const uint32_t* data, uint32_t size) = 0;
     virtual std::unique_ptr<RHIShaderBuffer> CreateShaderBuffer(const std::string& code) = 0;
+    virtual std::unique_ptr<RHIPipeline> CreatePipeline(const VertexShader* vertexShader, const FragmentShader* fragmentShader, const std::vector<Uniform>& uniforms) = 0;
     
     virtual std::string CompileShader(ShaderType type, const std::string& code) = 0;
     virtual std::vector<Uniform> GetUniforms(Shader* shader) = 0;
+    virtual void SendValue(void* value, uint32_t size, Shader* shader) = 0;
+    virtual void BindShader(Shader* shader) = 0;
     
     virtual void SetDefaultTexture(const SafePtr<Texture>& texture) = 0;
     

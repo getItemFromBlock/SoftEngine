@@ -2,6 +2,7 @@
 #include "IResource.h"
 #include "Utils/Type.h"
 
+#include "Render/RHI/RHIPipeline.h"
 #include "Render/RHI/RHIShaderBuffer.h"
 
 class FragmentShader;
@@ -9,6 +10,7 @@ class VertexShader;
 
 enum class ShaderType
 {
+    None,
     Vertex,
     Fragment
 };
@@ -45,6 +47,9 @@ enum class UniformType
     Vec2,
     Vec3,
     Vec4,
+    IVec2,
+    IVec3,
+    IVec4,
     Mat2,
     Mat3,
     Mat4,
@@ -53,14 +58,25 @@ enum class UniformType
     SamplerCube
 };
 
-struct Uniform
-{
+struct UniformMember {
     std::string name;
-    UniformType type;
-    uint32_t binding;
-    uint32_t set;
-    uint32_t size;
-    std::vector<Uniform> members;
+    std::string typeName;
+    UniformType type = UniformType::None;
+    uint32_t offset = 0;
+    uint32_t size = 0;
+    bool isArray = false;
+    std::vector<uint32_t> arrayDims;
+    std::vector<UniformMember> members;
+};
+
+struct Uniform {
+    std::string name;
+    uint32_t set = 0;
+    uint32_t binding = 0;
+    uint32_t size = 0;
+    UniformType type = UniformType::None;
+    std::vector<UniformMember> members;
+    ShaderType shaderType = ShaderType::None;
 };
 
 class Shader : public IResource
@@ -79,6 +95,10 @@ public:
     std::vector<Uniform> GetUniforms() const { return m_uniforms; }
     VertexShader* GetVertexShader() const { return m_vertexShader.get().get(); }
     FragmentShader* GetFragmentShader() const { return m_fragmentShader.get().get(); }
+    
+    void SendValue(void* value, uint32_t size, RHIRenderer* renderer);
+    
+    RHIPipeline* GetPipeline() const { return m_pipeline.get(); }
 private:
     void OnShaderSent();
 private:
@@ -86,4 +106,5 @@ private:
     SafePtr<FragmentShader> m_fragmentShader;
     
     std::vector<Uniform> m_uniforms;
+    std::unique_ptr<RHIPipeline> m_pipeline;
 };

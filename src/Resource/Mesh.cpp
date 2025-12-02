@@ -2,8 +2,6 @@
 
 #include "Debug/Log.h"
 #include "Render/RHI/RHIRenderer.h"
-#include "Render/Vulkan/VulkanIndexBuffer.h"
-#include "Render/Vulkan/VulkanVertexBuffer.h"
 
 bool Mesh::Load(ResourceManager* resourceManager)
 {
@@ -12,10 +10,7 @@ bool Mesh::Load(ResourceManager* resourceManager)
 }
 
 bool Mesh::SendToGPU(RHIRenderer* renderer)
-{
-    // VkDeviceSize vertexBufferSize = m_vertices.size() * sizeof(float);
-    // VkDeviceSize indexBufferSize = m_indices.size() * sizeof(uint32_t);
-    
+{    
     uint32_t floatsPerVertex = 11;
     m_vertexBuffer = renderer->CreateVertexBuffer(
         m_vertices.data(), 

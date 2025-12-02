@@ -5,6 +5,7 @@
 
 #include "Render/RHI/RHIRenderer.h"
 #include "Render/Vulkan/VulkanRenderer.h"
+#include "Resource/Mesh.h"
 
 #include "Resource/ResourceManager.h"
 #include "Resource/Model.h"
@@ -48,7 +49,7 @@ int Run(int argc, char** argv, char** envp)
 
     SafePtr<Model> cubeModel = resourceManager->Load<Model>("resources/models/Cube.obj");
     SafePtr cubeTexture = resourceManager->GetDefaultTexture();
-    // SafePtr cubeShader = resourceManager->GetDefaultShader();
+    SafePtr cubeShader = resourceManager->GetDefaultShader();
 
     dynamic_cast<VulkanRenderer*>(renderer.get())->SetModel(cubeModel);
     dynamic_cast<VulkanRenderer*>(renderer.get())->SetTexture(cubeTexture);
@@ -61,15 +62,67 @@ int Run(int argc, char** argv, char** envp)
 
         resourceManager->UpdateResourceToSend();
 
-        if (!renderer->IsInitialized())
+        if (!renderer->IsInitialized() || !cubeShader->SentToGPU())
             continue;
         
         renderer->WaitUntilFrameFinished();
-        renderer->Update();
+        // renderer->Update();
+        {
+            Vec2i windowSize = window->GetSize();
+            static auto lastTime = std::chrono::high_resolution_clock::now();
+            auto currentTime = std::chrono::high_resolution_clock::now();
+            float deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
+            lastTime = currentTime;
+
+            static float time = 0.0f;
+            time += deltaTime;
+
+            // float fps = 1.0f / deltaTime;
+            // PrintLog("FPS:   %f", fps);
+
+            UniformBufferObject ubo;
+            Vec3f camPos = Vec3f(2.0f, 2.0f, 2.0f);
+            Vec3f camTarget = Vec3f(0.0f, 0.0f, 0.0f);
+            Vec3f camUp = Vec3f(0.0f, 1.0f, 0.0f);
+
+            float distanceInFront = 5.f;
+            Vec3f forward = Vec3f::Normalize(camTarget - camPos);
+            Vec3f cubePosition = camPos + forward * distanceInFront;
+
+            float angle = time * 90.0f;
+            ubo.Model = Mat4::CreateTransformMatrix(cubePosition, Vec3f(0.f, angle, 0.f), Vec3f(1.f, 1.f, 1.f));
+
+            Quat camRotation = Quat::LookRotation(camTarget - camPos, camUp);
+
+            Mat4 out = Mat4::CreateTransformMatrix(camPos, camRotation, Vec3f(1, 1, 1));
+            ubo.View = Mat4::LookAtRH(camPos, camTarget, camUp);
+
+            ubo.Projection = Mat4::CreateProjectionMatrix(
+                45.f, (float)windowSize.x / (float)windowSize.y, 0.1f, 10.0f);
+            ubo.Projection[1][1] *= -1; // GLM -> Vulkan Y flip
+
+            cubeShader->SendValue(&ubo, sizeof(ubo), renderer.get());
+        }
         if (!renderer->BeginFrame())
             continue;
         
-        renderer->DrawFrame();
+        renderer->ClearColor();
+
+        renderer->BindShader(cubeShader.get().get());
+
+        // Draw the model if available
+        if (cubeModel && cubeModel->IsLoaded() && cubeModel->SentToGPU())
+        {
+            auto meshes = cubeModel->GetMeshes();
+
+            for (auto* mesh : meshes)
+            {
+                if (!mesh || !mesh->GetVertexBuffer() || !mesh->GetIndexBuffer())
+                    continue;
+
+                renderer->DrawVertex(mesh->GetVertexBuffer(), mesh->GetIndexBuffer());
+            }
+        }
         
         renderer->EndFrame();
         

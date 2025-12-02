@@ -54,6 +54,7 @@ public:
     bool BeginFrame() override;
     void Update() override;
     void EndFrame() override;
+    void DrawVertex(RHIVertexBuffer* _vertexBuffer, RHIIndexBuffer* _indexBuffer) override;
     
     void DrawFrame() override;
     
@@ -61,13 +62,17 @@ public:
     
     std::string CompileShader(ShaderType type, const std::string& code) override;
     std::vector<Uniform> GetUniforms(Shader* shader) override;
+    void SendValue(void* value, uint32_t size, Shader* shader) override;
+    void BindShader(Shader* shader) override;
     
     std::unique_ptr<RHITexture> CreateTexture(const ImageLoader::Image& image) override;
     std::unique_ptr<RHIVertexBuffer> CreateVertexBuffer(const float* data, uint32_t size, uint32_t floatPerVertex) override;
     std::unique_ptr<RHIIndexBuffer> CreateIndexBuffer(const uint32_t* data, uint32_t size) override;
     std::unique_ptr<RHIShaderBuffer> CreateShaderBuffer(const std::string& code) override;
+    std::unique_ptr<RHIPipeline> CreatePipeline(const VertexShader* vertexShader, const FragmentShader* fragmentShader, const std::vector<Uniform>& uniforms) override;
     
     void SetDefaultTexture(const SafePtr<Texture>& texture) override;
+    void ClearColor() const;
 
     void SetModel(const SafePtr<Model>& model);
     void SetTexture(const SafePtr<Texture>& texture);
@@ -83,15 +88,10 @@ private:
     std::unique_ptr<VulkanDevice> m_device;
     std::unique_ptr<VulkanSwapChain> m_swapChain;
     std::unique_ptr<VulkanRenderPass> m_renderPass;
-    std::unique_ptr<VulkanPipeline> m_pipeline;
     std::unique_ptr<VulkanFramebuffer> m_framebuffer;
     std::unique_ptr<VulkanCommandPool> m_commandPool;
     std::unique_ptr<VulkanSyncObjects> m_syncObjects;
     std::unique_ptr<VulkanDepthBuffer> m_depthBuffer;
-    std::unique_ptr<VulkanUniformBuffer> m_uniformBuffer;
-    std::unique_ptr<VulkanDescriptorPool> m_descriptorPool;
-    std::unique_ptr<VulkanDescriptorSet> m_descriptorSet;
-    std::unique_ptr<VulkanDescriptorSetLayout> m_descriptorSetLayout;
 
     uint32_t m_imageIndex = 0;
     

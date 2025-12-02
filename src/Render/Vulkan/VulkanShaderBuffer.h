@@ -15,6 +15,8 @@ public:
     bool Initialize(VulkanDevice* device, const std::string& code);
     
     void CleanUp() override;
+    
+    VkShaderModule GetModule() const { return m_module; }
 private:
     VkShaderModule m_module = VK_NULL_HANDLE;
     VulkanDevice* m_device = nullptr;
