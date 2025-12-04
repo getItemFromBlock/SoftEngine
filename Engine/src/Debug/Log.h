@@ -1,9 +1,12 @@
 #pragma once
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <cstring>
-#include <assert.h>
+#include <cassert>
 #include <cstdio>
+#include <ctime>
+#include <cstdint>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -43,25 +46,22 @@ namespace Debug
         switch (value)
         {
         default:
-        case LogType::L_INFO:
-            return "Info";
-        case LogType::L_WARNING:
-            return "Warning";
-        case LogType::L_ERROR:
-            return "Error";
+        case LogType::L_INFO: return "Info";
+        case LogType::L_WARNING: return "Warning";
+        case LogType::L_ERROR: return "Error";
         }
     }
 
     class Log
     {
     public:
-        ~Log();
+        ~Log() = default;
 
         static bool LogToFile;
 
-        static void OpenFile(const std::tm& calendar_time);
+        static void OpenFile(const tm& calendar_time);
 
-        static void WriteToFile(LogType type, const std::tm& calendar_time, const char* messageAndFile);
+        static void WriteToFile(LogType type, const tm& calendar_time, const char* messageAndFile);
 
         static void CloseFile();
         
@@ -70,8 +70,8 @@ namespace Debug
         template <typename... Args>
         static void Print(const char* file, int line, LogType type, const char* format, Args... args)
         {
-            std::time_t now = std::time(nullptr);
-            std::tm calendar_time;
+            time_t now = std::time(nullptr);
+            tm calendar_time;
 
         #ifdef _WIN32
             localtime_s(&calendar_time, &now);
@@ -80,9 +80,7 @@ namespace Debug
         #endif
 
             if (LogToFile && !m_isFileOpen)
-            {
                 OpenFile(calendar_time);
-            }
 
             std::string message = FormatString(format, args...);
             std::string fileLine = FormatString("%s (l:%d): ", file, line);
@@ -97,50 +95,30 @@ namespace Debug
             SetConsoleTextAttribute(hConsole, 14); // Yellow for fileLine
             std::cout << fileLine;
             switch (type) {
-                case LogType::L_INFO:
-                    SetConsoleTextAttribute(hConsole, 15); // White
-                    break;
-                case LogType::L_WARNING:
-                    SetConsoleTextAttribute(hConsole, 14); // Yellow
-                    break;
-                case LogType::L_ERROR:
-                    SetConsoleTextAttribute(hConsole, 4); // Red
-                    break;
-                default:
-                    break;
+                case LogType::L_INFO: SetConsoleTextAttribute(hConsole, 15); break;
+                case LogType::L_WARNING: SetConsoleTextAttribute(hConsole, 14); break;
+                case LogType::L_ERROR: SetConsoleTextAttribute(hConsole, 4); break;
+                default: break;
             }
             std::cout << message << std::endl;
-            SetConsoleTextAttribute(hConsole, 15); // Reset to default
+            SetConsoleTextAttribute(hConsole, 15); // Reset
         #else
-            switch (type)
-            {
-                case LogType::L_INFO:
-                    std::cout << "\033[37m"; // White
-                    break;
-                case LogType::L_WARNING:
-                    std::cout << "\033[33m"; // Yellow
-                    break;
-                case LogType::L_ERROR:
-                    std::cout << "\033[31m"; // Red
-                    break;
-                default:
-                    break;
+            switch (type) {
+                case LogType::L_INFO: std::cout << "\033[37m"; break;
+                case LogType::L_WARNING: std::cout << "\033[33m"; break;
+                case LogType::L_ERROR: std::cout << "\033[31m"; break;
+                default: break;
             }
-            std::cout << result;
-            std::cout << "\033[0m"; // Reset color
+            std::cout << result << "\033[0m"; // Reset
         #endif
 
             if (LogToFile && m_isFileOpen)
-            {
                 WriteToFile(type, calendar_time, messageAndFile.c_str());
-            }
-            
-#ifndef NDEBUG
+
+        #ifndef NDEBUG
             if (type == LogType::L_ERROR)
-            {
                 ShouldBreak(message);
-            }
-#endif
+        #endif
         }
 
     private:
@@ -156,5 +134,4 @@ namespace Debug
 #define PrintError(x, ...) Debug::Log::Print(__FILENAME__, __LINE__, Debug::LogType::L_ERROR, x, ##__VA_ARGS__)
 
 #define UNUSED(x) (void)(x)
-
 #define ASSERT(x) if (!(x)) { PrintError("Assertion failed: %s", #x); __debugbreak(); }

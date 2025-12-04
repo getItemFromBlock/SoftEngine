@@ -1,5 +1,7 @@
 ﻿#include "File.h"
 
+#include <sstream>
+
 bool File::ReadAllBytes(const std::filesystem::path& path, std::vector<uint8_t>& out)
 {
     File file(path);

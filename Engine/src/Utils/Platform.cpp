@@ -3,6 +3,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <thread>
+#include <cstdint>
 
 #include "Core/Window.h"
 
@@ -145,6 +146,8 @@ void Platform::SetThreadName(uint32_t threadId, const char* name)
 {
 #ifdef _WIN32
     ::SetThreadName(threadId, name);
+#elif defined(__linux__)
+    SetThreadName(name);
 #endif
 }
 #pragma endregion 
