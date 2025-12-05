@@ -20,7 +20,12 @@ public:
     template <typename F, typename R = std::invoke_result_t<std::decay_t<F>>>
     static std::future<R> Enqueue(F&& task)
     {
+#ifdef MULTI_THREAD
         return s_instance->m_threadPool->submit_task(std::forward<F>(task));
+#else
+        task();
+        return std::future<R>();
+#endif
     }
 
 private:

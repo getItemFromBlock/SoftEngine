@@ -240,6 +240,14 @@ void VulkanRenderer::DrawFrame()
 {
     RecordCommandBuffer(m_commandPool->GetCommandBuffer(m_currentFrame), m_imageIndex);
 }
+bool VulkanRenderer::MultiThreadSendToGPU()
+{
+#ifdef MULTI_THREAD
+    return true;
+#else
+    return false;
+#endif
+}
 
 void VulkanRenderer::EndFrame()
 {

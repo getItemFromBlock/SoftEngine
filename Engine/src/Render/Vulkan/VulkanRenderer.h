@@ -58,8 +58,8 @@ public:
     
     void DrawFrame() override;
     
-    bool MultiThreadSendToGPU() override { return true; }
-    
+    bool MultiThreadSendToGPU() override;
+
     std::string CompileShader(ShaderType type, const std::string& code) override;
     std::vector<Uniform> GetUniforms(Shader* shader) override;
     void SendTexture(uint32_t index, Texture* texture, Shader* shader) override;

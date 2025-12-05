@@ -318,18 +318,10 @@ void VulkanDevice::CreateLogicalDevice(VkSurfaceKHR surface)
 
     vkGetDeviceQueue(m_device, indices.graphicsFamily.value(), 0, &m_graphicsQueue.handle);
     vkGetDeviceQueue(m_device, indices.presentFamily.value(), 0, &m_presentQueue.handle);
-    
-    m_graphicsQueue.mutex = &m_graphicsQueueMutex;
-    m_graphicsQueue.shouldDelete = false;
-    m_presentQueue.shouldDelete = false;
-    
+        
     if (indices.graphicsFamily == indices.presentFamily)
     {
-        m_presentQueue.mutex = &m_graphicsQueueMutex;
-    }
-    else
-    {
-        m_presentQueue.mutex = &m_presentQueueMutex;
+        m_presentQueue.mutex = m_graphicsQueue.mutex;
     }
 }
 

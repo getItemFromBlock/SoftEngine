@@ -1,58 +1,47 @@
 ﻿#include <iostream>
-
 #include "Core/Engine.h"
-#include "Core/Window.h"
-#include "Debug/Log.h"
 
-#include "Render/RHI/RHIRenderer.h"
-#include "Render/Vulkan/VulkanRenderer.h"
-#include "Resource/Mesh.h"
+int Run(int argc, char** argv, char** envp)
+{
+    (void)argc; (void)argv; (void)envp;
 
-#include "Resource/ResourceManager.h"
-#include "Resource/Model.h"
-#include "Resource/Texture.h"
+    Engine engine;
+    engine.Initialize();
+    engine.Run();
+    engine.Cleanup();
+    return 0;
+}
 
-#include "Utils/Type.h"
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
 
 #if defined(_MSC_VER)
 #include <crtdbg.h>
 #endif
 
-int Run(int argc, char** argv, char** envp)
+
+#if defined(_WIN32) && defined(_MSC_VER) && defined(NDEBUG)
+int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR cmdLine, int cmdShow)
 {
-    (void)argc;
-    (void)argv;
-    (void)envp;
+    (void)hInst; (void)hPrev; (void)cmdLine; (void)cmdShow;
 
-    Engine engine;
-    engine.Initialize();
+    int argc = __argc;
+    char** argv = __argv;
+    char** envp = nullptr;
 
-    engine.Run();
-
-    engine.Cleanup();
-
-    return 0;
+    return Run(argc, argv, envp);
 }
 
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#endif
-
-#if defined(_WIN32) && defined(NDEBUG)
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdShow)
 #else
 int main(int argc, char** argv, char** envp)
-#endif
 {
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && !defined(NDEBUG)
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-#if defined(NDEBUG) && defined(_WIN32)
-    argc = __argc;
-    argv = __argv;
-    envp = nullptr;
-#endif
+    // _CrtSetBreakAlloc(2368);
 #endif
 
     return Run(argc, argv, envp);
 }
+#endif

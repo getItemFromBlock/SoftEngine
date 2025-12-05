@@ -12,15 +12,9 @@ class VulkanTexture;
 struct VulkanQueue
 {
     VulkanQueue(VkQueue _queue) : handle(_queue) {}
-    ~VulkanQueue()
-    {
-        if (shouldDelete)
-            delete mutex;
-    }
     
     VkQueue handle;
-    std::mutex* mutex = new std::mutex();
-    bool shouldDelete = true;
+    std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>();
 };
 
 
@@ -69,8 +63,6 @@ private:
     VulkanQueue m_graphicsQueue = VK_NULL_HANDLE;
     VulkanQueue m_presentQueue = VK_NULL_HANDLE;
     
-    std::mutex m_graphicsQueueMutex;
-    std::mutex m_presentQueueMutex;
     std::mutex m_mutex;
     
     VulkanTexture* m_defaultTexture = nullptr;

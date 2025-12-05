@@ -2,11 +2,20 @@
 
 #include "ThreadPool.h"
 #include "Window.h"
+
 #include "Debug/Log.h"
+
 #include "Render/Vulkan/VulkanRenderer.h"
+
 #include "Resource/Mesh.h"
 #include "Resource/Model.h"
 #include "Resource/ResourceManager.h"
+
+#include "Scene/Scene.h"
+
+#include "Component/MeshComponent.h"
+#include "Component/TransformComponent.h"
+#include "Scene/GameObject.h"
 
 bool Engine::Initialize()
 {
@@ -36,14 +45,26 @@ bool Engine::Initialize()
     m_resourceManager->LoadDefaultTexture(RESOURCE_PATH"/textures/debug.jpeg");
     m_resourceManager->LoadDefaultShader(RESOURCE_PATH"/shaders/unlit.shader");
     
+    m_componentRegister = std::make_unique<ComponentRegister>();
+    m_componentRegister->RegisterComponent<TransformComponent>();
+    m_componentRegister->RegisterComponent<MeshComponent>();
+    
     return true;
 }
 
 void Engine::Run()
 {
-    SafePtr<Model> cubeModel = m_resourceManager->Load<Model>(RESOURCE_PATH"/models/Cube.obj");
+    Scene scene;
+    SafePtr cubeModel = m_resourceManager->Load<Model>(RESOURCE_PATH"/models/Cube.obj");
+    cubeModel->OnLoaded.Bind([&]()
+    {
+        SafePtr cubeMesh = m_resourceManager->GetResource<Mesh>(cubeModel->GetMeshes()[0]->GetPath());
     
-    SafePtr cubeShader = m_resourceManager->GetDefaultShader();    
+        SafePtr<GameObject> object = scene.CreateGameObject();
+        SafePtr<MeshComponent> meshComp = object->AddComponent<MeshComponent>();
+        meshComp->SetMesh(cubeMesh);
+    });
+    SafePtr cubeShader = m_resourceManager->GetDefaultShader();
 
     bool process = false;
     static auto startTime = std::chrono::high_resolution_clock::now(); 
@@ -60,10 +81,11 @@ void Engine::Run()
 
         m_resourceManager->UpdateResourceToSend();
 
-        if (!m_renderer->IsInitialized() || !cubeShader->SentToGPU())
+        if (!m_renderer->IsInitialized() || !cubeShader || !cubeShader->SentToGPU())
             continue;
         
         m_renderer->WaitUntilFrameFinished();
+        
         {
             Vec2i windowSize = m_window->GetSize();
 
@@ -87,6 +109,7 @@ void Engine::Run()
 
             cubeShader->SendValue(&ubo, sizeof(ubo), m_renderer.get());
         }
+        scene.OnUpdate(deltaTime);
         if (!m_renderer->BeginFrame())
             continue;
         

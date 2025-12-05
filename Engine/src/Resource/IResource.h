@@ -12,7 +12,7 @@ class RHIRenderer;
 class IResource
 {
 public:
-    IResource(std::filesystem::path path) : p_path(std::move(path)) {}
+    IResource(const std::filesystem::path& path) : p_path(path.generic_string()) {}
     IResource(const IResource&) = delete;
     IResource(IResource&&) = delete;
     IResource& operator=(const IResource&) = delete;

@@ -18,6 +18,7 @@ public:
 private:
     uint64_t m_UUID;
 };
+constexpr uint64_t UUID_INVALID = 0xffffffffffffffffllu;
 
 namespace std
 {

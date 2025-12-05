@@ -2,6 +2,9 @@
 #include <memory>
 
 #include "Resource/ResourceManager.h"
+#include "Core/Window.h"
+#include "Render/RHI/RHIRenderer.h"
+#include "Scene/ComponentHandler.h"
 
 class Engine
 {
@@ -14,4 +17,5 @@ private:
     std::unique_ptr<Window> m_window;
     std::unique_ptr<RHIRenderer> m_renderer;
     std::unique_ptr<ResourceManager> m_resourceManager;
+    std::unique_ptr<ComponentRegister> m_componentRegister;
 };

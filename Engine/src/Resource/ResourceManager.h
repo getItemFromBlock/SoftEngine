@@ -79,6 +79,7 @@ public:
         }
 
         std::shared_ptr<T> resource = std::make_shared<T>(resourcePath);
+        AddResource(resource);
         if (multiThread)
         {
             ThreadPool::Enqueue([this, hash]() {
@@ -109,7 +110,6 @@ public:
                 }
             }
         }
-        AddResource(resource);
         return resource;
     }
     

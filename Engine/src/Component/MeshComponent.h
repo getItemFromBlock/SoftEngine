@@ -8,15 +8,14 @@ class Material;
 class MeshComponent : public IComponent
 {
 public:
-    MeshComponent() = default;
-    MeshComponent& operator=(const MeshComponent& other) = default;
-    MeshComponent(const MeshComponent&) = default;
-    MeshComponent(MeshComponent&&) noexcept = default;
-    ~MeshComponent() override = default;
+    using IComponent::IComponent;
     
     void OnUpdate(float deltaTime) override;
     void OnRender() override;
     
+    void SetMesh(const SafePtr<Mesh>& mesh);
+    
+    void AddMaterial(const SafePtr<Material>& material);
 private:
     std::vector<SafePtr<Material>> m_materials;
     SafePtr<Mesh> m_mesh;
