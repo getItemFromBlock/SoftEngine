@@ -134,4 +134,4 @@ namespace Debug
 #define PrintError(x, ...) Debug::Log::Print(__FILENAME__, __LINE__, Debug::LogType::L_ERROR, x, ##__VA_ARGS__)
 
 #define UNUSED(x) (void)(x)
-#define ASSERT(x) if (!(x)) { PrintError("Assertion failed: %s", #x); __debugbreak(); }
+#define ASSERT(x) if (!(x)) { PrintError("Assertion failed: %s", #x); }

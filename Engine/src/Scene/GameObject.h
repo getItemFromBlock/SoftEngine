@@ -30,7 +30,7 @@ public:
 
     UUID GetUUID() const { return m_uuid; }
     
-    void SetName(std::string name) { m_name = std::move(m_name); }
+    void SetName(std::string name) { m_name = std::move(name); }
     std::string GetName() const { return m_name; }
     
     SafePtr<GameObject> GetParent();

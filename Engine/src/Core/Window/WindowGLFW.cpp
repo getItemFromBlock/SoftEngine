@@ -115,7 +115,8 @@ void* WindowGLFW::GetNativeHandle() const
     // return glfwGetCocoaWindow(GetHandle());
     return nullptr;
 #else
-    return glfwGetX11Window(GetHandle());
+    // return glfwGetX11Window(GetHandle());
+    return nullptr;
 #endif
 }
 
