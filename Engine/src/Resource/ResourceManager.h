@@ -15,6 +15,7 @@
 #define RESOURCE_PATH "Engine/resources/"
 
 
+class Material;
 class Shader;
 class Texture;
 class RHIRenderer;
@@ -174,9 +175,11 @@ public:
     
     void LoadDefaultShader(const std::filesystem::path& shaderPath);
     void LoadDefaultTexture(const std::filesystem::path& texturePath);
+    void LoadDefaultMaterial(const std::filesystem::path& materialPath);
     
     std::shared_ptr<Shader> GetDefaultShader() const;
     std::shared_ptr<Texture> GetDefaultTexture() const;
+    std::shared_ptr<Material> GetDefaultMaterial() const;
 
 private:
     static uint64_t GetHash(const std::filesystem::path& resourcePath)
@@ -190,4 +193,5 @@ private:
     
     uint64_t m_defaultTexture;
     uint64_t m_defaultShader;
+    uint64_t m_defaultMaterial;
 };

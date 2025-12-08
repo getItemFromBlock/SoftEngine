@@ -6,6 +6,7 @@
 #include "ComponentHandler.h"
 #include "Utils/Type.h"
 
+class RHIRenderer;
 class IComponent;
 class GameObject;
 class Scene
@@ -17,7 +18,7 @@ public:
     Scene(Scene&&) noexcept = default;
     virtual ~Scene();
 
-    void OnRender();
+    void OnRender(RHIRenderer* renderer);
     void OnUpdate(float deltaTime) const;
 
     SafePtr<GameObject> CreateGameObject(GameObject* parent = nullptr);

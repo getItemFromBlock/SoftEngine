@@ -5,10 +5,11 @@ int Run(int argc, char** argv, char** envp)
 {
     (void)argc; (void)argv; (void)envp;
 
-    Engine engine;
-    engine.Initialize();
-    engine.Run();
-    engine.Cleanup();
+    Engine::Create();
+    Engine* engine = Engine::Get();
+    engine->Initialize();
+    engine->Run();
+    engine->Cleanup();
     return 0;
 }
 

@@ -17,6 +17,13 @@
 #include "Component/TransformComponent.h"
 #include "Scene/GameObject.h"
 
+void Engine::Create()
+{
+    if (s_instance)
+        return;
+    s_instance = std::make_unique<Engine>();
+}
+
 bool Engine::Initialize()
 {
     WindowConfig config;
@@ -44,6 +51,7 @@ bool Engine::Initialize()
     m_resourceManager->Initialize(m_renderer.get());
     m_resourceManager->LoadDefaultTexture(RESOURCE_PATH"/textures/debug.jpeg");
     m_resourceManager->LoadDefaultShader(RESOURCE_PATH"/shaders/unlit.shader");
+    m_resourceManager->LoadDefaultMaterial(RESOURCE_PATH"/shaders/unlit.material");
     
     m_componentRegister = std::make_unique<ComponentRegister>();
     m_componentRegister->RegisterComponent<TransformComponent>();
@@ -63,6 +71,7 @@ void Engine::Run()
         SafePtr<GameObject> object = scene.CreateGameObject();
         SafePtr<MeshComponent> meshComp = object->AddComponent<MeshComponent>();
         meshComp->SetMesh(cubeMesh);
+        meshComp->AddMaterial(m_resourceManager->GetDefaultMaterial());
     });
     SafePtr cubeShader = m_resourceManager->GetDefaultShader();
 
@@ -86,53 +95,15 @@ void Engine::Run()
         
         m_renderer->WaitUntilFrameFinished();
         
-        {
-            Vec2i windowSize = m_window->GetSize();
-
-            UniformBufferObject ubo;
-            Vec3f camPos = Vec3f(2.0f, 2.0f, 2.0f);
-            Vec3f camTarget = Vec3f(0.0f, 0.0f, 0.0f);
-            Vec3f camUp = Vec3f(0.0f, 1.0f, 0.0f);
-
-            float distanceInFront = 5.f;
-            Vec3f forward = Vec3f::Normalize(camTarget - camPos);
-            Vec3f cubePosition = camPos + forward * distanceInFront;
-
-            float angle = time * 90.0f;
-            ubo.Model = Mat4::CreateTransformMatrix(cubePosition, Vec3f(0.f, angle, 0.f), Vec3f(1.f, 1.f, 1.f));
-
-            ubo.View = Mat4::LookAtRH(camPos, camTarget, camUp);
-
-            ubo.Projection = Mat4::CreateProjectionMatrix(
-                45.f, (float)windowSize.x / (float)windowSize.y, 0.1f, 10.0f);
-            ubo.Projection[1][1] *= -1; // GLM -> Vulkan Y flip
-
-            cubeShader->SendValue(&ubo, sizeof(ubo), m_renderer.get());
-        }
         scene.OnUpdate(deltaTime);
         if (!m_renderer->BeginFrame())
             continue;
         
         m_renderer->ClearColor();
 
-        m_renderer->BindShader(cubeShader.get().get());
-
-        // Draw the model if available
-        if (cubeModel && cubeModel->IsLoaded() && cubeModel->SentToGPU())
-        {
-            auto meshes = cubeModel->GetMeshes();
-
-            for (auto* mesh : meshes)
-            {
-                if (!mesh || !mesh->GetVertexBuffer() || !mesh->GetIndexBuffer())
-                    continue;
-
-                m_renderer->DrawVertex(mesh->GetVertexBuffer(), mesh->GetIndexBuffer());
-            }
-        }
+        scene.OnRender(m_renderer.get());
         
         m_renderer->EndFrame();
-        
     }
 }
 
@@ -149,4 +120,9 @@ void Engine::Cleanup() const
     ThreadPool::Terminate();
 
     m_window->Terminate();
+}
+
+Engine* Engine::Get()
+{
+    return s_instance.get();
 }

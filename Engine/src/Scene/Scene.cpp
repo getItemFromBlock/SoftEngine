@@ -19,13 +19,13 @@ Scene::~Scene()
 {
 }
 
-void Scene::OnRender()
+void Scene::OnRender(RHIRenderer* renderer)
 {
     for (const std::vector<std::shared_ptr<IComponent>>& componentList : m_components | std::views::values)
     {
         for (const std::shared_ptr<IComponent>& component : componentList)
         {
-            component->OnRender();
+            component->OnRender(renderer);
         }
     }
 }

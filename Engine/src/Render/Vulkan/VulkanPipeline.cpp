@@ -527,9 +527,14 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkRenderPass renderPass, V
         // --- Descriptor Pool Creation ---
         
         std::vector<VkDescriptorPoolSize> poolSizes;
+        poolSizes.reserve(descriptorTypeCounts.size());
         for (const auto& [type, count] : descriptorTypeCounts)
         {
-            poolSizes.push_back({type, count * MAX_FRAMES_IN_FLIGHT}); 
+            poolSizes.push_back(
+            {
+                .type = type, 
+                .descriptorCount = count * MAX_FRAMES_IN_FLIGHT
+            }); 
         }
 
         m_descriptorPool = std::make_unique<VulkanDescriptorPool>();

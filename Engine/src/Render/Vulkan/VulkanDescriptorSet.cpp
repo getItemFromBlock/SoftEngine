@@ -148,7 +148,8 @@ void VulkanDescriptorSet::UpdateDescriptorSets(uint32_t frameIndex, uint32_t ind
         else if (uniforms[i].type == UniformType::Sampler2D)
         {
             VulkanTexture* vulkanTexture = dynamic_cast<VulkanTexture*>(defaultTexture->GetBuffer());
-            if (!vulkanTexture) continue;
+            if (!vulkanTexture) 
+                continue;
             VkDescriptorImageInfo imageInfo{};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             imageInfo.imageView = vulkanTexture->GetImageView();

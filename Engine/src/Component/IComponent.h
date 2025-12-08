@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "Core/UUID.h"
 
+class RHIRenderer;
 class GameObject;
 class IComponent
 {
@@ -15,7 +16,7 @@ public:
     virtual void OnCreate() {}
     virtual void OnStart() {}
     virtual void OnUpdate(float deltaTime) {}
-    virtual void OnRender() {}
+    virtual void OnRender(RHIRenderer* renderer) {}
     virtual void OnDestroy() {}
     
     UUID GetUUID() const { return m_uuid; }

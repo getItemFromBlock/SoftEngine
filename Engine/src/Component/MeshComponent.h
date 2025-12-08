@@ -11,7 +11,7 @@ public:
     using IComponent::IComponent;
     
     void OnUpdate(float deltaTime) override;
-    void OnRender() override;
+    void OnRender(RHIRenderer* renderer) override;
     
     void SetMesh(const SafePtr<Mesh>& mesh);
     

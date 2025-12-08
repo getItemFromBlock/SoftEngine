@@ -31,17 +31,14 @@ struct MaterialAttributes
 class Material : public IResource
 {
 public:
-    Material() = default;
-    Material(const Material&) = delete;
-    Material(Material&&) = delete;
-    Material& operator=(const Material&) = delete;
-    ~Material() override = default;
+    using IResource::IResource;
     
     bool Load(ResourceManager* resourceManager) override;
     bool SendToGPU(RHIRenderer* renderer) override;
     void Unload() override;
     
     void SetShader(const SafePtr<Shader>& shader);
+    SafePtr<Shader> GetShader() const { return m_shader; }
 
     void SetAttribute(const std::string& name, float attribute);
     void SetAttribute(const std::string& name, int attribute);
@@ -53,4 +50,5 @@ private:
     SafePtr<Shader> m_shader;
     
     MaterialAttributes m_attributes;
+    MaterialAttributes m_temporaryAttributes;
 };
