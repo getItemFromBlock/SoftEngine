@@ -4,6 +4,7 @@ add_rules("mode.debug", "mode.release")
 
 if is_plat("windows") then
     set_runtimes(is_mode("debug") and "MDd" or "MD")
+    add_cxxflags("/wd4100")
 elseif is_plat("macosx") then
     add_cxxflags("-Wno-enum-enum-conversion", {force = true})
     add_cxxflags("-Wno-error=deprecated-declarations", {force = true})

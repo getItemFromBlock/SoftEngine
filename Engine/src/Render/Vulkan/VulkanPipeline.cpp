@@ -8,6 +8,7 @@
 #include <array>
 #include <iostream>
 #include <fstream>
+#include <ranges>
 #include <stdexcept>
 
 #include "VulkanDevice.h"
@@ -318,19 +319,19 @@ static VkShaderStageFlags ConvertType(ShaderType type)
 }
 
 bool VulkanPipeline::Initialize(VulkanDevice* device, VkRenderPass renderPass, VkExtent2D extent,
-                                const std::vector<Uniform>& uniforms, const VertexShader* vertexShader, const FragmentShader* fragShader,
+                                const Uniforms& uniforms, const VertexShader* vertexShader, const FragmentShader* fragShader,
                                 uint32_t MAX_FRAMES_IN_FLIGHT, Texture* defaultTexture)
 {
     m_device = device;
     try
     {
         // --- Descriptor Set Layouts and Pool Sizing ---
-
         std::unordered_map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> layoutBindings;
         std::unordered_map<VkDescriptorType, uint32_t> descriptorTypeCounts;
-        uint32_t maxUniformBufferSize = 0; // Initialize tracking for the largest required UBO size
 
-        for (const auto& uniform : uniforms)
+        std::unordered_map<UBOBinding, uint32_t> uniformBufferSizes; 
+
+        for (const auto& uniform : uniforms | std::views::values)
         {
             VkDescriptorSetLayoutBinding layoutBinding{};
             layoutBinding.binding = uniform.binding;
@@ -338,15 +339,16 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkRenderPass renderPass, V
             layoutBinding.descriptorType = ConvertType(uniform.type);
             layoutBinding.pImmutableSamplers = nullptr;
             layoutBinding.stageFlags = ConvertType(uniform.shaderType);
-            
+    
             layoutBindings[uniform.set].push_back(layoutBinding);
 
             descriptorTypeCounts[layoutBinding.descriptorType] += 1;
 
-            // Track the maximum size needed for any Uniform Buffer
+            // Track the size needed for this specific Uniform Buffer (set, binding)
             if (layoutBinding.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
             {
-                maxUniformBufferSize = std::max(maxUniformBufferSize, uniform.size);
+                UBOBinding key = UBOBinding{uniform.set, uniform.binding};
+                uniformBufferSizes[key] = uniform.size;
             }
         }
 
@@ -510,22 +512,26 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkRenderPass renderPass, V
         if (result != VK_SUCCESS)
             throw std::runtime_error("Failed to create graphics pipeline. VkResult: " + std::to_string(result));
         
-        // --- UNIFORM BUFFER INITIALIZATION (Max Size) ---
+        // --- UNIFORM BUFFER INITIALIZATION (Per-Binding) ---
         
-        if (maxUniformBufferSize > 0)
+        for (const auto& [key, size] : uniformBufferSizes)
         {
-            m_uniformBuffer = std::make_unique<VulkanUniformBuffer>();
-            // Use the calculated maximum size for all uniform buffers
-            if (!m_uniformBuffer->Initialize(m_device, maxUniformBufferSize, MAX_FRAMES_IN_FLIGHT)) 
+            uint32_t set = key.set;
+            uint32_t binding = key.binding;
+    
+            std::unique_ptr<VulkanUniformBuffer> ubo = std::make_unique<VulkanUniformBuffer>();
+
+            if (!ubo->Initialize(m_device, size, MAX_FRAMES_IN_FLIGHT)) 
             {
-                PrintError("Failed to initialize uniform buffer!");
+                PrintError("Failed to initialize uniform buffer for set %s binding %s!", set, binding);
                 return false;
             }
-            m_uniformBuffer->MapAll();
+            ubo->MapAll();
+    
+            m_uniformBuffers[key] = std::move(ubo);
         }
         
         // --- Descriptor Pool Creation ---
-        
         std::vector<VkDescriptorPoolSize> poolSizes;
         poolSizes.reserve(descriptorTypeCounts.size());
         for (const auto& [type, count] : descriptorTypeCounts)
@@ -539,7 +545,8 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkRenderPass renderPass, V
 
         m_descriptorPool = std::make_unique<VulkanDescriptorPool>();
         
-        if (!m_descriptorPool->Initialize(m_device, poolSizes, MAX_FRAMES_IN_FLIGHT * m_descriptorSetLayouts.size()))
+        if (!m_descriptorPool->Initialize(m_device, poolSizes, 
+            static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * m_descriptorSetLayouts.size())))
         {
             PrintError("Failed to initialize descriptor pool!");
             return false;
@@ -557,7 +564,7 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkRenderPass renderPass, V
         {
             for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
             {
-                m_descriptorSets[j]->UpdateDescriptorSets(i, j, uniforms, m_uniformBuffer.get(), defaultTexture);
+                m_descriptorSets[j]->UpdateDescriptorSets(i, j, uniforms, GetUniformBuffers(), defaultTexture);
             }
         }
         
@@ -613,6 +620,26 @@ void VulkanPipeline::Bind(VkCommandBuffer commandBuffer)
 {
     if (m_pipeline != VK_NULL_HANDLE)
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+}
+
+UniformBuffers VulkanPipeline::GetUniformBuffers() const
+{
+    UniformBuffers uniforms;
+    for (const auto& [key, value] : m_uniformBuffers)
+        uniforms[key] = value.get();
+    return uniforms;
+}
+
+VulkanUniformBuffer* VulkanPipeline::GetUniformBuffer(UBOBinding binding) const
+{
+    RHIUniformBuffer* base = m_uniformBuffers.at(binding).get();
+    return dynamic_cast<VulkanUniformBuffer*>(base);
+}
+
+VulkanUniformBuffer* VulkanPipeline::GetUniformBuffer(int set, int binding) const
+{
+    RHIUniformBuffer* base = m_uniformBuffers.at({set, binding}).get();
+    return dynamic_cast<VulkanUniformBuffer*>(base);
 }
 
 VkShaderModule VulkanPipeline::CreateShaderModule(const std::vector<char>& code) const

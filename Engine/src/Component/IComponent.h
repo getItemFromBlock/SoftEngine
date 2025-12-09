@@ -19,9 +19,9 @@ public:
     virtual void OnRender(RHIRenderer* renderer) {}
     virtual void OnDestroy() {}
     
-    UUID GetUUID() const { return m_uuid; }
+    Core::UUID GetUUID() const { return m_uuid; }
     GameObject* GetGameObject() const { return m_gameObject; }
 private:
-    UUID m_uuid;
+    Core::UUID m_uuid;
     GameObject* m_gameObject = nullptr;
 };

@@ -75,7 +75,6 @@ void Engine::Run()
     });
     SafePtr cubeShader = m_resourceManager->GetDefaultShader();
 
-    bool process = false;
     static auto startTime = std::chrono::high_resolution_clock::now(); 
     while (!m_window->ShouldClose())
     {

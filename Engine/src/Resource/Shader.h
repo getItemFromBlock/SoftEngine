@@ -4,6 +4,7 @@
 
 #include "Render/RHI/RHIPipeline.h"
 #include "Render/RHI/RHIShaderBuffer.h"
+#include "Render/RHI/RHIUniformBuffer.h"
 
 class Texture;
 class FragmentShader;
@@ -80,6 +81,7 @@ struct Uniform {
     ShaderType shaderType = ShaderType::None;
 };
 
+using Uniforms = std::unordered_map<std::string, Uniform>;
 class Shader : public IResource
 {
 public:
@@ -93,12 +95,13 @@ public:
     bool SendToGPU(RHIRenderer* renderer) override;
     void Unload() override;
 
-    std::vector<Uniform> GetUniforms() const { return m_uniforms; }
+    Uniform GetUniform(const std::string& name) { return m_uniforms[name]; }
+    Uniforms GetUniforms() const { return m_uniforms; }
     VertexShader* GetVertexShader() const { return m_vertexShader.get().get(); }
     FragmentShader* GetFragmentShader() const { return m_fragmentShader.get().get(); }
     
-    void SendTexture(Texture* texture, RHIRenderer* renderer);
-    void SendValue(void* value, uint32_t size, RHIRenderer* renderer);
+    void SendTexture(UBOBinding binding, Texture* texture, RHIRenderer* renderer);
+    void SendValue(UBOBinding binding, void* value, uint32_t size, RHIRenderer* renderer);
     
     RHIPipeline* GetPipeline() const { return m_pipeline.get(); }
 private:
@@ -106,7 +109,7 @@ private:
 private:
     SafePtr<VertexShader> m_vertexShader;
     SafePtr<FragmentShader> m_fragmentShader;
-    
-    std::vector<Uniform> m_uniforms;
+
+    Uniforms m_uniforms;
     std::unique_ptr<RHIPipeline> m_pipeline;
 };

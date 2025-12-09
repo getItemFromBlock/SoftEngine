@@ -1,6 +1,9 @@
 #include "Material.h"
 
+#include <ranges>
+
 #include "Shader.h"
+#include "Debug/Log.h"
 
 bool Material::Load(ResourceManager* resourceManager)
 {
@@ -23,9 +26,9 @@ void Material::SetShader(const SafePtr<Shader>& shader)
     auto lambda = [this]()
     {
         m_attributes.Clear();
-        auto uniforms = m_shader->GetUniforms();
+        Uniforms uniforms = m_shader->GetUniforms();
         
-        for (Uniform& uniform : uniforms)
+        for (Uniform& uniform : uniforms | std::views::values)
         {
             switch (uniform.type) {
             case UniformType::NestedStruct:
@@ -67,6 +70,9 @@ void Material::SetShader(const SafePtr<Shader>& shader)
                     m_temporaryAttributes.samplerAttributes[uniform.name] : SafePtr<Texture>{};
                 break;
             case UniformType::SamplerCube:
+                break;
+            default:
+                PrintError("Unknown uniform type: %d", static_cast<int>(uniform.type));
                 break;
             }
         }

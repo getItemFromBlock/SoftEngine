@@ -52,7 +52,7 @@ SafePtr<GameObject> Scene::CreateGameObject(GameObject* parent)
     return object;
 }
 
-SafePtr<GameObject> Scene::GetGameObject(UUID uuid) const
+SafePtr<GameObject> Scene::GetGameObject(Core::UUID uuid) const
 {
     return m_gameObjects.at(uuid);
 }
@@ -66,7 +66,7 @@ SafePtr<GameObject> Scene::GetRootObject() const
 
 void Scene::SetParent(GameObject* object, GameObject* parent)
 {
-    UUID objectUuid = object->GetUUID();
+    Core::UUID objectUuid = object->GetUUID();
     if (object->m_parentUUID != UUID_INVALID)
     {
         SafePtr<GameObject> prevParent = GetGameObject(object->m_parentUUID);

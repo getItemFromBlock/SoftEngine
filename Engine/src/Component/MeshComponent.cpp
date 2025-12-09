@@ -10,7 +10,12 @@ void MeshComponent::OnUpdate(float deltaTime)
 
     for (auto& material : m_materials)
     {
-        UniformBufferObject ubo;
+        struct MVP
+        {
+            Mat4 Model;
+            Mat4 VP;
+        } ubo;
+        
         Vec3f camPos = Vec3f(2.0f, 2.0f, 2.0f);
         Vec3f camTarget = Vec3f(0.0f, 0.0f, 0.0f);
         Vec3f camUp = Vec3f(0.0f, 1.0f, 0.0f);
@@ -22,14 +27,23 @@ void MeshComponent::OnUpdate(float deltaTime)
         float angle = 90.f;
         ubo.Model = Mat4::CreateTransformMatrix(cubePosition, Vec3f(0.f, angle, 0.f), Vec3f(1.f, 1.f, 1.f));
 
-        ubo.View = Mat4::LookAtRH(camPos, camTarget, camUp);
+        auto view = Mat4::LookAtRH(camPos, camTarget, camUp);
 
-        ubo.Projection = Mat4::CreateProjectionMatrix(
+        auto projection = Mat4::CreateProjectionMatrix(
             45.f, (float)windowSize.x / (float)windowSize.y, 0.1f, 10.0f);
-        ubo.Projection[1][1] *= -1; // GLM -> Vulkan Y flip
-
-        material->GetShader()->SendValue(&ubo, sizeof(ubo), renderer);
-        // material->GetShader()->get
+        projection[1][1] *= -1;
+        ubo.VP = projection * view;
+        {
+            Uniform uniform = material->GetShader()->GetUniform("ubo");
+            auto binding = UBOBinding(uniform.set, uniform.binding);
+            material->GetShader()->SendValue(binding, &ubo, sizeof(ubo), renderer);
+        }
+        {
+            Vec4f color = Vec4f::One();
+            Uniform uniform = material->GetShader()->GetUniform("material");
+            auto binding = UBOBinding(uniform.set, uniform.binding);
+            material->GetShader()->SendValue(binding, &color, sizeof(color), renderer);
+        }
     }
 }
 

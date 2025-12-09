@@ -22,7 +22,7 @@ public:
     void OnUpdate(float deltaTime) const;
 
     SafePtr<GameObject> CreateGameObject(GameObject* parent = nullptr);
-    SafePtr<GameObject> GetGameObject(UUID uuid) const;
+    SafePtr<GameObject> GetGameObject(Core::UUID UUID) const;
     SafePtr<GameObject> GetRootObject() const;
     void DestroyGameObject(GameObject* gameObject);
     
@@ -51,8 +51,8 @@ public:
 private:
     friend GameObject;
 
-    UUID m_rootUUID = UUID_INVALID;
-    std::unordered_map<UUID, std::shared_ptr<GameObject>> m_gameObjects;
+    Core::UUID m_rootUUID = UUID_INVALID;
+    std::unordered_map<Core::UUID, std::shared_ptr<GameObject>> m_gameObjects;
     std::unordered_map<ComponentID, std::vector<std::shared_ptr<IComponent>>> m_components;
 };
 

@@ -22,7 +22,7 @@ public:
     virtual bool SendToGPU(RHIRenderer* renderer) = 0;
     virtual void Unload() = 0;
 
-    UUID GetUUID() const { return p_uuid; }
+    Core::UUID GetUUID() const { return p_uuid; }
     std::filesystem::path GetPath() const { return p_path; }
     bool IsLoaded() const { return p_isLoaded; }
     bool SentToGPU() const { return p_sendToGPU; }
@@ -43,7 +43,7 @@ public:
     Event<> OnSentToGPU;
 protected:    
     std::filesystem::path p_path;
-    UUID p_uuid;
+    Core::UUID p_uuid;
 
     std::atomic_bool p_isLoaded;
     std::atomic_bool p_sendToGPU;

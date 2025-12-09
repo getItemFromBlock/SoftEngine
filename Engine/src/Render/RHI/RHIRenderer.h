@@ -6,13 +6,17 @@
 #include "RHIPipeline.h"
 #include "RHIShaderBuffer.h"
 #include "RHITexture.h"
+#include "RHIUniformBuffer.h"
 #include "RHIVertexBuffer.h"
+
+#include "Resource/Shader.h"
+
 #include "Utils/Type.h"
 
 class VertexShader;
 class FragmentShader;
 class Shader;
-struct Uniform;
+
 enum class ShaderType;
 class Texture;
 class Window;
@@ -59,12 +63,12 @@ public:
     virtual std::unique_ptr<RHIVertexBuffer> CreateVertexBuffer(const float* data, uint32_t size, uint32_t floatPerVertex) = 0;
     virtual std::unique_ptr<RHIIndexBuffer> CreateIndexBuffer(const uint32_t* data, uint32_t size) = 0;
     virtual std::unique_ptr<RHIShaderBuffer> CreateShaderBuffer(const std::string& code) = 0;
-    virtual std::unique_ptr<RHIPipeline> CreatePipeline(const VertexShader* vertexShader, const FragmentShader* fragmentShader, const std::vector<Uniform>& uniforms) = 0;
+    virtual std::unique_ptr<RHIPipeline> CreatePipeline(const VertexShader* vertexShader, const FragmentShader* fragmentShader, const Uniforms& uniforms) = 0;
     
     virtual std::string CompileShader(ShaderType type, const std::string& code) = 0;
-    virtual std::vector<Uniform> GetUniforms(Shader* shader) = 0;
-    virtual void SendTexture(uint32_t index, Texture* texture, Shader* shader) = 0;
-    virtual void SendValue(void* value, uint32_t size, Shader* shader) = 0;
+    virtual Uniforms GetUniforms(Shader* shader) = 0;
+    virtual void SendTexture(UBOBinding binding, Texture* texture, Shader* shader) = 0;
+    virtual void SendValue(UBOBinding binding, void* value, uint32_t size, Shader* shader) = 0;
     virtual void BindShader(Shader* shader) = 0;
     
     virtual void SetDefaultTexture(const SafePtr<Texture>& texture) = 0;

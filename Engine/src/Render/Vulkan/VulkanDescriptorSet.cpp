@@ -4,6 +4,7 @@
 #include "VulkanTexture.h"
 #include <stdexcept>
 #include <iostream>
+#include <ranges>
 
 #include "Debug/Log.h"
 #include "Resource/Texture.h"
@@ -112,16 +113,16 @@ VkDescriptorSet VulkanDescriptorSet::GetDescriptorSet(uint32_t index) const
     return m_descriptorSets[index];
 }
 
-void VulkanDescriptorSet::UpdateDescriptorSets(uint32_t frameIndex, uint32_t index, const std::vector<Uniform>& uniforms, VulkanUniformBuffer* uniformBuffers, Texture* defaultTexture) const
+void VulkanDescriptorSet::UpdateDescriptorSets(uint32_t frameIndex, uint32_t index, const Uniforms& uniforms, const UniformBuffers& uniformBuffers, Texture* defaultTexture) const
 {
     size_t bufferCount = 0, imageCount = 0;
-    for (const auto &u : uniforms)
+    for (const auto& uniform : uniforms | std::views::values)
     {
-        if (u.set == index)
+        if (uniform.set == index)
         {
-            if (u.type == UniformType::NestedStruct) 
+            if (uniform.type == UniformType::NestedStruct) 
                 ++bufferCount;
-            else if (u.type == UniformType::Sampler2D) 
+            else if (uniform.type == UniformType::Sampler2D) 
                 ++imageCount;
         }
     }
@@ -133,19 +134,29 @@ void VulkanDescriptorSet::UpdateDescriptorSets(uint32_t frameIndex, uint32_t ind
     descBufferInfos.reserve(bufferCount);
     imageInfos.reserve(imageCount);
 
-    for (size_t i = 0; i < uniforms.size(); ++i)
+    for (const auto& uniform : uniforms | std::views::values)
     {
-        if (uniforms[i].set != index) continue;
+        if (uniform.set != index) continue;
 
-        if (uniforms[i].type == UniformType::NestedStruct)
+        if (uniform.type == UniformType::NestedStruct)
         {
+            auto uboIt = uniformBuffers.find({index, uniform.binding});
+            
+            if (uboIt == uniformBuffers.end())
+            {
+                PrintError("Failed to find uniform buffer for set %s binding %s!", index, uniform.binding);
+                continue; 
+            }
+            
+            VulkanUniformBuffer* ubo = dynamic_cast<VulkanUniformBuffer*>(uboIt->second);
+            
             VkDescriptorBufferInfo descBufferInfo{};
-            descBufferInfo.buffer = uniformBuffers->GetBuffer(frameIndex);
+            descBufferInfo.buffer = ubo->GetBuffer(frameIndex); 
             descBufferInfo.offset = 0;
-            descBufferInfo.range = uniforms[i].size;
+            descBufferInfo.range = ubo->GetSize(); 
             descBufferInfos.push_back(descBufferInfo);
         }
-        else if (uniforms[i].type == UniformType::Sampler2D)
+        else if (uniform.type == UniformType::Sampler2D)
         {
             VulkanTexture* vulkanTexture = dynamic_cast<VulkanTexture*>(defaultTexture->GetBuffer());
             if (!vulkanTexture) 
@@ -161,10 +172,10 @@ void VulkanDescriptorSet::UpdateDescriptorSets(uint32_t frameIndex, uint32_t ind
         descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrite.pNext = nullptr;
         descriptorWrite.dstSet = GetDescriptorSet(frameIndex);
-        descriptorWrite.dstBinding = uniforms[i].binding;
+        descriptorWrite.dstBinding = uniform.binding;
         descriptorWrite.dstArrayElement = 0;
 
-        if (uniforms[i].type == UniformType::NestedStruct)
+        if (uniform.type == UniformType::NestedStruct)
         {
             descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             descriptorWrite.descriptorCount = 1;
@@ -172,7 +183,7 @@ void VulkanDescriptorSet::UpdateDescriptorSets(uint32_t frameIndex, uint32_t ind
             descriptorWrite.pImageInfo = nullptr;
             descriptorWrite.pTexelBufferView = nullptr;
         }
-        else if (uniforms[i].type == UniformType::Sampler2D)
+        else if (uniform.type == UniformType::Sampler2D)
         {
             descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             descriptorWrite.descriptorCount = 1;

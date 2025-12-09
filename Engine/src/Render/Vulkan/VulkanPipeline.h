@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "VulkanUniformBuffer.h"
 #include "VulkanDescriptorPool.h"
 #include "VulkanDescriptorSet.h"
 #include "VulkanDescriptorSetLayout.h"
@@ -33,7 +34,7 @@ public:
     bool Initialize(VulkanDevice* device,
                     VkRenderPass renderPass,
                     VkExtent2D extent,
-                    const std::vector<Uniform>& uniforms, const VertexShader* vertexShader, const FragmentShader* fragShader, uint32_t
+                    const Uniforms& uniforms, const VertexShader* vertexShader, const FragmentShader* fragShader, uint32_t
                     MAX_FRAMES_IN_FLIGHT, Texture* defaultTexture);
     
     void Cleanup();
@@ -45,7 +46,10 @@ public:
 
     void Bind(VkCommandBuffer commandBuffer);
 
-    VulkanUniformBuffer* GetUniformBuffer() const { return m_uniformBuffer.get(); }
+    UniformBuffers GetUniformBuffers() const;
+    VulkanUniformBuffer* GetUniformBuffer(UBOBinding binding) const;
+    VulkanUniformBuffer* GetUniformBuffer(int set, int binding) const;
+
 private:
     VkShaderModule CreateShaderModule(const std::vector<char>& code) const;
     std::vector<char> ReadFileBin(const std::string& filename);
@@ -58,7 +62,7 @@ private:
     std::vector<std::unique_ptr<VulkanDescriptorSetLayout>> m_descriptorSetLayouts;
     std::unique_ptr<VulkanDescriptorPool> m_descriptorPool;
     std::vector<std::unique_ptr<VulkanDescriptorSet>> m_descriptorSets;
-    std::unique_ptr<VulkanUniformBuffer> m_uniformBuffer;
+    UniformBuffersOwner m_uniformBuffers;
 };
 
 #endif

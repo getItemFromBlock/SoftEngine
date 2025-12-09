@@ -103,14 +103,14 @@ void Shader::Unload()
 {
 }
 
-void Shader::SendTexture(Texture* texture, RHIRenderer* renderer)
+void Shader::SendTexture(UBOBinding binding, Texture* texture, RHIRenderer* renderer)
 {
-    renderer->SendTexture(1, texture, this);
+    renderer->SendTexture(binding, texture, this);
 }
 
-void Shader::SendValue(void* value, uint32_t size, RHIRenderer* renderer)
+void Shader::SendValue(UBOBinding binding, void* value, uint32_t size, RHIRenderer* renderer)
 {
-    renderer->SendValue(value, size, this);
+    renderer->SendValue(binding, value, size, this);
 }
 
 void Shader::OnShaderSent()

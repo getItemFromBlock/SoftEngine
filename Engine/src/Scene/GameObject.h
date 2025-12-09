@@ -28,7 +28,7 @@ public:
     template<typename T>
     void RemoveComponent() const;
 
-    UUID GetUUID() const { return m_uuid; }
+    Core::UUID GetUUID() const { return m_uuid; }
     
     void SetName(std::string name) { m_name = std::move(name); }
     std::string GetName() const { return m_name; }
@@ -38,13 +38,13 @@ public:
 private:
     friend Scene;
     
-    UUID m_uuid;
+    Core::UUID m_uuid;
     std::string m_name;
     
     Scene& m_scene;
     
-    UUID m_parentUUID = UUID_INVALID;
-    std::set<UUID> m_childrenUUID = {};
+    Core::UUID m_parentUUID = UUID_INVALID;
+    std::set<Core::UUID> m_childrenUUID = {};
 };
 
 template<typename T>

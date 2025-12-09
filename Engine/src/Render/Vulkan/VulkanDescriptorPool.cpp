@@ -20,7 +20,7 @@ bool VulkanDescriptorPool::Initialize(VulkanDevice* device, const std::vector<Vk
     poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     poolInfo.pPoolSizes = poolSizes.data();
     poolInfo.maxSets = maxSets;
-    poolInfo.flags = 0; // Optional: VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT
+    poolInfo.flags = 0;
 
     if (vkCreateDescriptorPool(m_device->GetDevice(), &poolInfo, nullptr, &m_descriptorPool) != VK_SUCCESS)
     {

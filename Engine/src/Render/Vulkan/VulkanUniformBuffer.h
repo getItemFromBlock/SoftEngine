@@ -15,7 +15,7 @@ class VulkanUniformBuffer : public RHIUniformBuffer
 {
 public:
     VulkanUniformBuffer() = default;
-    ~VulkanUniformBuffer();
+    ~VulkanUniformBuffer() override;
 
     bool Initialize(VulkanDevice* device, VkDeviceSize size, uint32_t frameCount);
 

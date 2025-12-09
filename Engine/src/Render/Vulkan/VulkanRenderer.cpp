@@ -17,6 +17,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <chrono>
+#include <ranges>
 #include <spirv_reflect.h>
 #include <shaderc/shaderc.hpp>
 
@@ -461,7 +462,7 @@ static void ParseBlockVariable(const SpvReflectBlockVariable* var, UniformMember
     }
 }
 
-static std::vector<Uniform> SpirvReflectExample(const std::string& spirv)
+static Uniforms SpirvReflectExample(const std::string& spirv)
 {
     size_t spirv_nbytes = spirv.size();
     const void* spirv_code = spirv.data();
@@ -497,7 +498,7 @@ static std::vector<Uniform> SpirvReflectExample(const std::string& spirv)
     result = spvReflectEnumerateDescriptorBindings(&module, &binding_count, bindings);
     assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
-    std::vector<Uniform> uniforms;
+    Uniforms uniforms;
     uniforms.reserve(binding_count);
 
     for (uint32_t i = 0; i < binding_count; ++i)
@@ -539,7 +540,7 @@ static std::vector<Uniform> SpirvReflectExample(const std::string& spirv)
         }
 
         if (u.type != UniformType::Unknown) {
-            uniforms.push_back(std::move(u));
+            uniforms[u.name] = std::move(u);
         }
     }
 
@@ -549,53 +550,52 @@ static std::vector<Uniform> SpirvReflectExample(const std::string& spirv)
     return uniforms;
 }
 
-std::vector<Uniform> VulkanRenderer::GetUniforms(Shader* shader)
+Uniforms VulkanRenderer::GetUniforms(Shader* shader)
 {
     VertexShader* vertex = shader->GetVertexShader();
     FragmentShader* frag = shader->GetFragmentShader();
     
-    std::vector<Uniform> uniforms;
+    Uniforms uniforms;
 
-    std::vector<Uniform> result = {};
+    Uniforms result = {};
     result = SpirvReflectExample(vertex->GetContent());
     uniforms.reserve(result.size());
-    for (auto& uniform : result)
+    for (auto& uniform : result | std::views::values)
     {
         uniform.shaderType = ShaderType::Vertex;
-        uniforms.push_back(uniform);
+        uniforms[uniform.name] = uniform;
     }
     
     result = SpirvReflectExample(frag->GetContent());
     uniforms.reserve(uniforms.size() + result.size());
-    for (auto& uniform : result)
+    for (auto& uniform : result | std::views::values)
     {
         uniform.shaderType = ShaderType::Fragment;
-        uniforms.push_back(uniform);
+        uniforms[uniform.name] = uniform;
     }
     
     return uniforms;
 }
 
-void VulkanRenderer::SendTexture(uint32_t index, Texture* texture, Shader* shader)
+void VulkanRenderer::SendTexture(UBOBinding binding, Texture* texture, Shader* shader)
 {
     VulkanPipeline* pipeline = dynamic_cast<VulkanPipeline*>(shader->GetPipeline());
     auto descriptors = pipeline->GetDescriptorSets();
-    auto uniformBuffer = pipeline->GetUniformBuffer();
+    auto uniformBuffers = pipeline->GetUniformBuffers();
     for (uint32_t j = 0; j < descriptors.size(); j++)
     {
         for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
-            descriptors[j]->UpdateDescriptorSets(i, j, shader->GetUniforms(), uniformBuffer, texture);
+            descriptors[j]->UpdateDescriptorSets(i, j, shader->GetUniforms(), uniformBuffers, texture);
         }
     }
-    // pipeline->
 }
 
-void VulkanRenderer::SendValue(void* value, uint32_t size, Shader* shader)
+void VulkanRenderer::SendValue(UBOBinding binding, void* value, uint32_t size, Shader* shader)
 {
     VulkanPipeline* pipeline = dynamic_cast<VulkanPipeline*>(shader->GetPipeline());
 
-    VulkanUniformBuffer* uniformBuffer = pipeline->GetUniformBuffer();
+    VulkanUniformBuffer* uniformBuffer = pipeline->GetUniformBuffer(binding.set, binding.binding);
     
     uniformBuffer->WriteToMapped(value, size, m_currentFrame);
 }
@@ -714,7 +714,7 @@ std::unique_ptr<RHIShaderBuffer> VulkanRenderer::CreateShaderBuffer(const std::s
 }
 
 std::unique_ptr<RHIPipeline> VulkanRenderer::CreatePipeline(const VertexShader* vertexShader,
-    const FragmentShader* fragmentShader, const std::vector<Uniform>& uniforms)
+                                                            const FragmentShader* fragmentShader, const Uniforms& uniforms)
 {
     std::unique_ptr<VulkanPipeline> pipeline = std::make_unique<VulkanPipeline>();
     pipeline->Initialize(m_device.get(), m_renderPass->GetRenderPass(), m_swapChain->GetExtent(), uniforms, vertexShader, fragmentShader, MAX_FRAMES_IN_FLIGHT, m_defaultTexture.get().get());
