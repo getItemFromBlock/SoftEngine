@@ -29,6 +29,8 @@ std::unique_ptr<Window> Window::Create(WindowAPI windowAPI, RenderAPI renderAPI,
     
     if (window && window->Initialize(renderAPI, config))
     {
+        window->InitializeInputs();
+        
         PrintLog("Window created successfully");
         return window;
     }
@@ -53,6 +55,19 @@ std::unique_ptr<Window> Window::Create(const WindowConfig& config)
     return Create(windowAPI, renderAPI, config);
 }
 
+void Window::InitializeInputs()
+{
+    EKeyCallback.Bind([this](Key key, KeyEvent state)
+    {
+        p_input.OnKeyCallback(key, state);
+    });
+    
+    EMouseButtonCallback.Bind([this](MouseButton button, KeyEvent state)
+    {
+        p_input.OnMouseButtonCallback(button, state);
+    });
+}
+
 void Window::SetMouseCursorPosition(const Vec2i& position, CoordinateSpace space)
 {
     if (space == CoordinateSpace::Window)
@@ -63,6 +78,12 @@ void Window::SetMouseCursorPosition(const Vec2i& position, CoordinateSpace space
     {
         SetMouseCursorPositionScreen(Vec2f(position));
     }
+}
+
+float Window::GetAspectRatio() const
+{
+    Vec2i size = GetSize();
+    return static_cast<float>(size.x) / static_cast<float>(size.y);
 }
 
 Vec2i Window::GetMouseCursorPosition(CoordinateSpace space) const

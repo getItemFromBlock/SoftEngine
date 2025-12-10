@@ -5,6 +5,7 @@
 #include "Core/Window.h"
 #include "Render/RHI/RHIRenderer.h"
 #include "Scene/ComponentHandler.h"
+#include "Scene/Scene.h"
 
 class Engine
 {
@@ -19,12 +20,13 @@ public:
 
     Window* GetWindow() const { return m_window.get(); }
     RHIRenderer* GetRenderer() const { return m_renderer.get(); }
-    
+
 private:
     std::unique_ptr<Window> m_window;
     std::unique_ptr<RHIRenderer> m_renderer;
     std::unique_ptr<ResourceManager> m_resourceManager;
     std::unique_ptr<ComponentRegister> m_componentRegister;
+    std::unique_ptr<Scene> m_scene;
     
     inline static std::unique_ptr<Engine> s_instance = nullptr;
 };

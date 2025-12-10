@@ -71,6 +71,8 @@ public:
 
     void WaitEvents() override;
     
+    // KeyEvent GetKeyState(Key key) const override;
+    
 #ifdef RENDER_API_VULKAN
     VkSurfaceKHR CreateSurface(VkInstance instance) override;
 #endif

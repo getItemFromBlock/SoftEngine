@@ -62,16 +62,24 @@ bool Engine::Initialize()
 
 void Engine::Run()
 {
-    Scene scene;
+    m_scene = std::make_unique<Scene>();
+    
     SafePtr cubeModel = m_resourceManager->Load<Model>(RESOURCE_PATH"/models/Cube.obj");
     cubeModel->OnLoaded.Bind([&]()
     {
         SafePtr cubeMesh = m_resourceManager->GetResource<Mesh>(cubeModel->GetMeshes()[0]->GetPath());
     
-        SafePtr<GameObject> object = scene.CreateGameObject();
-        SafePtr<MeshComponent> meshComp = object->AddComponent<MeshComponent>();
-        meshComp->SetMesh(cubeMesh);
-        meshComp->AddMaterial(m_resourceManager->GetDefaultMaterial());
+        for (int i = 0; i < 2; i++)
+        {
+            SafePtr<GameObject> object = m_scene->CreateGameObject();
+            
+            SafePtr<TransformComponent> transform = object->GetComponent<TransformComponent>();
+            transform->SetLocalPosition(Vec3f(i * 2.0f, 0.0f, 0.0f));
+            
+            SafePtr<MeshComponent> meshComp = object->AddComponent<MeshComponent>();
+            meshComp->SetMesh(cubeMesh);
+            meshComp->AddMaterial(m_resourceManager->GetDefaultMaterial());
+        }
     });
     SafePtr cubeShader = m_resourceManager->GetDefaultShader();
 
@@ -93,14 +101,14 @@ void Engine::Run()
             continue;
         
         m_renderer->WaitUntilFrameFinished();
-        
-        scene.OnUpdate(deltaTime);
+
+        m_scene->OnUpdate(deltaTime);
         if (!m_renderer->BeginFrame())
             continue;
         
         m_renderer->ClearColor();
 
-        scene.OnRender(m_renderer.get());
+        m_scene->OnRender(m_renderer.get());
         
         m_renderer->EndFrame();
     }

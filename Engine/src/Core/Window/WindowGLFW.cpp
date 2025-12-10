@@ -88,6 +88,7 @@ bool WindowGLFW::Initialize(RenderAPI renderAPI, const WindowConfig& config)
 
 void WindowGLFW::PollEvents()
 {
+    p_input.UpdateStates();
     glfwPollEvents();
 }
 
@@ -124,6 +125,12 @@ void WindowGLFW::WaitEvents()
 {
     glfwWaitEvents();
 }
+
+/*KeyEvent WindowGLFW::GetKeyState(Key key) const
+{
+    int state = glfwGetKey(GetHandle(), (int)key);
+    return state == GLFW_PRESS ? KeyEvent::Pressed : state == GLFW_RELEASE ? KeyEvent::Released : stat;
+}*/
 
 VkSurfaceKHR WindowGLFW::CreateSurface(VkInstance instance)
 {
@@ -413,17 +420,16 @@ void WindowGLFW::KeyCallback(GLFWwindow* window, int key, int scancode, int acti
         KeyEvent event = KeyEvent::None;
         switch (action)
         {
-            case GLFW_PRESS:
-                event = KeyEvent::Pressed;
-                break;
-            case GLFW_REPEAT:
-                event = KeyEvent::Down;
-                break;
-            case GLFW_RELEASE:
-                event = KeyEvent::Released;
-                break;
+        case GLFW_PRESS:
+            event = KeyEvent::Pressed;
+            break;
+        case GLFW_RELEASE:
+            event = KeyEvent::Released;
+            break;
+        default:
+            return;
         }
-        win->EKeyCallback.Invoke(key, event);
+        win->EKeyCallback.Invoke(static_cast<Key>(key), event);
     }
 }
 
@@ -434,7 +440,7 @@ void WindowGLFW::MouseButtonCallback(GLFWwindow* window, int button, int action,
     if (win)
     {
         KeyEvent event = (action == GLFW_PRESS) ? KeyEvent::Pressed : KeyEvent::Released;
-        win->EMouseButtonCallback.Invoke(button, event);
+        win->EMouseButtonCallback.Invoke(static_cast<MouseButton>(button), event);
     }
 }
 

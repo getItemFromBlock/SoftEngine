@@ -29,6 +29,11 @@ public:
 			callback(args...);
 		}
 	}
+	
+	void operator+=(Callback callback)
+	{
+		Bind(callback);
+	}
 private:
 	std::vector<Callback> m_callbacks;
 };

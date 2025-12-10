@@ -14,18 +14,21 @@ Scene::Scene()
     SafePtr<GameObject> root = CreateGameObject();
     root->SetName("Root");
     m_rootUUID = root->GetUUID();
-    
-    m_cameraData.position = Vec3f(2.0f, 2.0f, 2.0f);
-    m_cameraData.rotation = Quat::Identity();
 
-    Vec2i windowSize = Engine::Get()->GetWindow()->GetSize();
-    Mat4 view = Mat4::LookAtRH(m_cameraData.position, Vec3f(0.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f));
-    Mat4 projection = Mat4::CreateProjectionMatrix(45.f,
-                                                   static_cast<float>(windowSize.x) / static_cast<float>(windowSize.y),
-                                                   0.1f, 10.0f);
-    projection[1][1] *= -1;
-    
-    m_cameraData.VP = projection * view;
+    m_cameraData.transform = std::make_unique<TransformComponent>();
+    m_cameraData.transform->SetLocalPosition(Vec3f(2.0f, 2.0f, 2.0f));
+
+    m_cameraData.transform->EOnUpdateModelMatrix += [this]()
+    {
+        float aspect = Engine::Get()->GetWindow()->GetAspectRatio();
+        Mat4 view = Mat4::LookAtRH(m_cameraData.transform->GetLocalPosition(),
+                                   m_cameraData.transform->GetLocalPosition() + m_cameraData.transform->GetForward(), 
+                                   m_cameraData.transform->GetUp());
+        Mat4 projection = Mat4::CreateProjectionMatrix(45.f, aspect, 0.1f, 10.0f); 
+        projection[1][1] *= -1;
+
+        m_cameraData.VP = projection * view;
+    };
 }
 
 Scene::~Scene() = default;
@@ -41,8 +44,9 @@ void Scene::OnRender(RHIRenderer* renderer)
     }
 }
 
-void Scene::OnUpdate(float deltaTime) const
+void Scene::OnUpdate(float deltaTime)
 {
+    UpdateCamera(deltaTime);
     for (const std::vector<std::shared_ptr<IComponent>>& componentList : m_components | std::views::values)
     {
         for (const std::shared_ptr<IComponent>& component : componentList)
@@ -121,18 +125,102 @@ void Scene::RemoveAllComponents(GameObject* gameObject)
 
     for (auto& componentList : m_components | std::views::values)
     {
-        auto removeIt = std::ranges::remove_if(componentList, 
-            [gameObject](const std::shared_ptr<IComponent>& component)
-            {
+        auto removeIt = std::ranges::remove_if(componentList,
+           [gameObject](const std::shared_ptr<IComponent>& component)
+           {
                if (component->GetGameObject() == gameObject)
                {
                    component->OnDestroy();
                    return true;
                }
                return false;
-            }
+           }
         ).begin();
 
         componentList.erase(removeIt, componentList.end());
     }
+}
+
+void Scene::UpdateCamera(float deltaTime) const
+{
+    static Vec2f startClickPos;
+    static Vec2f prevMousePos = Vec2f::Zero();
+    auto transform = m_cameraData.transform.get();
+    transform->OnUpdate(deltaTime);
+    
+    auto position = transform->GetLocalPosition();
+    Window* window = Engine::Get()->GetWindow();
+    Input& input = window->GetInput();
+    
+    static bool isLooking = false;
+    
+    auto stopLooking = [&]()
+    {
+        isLooking = false;
+        prevMousePos = window->GetMouseCursorPosition();
+        window->SetMouseCursorMode(CursorMode::Normal);
+        window->SetMouseCursorPosition(startClickPos);
+    };
+    
+    if (isLooking && input.IsMouseButtonReleased(MouseButton::BUTTON_2))
+    {
+        stopLooking();
+    }
+    
+    if (input.IsMouseButtonPressed(MouseButton::BUTTON_2))
+    {
+        isLooking = true;
+        window->SetMouseCursorMode(CursorMode::Hidden);
+        startClickPos = window->GetMouseCursorPosition();
+        prevMousePos = startClickPos;
+    }
+    
+    if (!isLooking)
+        return;
+    
+    const float speed = 10.f;
+    const float freeLookSensitivity = 0.5f;
+    if (input.IsKeyDown(Key::W))
+    {
+        position += transform->GetForward() * speed * deltaTime;
+    }
+    if (input.IsKeyDown(Key::S))
+    {
+        position -= transform->GetForward() * speed * deltaTime;
+    }
+    if (input.IsKeyDown(Key::A))
+    {
+        position -= transform->GetRight() * speed * deltaTime;
+    }
+    if (input.IsKeyDown(Key::D))
+    {
+        position += transform->GetRight() * speed * deltaTime;
+    }
+    if (input.IsKeyDown(Key::Q))
+    {
+        position += transform->GetUp() * speed * deltaTime;
+    }
+    if (input.IsKeyDown(Key::E))
+    {
+        position -= transform->GetUp() * speed * deltaTime;
+    }
+
+    transform->SetLocalPosition(position);
+    
+    const Vec2f mousePos = window->GetMouseCursorPosition();
+    const Vec2f delta = mousePos - prevMousePos;
+
+    float mouseX = delta.x * freeLookSensitivity;
+    float mouseY = delta.y * freeLookSensitivity;
+
+    prevMousePos = mousePos;
+
+    if (m_cameraData.transform->GetUp().y < 0)
+    {
+        mouseX *= -1;
+    }
+
+    m_cameraData.transform->Rotate(Vec3f::Up(), -mouseX, Space::World);
+    m_cameraData.transform->Rotate(Vec3f::Right(), -mouseY, Space::Local);
+
 }

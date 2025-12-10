@@ -438,20 +438,20 @@ void WindowSDL::ProcessEvent(const SDL_Event& event)
         case SDL_KEYDOWN:
         {
             KeyEvent keyEvent = event.key.repeat ? KeyEvent::Down : KeyEvent::Pressed;
-            EKeyCallback.Invoke(event.key.keysym.scancode, keyEvent);
+            EKeyCallback.Invoke((Key)event.key.keysym.scancode, keyEvent);
             break;
         }
             
         case SDL_KEYUP:
-            EKeyCallback.Invoke(event.key.keysym.scancode, KeyEvent::Released);
+            EKeyCallback.Invoke((Key)event.key.keysym.scancode, KeyEvent::Released);
             break;
             
         case SDL_MOUSEBUTTONDOWN:
-            EMouseButtonCallback.Invoke(event.button.button, KeyEvent::Pressed);
+            EMouseButtonCallback.Invoke((MouseButton)event.button.button, KeyEvent::Pressed);
             break;
             
         case SDL_MOUSEBUTTONUP:
-            EMouseButtonCallback.Invoke(event.button.button, KeyEvent::Released);
+            EMouseButtonCallback.Invoke((MouseButton)event.button.button, KeyEvent::Released);
             break;
             
         case SDL_MOUSEWHEEL:

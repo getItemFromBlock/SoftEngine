@@ -1,12 +1,27 @@
 ﻿#pragma once
+#include <unordered_map>
 
 enum class KeyEvent
 {
     None,
     Pressed,
     Down,
-    Released
+    Released,
+    Up
 };
+
+inline const char* to_string(KeyEvent e)
+{
+    switch (e)
+    {
+    case KeyEvent::None: return "None";
+    case KeyEvent::Pressed: return "Pressed";
+    case KeyEvent::Down: return "Down";
+    case KeyEvent::Released: return "Released";
+    case KeyEvent::Up: return "Up";
+    default: return "unknown";
+    }
+}
 
 enum class Key : int
 {
@@ -310,3 +325,36 @@ inline const char* to_string(MouseButton e)
     default: return "unknown";
     }
 }
+
+class Input
+{
+public:
+    void OnKeyCallback(Key key, KeyEvent event)
+    {
+        m_keys[key] = event;
+    }
+    
+    void OnMouseButtonCallback(MouseButton button, KeyEvent event)
+    {
+        m_mouseButtons[button] = event;
+    }
+    
+    void UpdateStates();
+    
+    KeyEvent GetKeyState(Key key) const;
+    KeyEvent GetMouseButtonState(MouseButton button) const;
+
+    bool IsKeyDown(Key key) const;
+    bool IsKeyPressed(Key key) const;
+    bool IsKeyReleased(Key key) const;
+    bool IsKeyUp(Key key) const;
+
+    bool IsMouseButtonDown(MouseButton button) const;
+    bool IsMouseButtonPressed(MouseButton button) const;
+    bool IsMouseButtonReleased(MouseButton button) const;
+    bool IsMouseButtonUp(MouseButton button) const;
+
+private:
+    std::unordered_map<Key, KeyEvent> m_keys;
+    std::unordered_map<MouseButton, KeyEvent> m_mouseButtons;
+};

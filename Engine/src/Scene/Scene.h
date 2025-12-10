@@ -6,14 +6,14 @@
 #include "ComponentHandler.h"
 #include "Utils/Type.h"
 
+class TransformComponent;
 class RHIRenderer;
 class IComponent;
 class GameObject;
 
 struct CameraData
 {
-    Vec3f position;
-    Quat rotation;
+    std::unique_ptr<TransformComponent> transform;
     
     Mat4 VP;
 };
@@ -28,7 +28,7 @@ public:
     virtual ~Scene();
 
     void OnRender(RHIRenderer* renderer);
-    void OnUpdate(float deltaTime) const;
+    void OnUpdate(float deltaTime);
 
     SafePtr<GameObject> CreateGameObject(GameObject* parent = nullptr);
     SafePtr<GameObject> GetGameObject(Core::UUID UUID) const;
@@ -58,6 +58,7 @@ public:
 #pragma endregion 
 
     const CameraData& GetCameraData() const { return m_cameraData; }
+    void UpdateCamera(float deltaTime) const;
 private:
     friend GameObject;
 
@@ -66,41 +67,54 @@ private:
     std::unordered_map<ComponentID, std::vector<std::shared_ptr<IComponent>>> m_components;
     
     CameraData m_cameraData;
-    
 };
 
 template<typename T>
 SafePtr<T> Scene::GetComponent(GameObject* gameObject)
 {
-    auto components = m_components[ComponentRegister::GetComponentID<T>()];
-    for (auto& component : components)
+    static_assert(std::is_base_of_v<IComponent, T>, "T must inherit from IComponent");
+
+    auto& components = m_components[ComponentRegister::GetComponentID<T>()];
+
+    for (const std::shared_ptr<IComponent>& component : components)
     {
         if (component->GetGameObject() == gameObject)
-            return component;
+        {
+            return SafePtr<T>(std::static_pointer_cast<T>(component));
+        }
     }
-    return nullptr;
+    return {};
 }
+
 template<typename T>
 std::vector<SafePtr<T>> Scene::GetComponents(GameObject* gameObject)
 {
-    std::vector<SafePtr<T>> components;
-    auto componentsList = m_components[ComponentRegister::GetComponentID<T>()];
-    for (auto& component : componentsList)
+    static_assert(std::is_base_of_v<IComponent, T>, "T must inherit from IComponent");
+
+    std::vector<SafePtr<T>> out;
+    auto& componentsList = m_components[ComponentRegister::GetComponentID<T>()];
+
+    for (const auto& component : componentsList)
     {
         if (component->GetGameObject() == gameObject)
-            components.push_back(component);
+        {
+            out.push_back(SafePtr<T>(std::static_pointer_cast<T>(component)));
+        }
     }
-    return components;
+    return out;
 }
+
 template<typename T>
 bool Scene::HasComponent(GameObject* gameObject)
 {
+    static_assert(std::is_base_of_v<IComponent, T>, "T must inherit from IComponent");
     return GetComponent<T>(gameObject) != nullptr;
 }
 
 template<typename T>
 SafePtr<T> Scene::AddComponent(GameObject* gameObject)
 {
+    static_assert(std::is_base_of_v<IComponent, T>, "T must inherit from IComponent");
     auto component = std::make_shared<T>(gameObject);
     m_components[ComponentRegister::GetComponentID<T>()].push_back(component);
     return component;
@@ -109,6 +123,7 @@ SafePtr<T> Scene::AddComponent(GameObject* gameObject)
 template<typename T>
 void Scene::RemoveComponent(GameObject* gameObject)
 {
+    static_assert(std::is_base_of_v<IComponent, T>, "T must inherit from IComponent");
     auto component = GetComponent<T>(gameObject);
     if (!component)
     {

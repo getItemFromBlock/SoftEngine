@@ -53,6 +53,8 @@ public:
     
     virtual bool InitializeAPI() = 0;
     
+    void InitializeInputs();
+    
     virtual bool Initialize(RenderAPI renderAPI, const WindowConfig& config) = 0;
     virtual void PollEvents() = 0;
     virtual void Terminate() = 0;
@@ -82,6 +84,7 @@ public:
 
     // === Getters === //
     virtual std::string GetTitle() const = 0;
+    float GetAspectRatio() const;
     virtual Vec2i GetSize() const = 0;
     virtual Vec2i GetPosition() const = 0;
     virtual bool GetVSync() const = 0;
@@ -105,6 +108,7 @@ public:
 
     virtual void* GetNativeHandle() const = 0;
 
+    Input& GetInput() { return p_input; }
 #ifdef RENDER_API_VULKAN
     virtual VkSurfaceKHR CreateSurface(VkInstance instance) = 0;
 #endif
@@ -113,8 +117,8 @@ public:
     Event<Vec2i> EResizeEvent;
     Event<Vec2i> EMoveEvent;
     Event<int, const char**> EDropCallback;
-    Event<int, KeyEvent> EKeyCallback;
-    Event<int, KeyEvent> EMouseButtonCallback;
+    Event<Key, KeyEvent> EKeyCallback;
+    Event<MouseButton, KeyEvent> EMouseButtonCallback;
     Event<double, double> EScrollCallback;
     Event<double, double> EScaleCallback;
     Event<const char*> EErrorCallback;
@@ -126,4 +130,5 @@ protected:
     void* p_windowHandle = nullptr;
     WindowAPI p_windowAPI;
     RenderAPI p_renderAPI;
+    Input p_input;
 };
