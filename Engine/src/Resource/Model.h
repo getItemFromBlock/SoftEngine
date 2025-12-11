@@ -18,6 +18,8 @@ public:
     bool SendToGPU(RHIRenderer* renderer) override;
     void Unload() override;
     
+    ResourceType GetResourceType() const override { return ResourceType::Model; }
+    
     std::vector<Mesh*> GetMeshes() const { return m_meshes; }
 private:
     std::vector<Mesh*> m_meshes;

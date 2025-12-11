@@ -17,11 +17,26 @@ BaseShader::~BaseShader()
 bool BaseShader::Load(ResourceManager* resourceManager)
 {
     UNUSED(resourceManager);
-    File file(p_path);
-    if (!file.ReadAllText(p_content))
+
+    std::filesystem::path compiledPath = GetCompiledPath();
+    if (File::Exist(compiledPath))
     {
-        PrintError("Failed to read shader source from file: %s", p_path.c_str());
-        return false;
+        File file(compiledPath);
+        if (!file.ReadAllText(p_content))
+        {
+            PrintError("Failed to read compiled shader from file: %s", compiledPath.c_str());
+            return false;
+        }
+        p_compiled = true;
+    }
+    else
+    {
+        File file(p_path);
+        if (!file.ReadAllText(p_content))
+        {
+            PrintError("Failed to read shader source from file: %s", p_path.c_str());
+            return false;
+        }
     }
     return true;
 }
@@ -30,12 +45,24 @@ bool BaseShader::SendToGPU(RHIRenderer* renderer)
 {
     if (!p_buffer)
     {
-        p_content = renderer->CompileShader(GetShaderType(), p_content);
-        if (p_content.empty())
+        if (!p_compiled)
         {
-            PrintError("Failed to compile shader: %s", p_path.c_str());
-            return false;
+            PrintLog("Compiling shader: %s", p_path.generic_string().c_str());
+            p_content = renderer->CompileShader(GetShaderType(), p_content);
+            if (p_content.empty())
+            {
+                PrintError("Failed to compile shader: %s", p_path.c_str());
+                return false;
+            }
+        
+            File compiled(GetCompiledPath());
+            if (!compiled.WriteAllText(p_content))
+            {
+                PrintError("Failed to write compiled shader to file: %s", GetCompiledPath().c_str());
+                return false;
+            }
         }
+        
         p_buffer = renderer->CreateShaderBuffer(p_content);
         if (!p_buffer)
         {
@@ -44,6 +71,12 @@ bool BaseShader::SendToGPU(RHIRenderer* renderer)
         }
     }
     return true;
+}
+std::filesystem::path BaseShader::GetCompiledPath() const
+{
+    std::filesystem::path cachePath = ResourceManager::GetCompiledCacheDir();
+
+    return cachePath / (std::to_string(p_uuid) + ".compiled");
 }
 
 bool Shader::Load(ResourceManager* resourceManager)

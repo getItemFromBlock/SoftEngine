@@ -23,3 +23,6 @@ compile.*
 
 # Xcode
 *.xcodeproj
+
+# Engine
+/Engine/cache

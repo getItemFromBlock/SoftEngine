@@ -30,11 +30,16 @@ public:
     virtual bool SendToGPU(RHIRenderer* renderer) override;
     virtual void Unload() override {}
     
+    virtual ResourceType GetResourceType() const override = 0;
+    
     virtual ShaderType GetShaderType() const = 0;
     std::string GetContent() const { return p_content; }
     RHIShaderBuffer* GetBuffer() const { return p_buffer.get(); }
+    
+    std::filesystem::path GetCompiledPath() const;
 private:
     std::string p_content;
+    bool p_compiled = false;
     std::unique_ptr<RHIShaderBuffer> p_buffer;
 };
 
@@ -104,6 +109,8 @@ public:
     bool Load(ResourceManager* resourceManager) override;
     bool SendToGPU(RHIRenderer* renderer) override;
     void Unload() override;
+    
+    ResourceType GetResourceType() const override { return ResourceType::Shader; }
 
     PushConstants GetPushConstants() const {return m_pushConstants;}
     Uniform GetUniform(const std::string& name) { return m_uniforms[name]; }

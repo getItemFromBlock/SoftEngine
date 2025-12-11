@@ -21,8 +21,8 @@ void Material::Unload()
 void Material::SetShader(const SafePtr<Shader>& shader)
 {
     m_shader = shader;
-
-    auto lambda = [this]()
+    
+    m_shader->OnSentToGPU.Bind([this]()
     {
         m_attributes.Clear();
         Uniforms uniforms = m_shader->GetUniforms();
@@ -71,6 +71,7 @@ void Material::SetShader(const SafePtr<Shader>& shader)
                                     value
                                 );
                             }
+                            break;
                             case UniformType::Vec4:
                             {
                                 Vec4f value = m_temporaryAttributes.vec4Attributes.contains(member.name) ? m_temporaryAttributes.vec4Attributes[member.name].value : Vec4f::Zero();
@@ -79,6 +80,7 @@ void Material::SetShader(const SafePtr<Shader>& shader)
                                     value
                                 );
                             }
+                            break;
                             case UniformType::Mat4:
                             {
                                 Mat4 value = m_temporaryAttributes.matrixAttributes.contains(member.name) ? m_temporaryAttributes.matrixAttributes[member.name].value : Mat4::Identity();
@@ -87,6 +89,7 @@ void Material::SetShader(const SafePtr<Shader>& shader)
                                     value
                                 );
                             }
+                            break;
                         }
                     }
                     break;
@@ -101,15 +104,7 @@ void Material::SetShader(const SafePtr<Shader>& shader)
                     break;
             }
         }
-    };
-    if (m_shader->SentToGPU())
-    {
-        lambda();
-    }
-    else
-    {
-        m_shader->OnSentToGPU.Bind(lambda);
-    }
+    });
 }
 
 void Material::SetAttribute(const std::string& name, float attribute)
@@ -195,41 +190,58 @@ void Material::SetAttribute(const std::string& name, const Mat4& attribute)
     }
 }
 
-void Material::SendAllValues(RHIRenderer* renderer)
+void Material::SendAllValues(RHIRenderer* renderer) const
 {
-    std::unordered_map<std::string, CustomAttributes> customAttributes;
+    if (!m_shader->IsLoaded() || !m_shader->SentToGPU())
+        return;
+    struct UniformBuffer {
+        std::vector<uint8_t> data;
+    };
     
+    std::unordered_map<std::string, UniformBuffer> customAttributes;
+
+    auto AppendData = [&](const std::string& uniformName, const void* valuePtr, size_t size) 
+    {
+        auto& buffer = customAttributes[uniformName].data;
+        const uint8_t* bytePtr = static_cast<const uint8_t*>(valuePtr);
+        buffer.insert(buffer.end(), bytePtr, bytePtr + size);
+    };
+
     for (auto& attrib : m_attributes.floatAttributes)
     {
-        customAttributes[attrib.second.uniformName].size += sizeof(float);
+        AppendData(attrib.second.uniformName, &attrib.second.value, sizeof(float));
     }
     for (auto& attrib : m_attributes.intAttributes)
     {
-        customAttributes[attrib.second.uniformName].size += sizeof(int);
+        AppendData(attrib.second.uniformName, &attrib.second.value, sizeof(int));
     }
     for (auto& attrib : m_attributes.vec2Attributes)
     {
-        customAttributes[attrib.second.uniformName].size += sizeof(Vec2f);
+        AppendData(attrib.second.uniformName, &attrib.second.value, sizeof(Vec2f));
     }
     for (auto& attrib : m_attributes.vec3Attributes)
     {
-        customAttributes[attrib.second.uniformName].size += sizeof(Vec3f);
+        AppendData(attrib.second.uniformName, &attrib.second.value, sizeof(Vec3f));
     }
     for (auto& attrib : m_attributes.vec4Attributes)
     {
-        customAttributes[attrib.second.uniformName].size += sizeof(Vec4f);
+        AppendData(attrib.second.uniformName, &attrib.second.value, sizeof(Vec4f));
     }
     for (auto& attrib : m_attributes.matrixAttributes)
     {
-        customAttributes[attrib.second.uniformName].size += sizeof(Mat4);
+        AppendData(attrib.second.uniformName, &attrib.second.value, sizeof(Mat4));
     }
     
-    //TODO allocate memory and set the value to the memory for each uniforms
-    
     for (auto& uniformData : customAttributes)
-    {
+    {        
         Uniform uniform = m_shader->GetUniform(uniformData.first);
         auto binding = UBOBinding(uniform.set, uniform.binding);
-        m_shader->SendValue(binding, uniformData.second.data, uniformData.second.size, renderer);
+        
+        m_shader->SendValue(
+            binding, 
+            uniformData.second.data.data(),
+            uniformData.second.data.size(), 
+            renderer
+        );
     }
 }

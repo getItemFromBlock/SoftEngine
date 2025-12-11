@@ -16,6 +16,7 @@
 #include "Component/MeshComponent.h"
 #include "Component/TransformComponent.h"
 #include "Scene/GameObject.h"
+#include "Utils/Color.h"
 
 void Engine::Create()
 {
@@ -70,9 +71,15 @@ void Engine::Run()
         SafePtr cubeMesh = m_resourceManager->GetResource<Mesh>(cubeModel->GetMeshes()[0]->GetPath());
     
         size_t count = 3 * 3 * 3;
-        size_t sqrtCount = std::pow(count, 1 / 3.f);
+        float sqrtCount = std::pow(count, 1 / 3.f);
         for (int i = 0; i < count; i++)
         {
+            auto mat = m_resourceManager->CreateMaterial("Material " + std::to_string(i));
+
+            float hue = i * 360 / count;
+            
+            mat->SetAttribute("color", static_cast<Vec4f>(Color::FromHSV(hue, 1.f, 1.f)));
+            
             SafePtr<GameObject> object = m_scene->CreateGameObject();
             
             SafePtr<TransformComponent> transform = object->GetComponent<TransformComponent>();
@@ -93,7 +100,7 @@ void Engine::Run()
             
             SafePtr<MeshComponent> meshComp = object->AddComponent<MeshComponent>();
             meshComp->SetMesh(cubeMesh);
-            meshComp->AddMaterial(m_resourceManager->GetDefaultMaterial());
+            meshComp->AddMaterial(mat);
         }
     });
     SafePtr cubeShader = m_resourceManager->GetDefaultShader();
@@ -136,6 +143,7 @@ void Engine::Cleanup() const
     
     ThreadPool::WaitUntilAllTasksFinished();
 
+    m_resourceManager->CreateCache();
     m_resourceManager->Clear();
     m_renderer->Cleanup();
     

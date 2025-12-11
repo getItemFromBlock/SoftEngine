@@ -77,6 +77,8 @@ public:
     bool Load(ResourceManager* resourceManager) override;
     bool SendToGPU(RHIRenderer* renderer) override;
     void Unload() override;
+    
+    ResourceType GetResourceType() const override { return ResourceType::Mesh; }
 
     RHIVertexBuffer* GetVertexBuffer() const { return m_vertexBuffer.get(); }
     RHIIndexBuffer* GetIndexBuffer() const { return m_indexBuffer.get(); }

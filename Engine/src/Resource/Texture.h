@@ -16,6 +16,8 @@ public:
     bool SendToGPU(RHIRenderer* renderer) override;
     void Unload() override;
     
+    ResourceType GetResourceType() const override { return ResourceType::Texture; }
+    
     RHITexture* GetBuffer() const { return m_buffer.get(); }
 private:
     ImageLoader::Image m_image = {};

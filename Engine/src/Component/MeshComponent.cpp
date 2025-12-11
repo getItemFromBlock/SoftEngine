@@ -7,26 +7,25 @@
 #include "Scene/GameObject.h"
 
 #include "TransformComponent.h"
+#include "Utils/Color.h"
 
 void MeshComponent::OnUpdate(float deltaTime)
 {
+    static float time;
+    time += deltaTime;
+    time = std::fmod(time, 360.f);
+    
     RHIRenderer* renderer = Engine::Get()->GetRenderer();
 
     Mat4 VP = p_gameObject->GetScene()->GetCameraData().VP;
 
     for (auto& material : m_materials)
     {
-        {
-            Uniform uniform = material->GetShader()->GetUniform("ubo");
-            auto binding = UBOBinding(uniform.set, uniform.binding);
-            material->GetShader()->SendValue(binding, &VP, sizeof(VP), renderer);
-        }
-        {
-            Vec4f color = Vec4f::One();
-            Uniform uniform = material->GetShader()->GetUniform("material");
-            auto binding = UBOBinding(uniform.set, uniform.binding);
-            material->GetShader()->SendValue(binding, &color, sizeof(color), renderer);
-        }
+        material->SetAttribute("viewProj", VP);
+        
+        material->SetAttribute("color", static_cast<Vec4f>(Color::FromHSV(time, 1.f, 1.f)));
+        
+        material->SendAllValues(renderer);
     }
 }
 

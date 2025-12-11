@@ -14,6 +14,8 @@ public:
     bool SendToGPU(RHIRenderer* renderer) override;
     void Unload() override;
     
+    ResourceType GetResourceType() const override { return ResourceType::VertexShader; }
+    
     ShaderType GetShaderType() const override { return ShaderType::Fragment; }
 private:
 };

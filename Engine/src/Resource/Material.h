@@ -21,10 +21,10 @@ struct Attribute
     T value;
     
     Attribute() = default;
-    Attribute(std::string uniformName, T value) : uniformName(std::move(uniformName)), value(value) {}
+    Attribute(const std::string& uniformName, T value) : uniformName(uniformName), value(value) {}
     
     void operator=(const T& value) { this->value = value; }
-    void operator=(const Attribute& attribute) { this->uniformName, this->value = attribute.value; }
+    void operator=(const Attribute& attribute) { this->uniformName = attribute.uniformName, this->value = attribute.value; }
 };
 
 struct MaterialAttributes
@@ -57,6 +57,8 @@ public:
     bool SendToGPU(RHIRenderer* renderer) override;
     void Unload() override;
     
+    ResourceType GetResourceType() const override { return ResourceType::Material; }
+    
     void SetShader(const SafePtr<Shader>& shader);
     SafePtr<Shader> GetShader() const { return m_shader; }
 
@@ -68,7 +70,7 @@ public:
     void SetAttribute(const std::string& name, const SafePtr<Texture>& texture);
     void SetAttribute(const std::string& name, const Mat4& attribute);
 
-    void SendAllValues(RHIRenderer* renderer);
+    void SendAllValues(RHIRenderer* renderer) const;
 private:
     SafePtr<Shader> m_shader;
     

@@ -9,10 +9,53 @@
 class ResourceManager;
 class RHIRenderer;
 
+enum class ResourceType
+{
+    None,
+    Texture,
+    Mesh,
+    Model,
+    FragmentShader,
+    VertexShader,
+    // ComputeShader,
+    Shader,
+    Material
+};
+
+inline const char* to_string(ResourceType e)
+{
+    switch (e)
+    {
+        case ResourceType::None: return "None";
+        case ResourceType::Texture: return "Texture";
+        case ResourceType::Mesh: return "Mesh";
+        case ResourceType::Model: return "Model";
+        case ResourceType::FragmentShader: return "FragmentShader";
+        case ResourceType::VertexShader: return "VertexShader";
+        case ResourceType::Shader: return "Shader";
+        case ResourceType::Material: return "Material";
+        default: return "unknown";
+    }
+}
+
+inline static std::unordered_map<std::string, ResourceType> extensionToResourceType =
+{
+    { "png", ResourceType::Texture },
+    { "jpeg", ResourceType::Texture },
+    { "tga", ResourceType::Texture },
+    { "bmp", ResourceType::Texture },
+    { "psd", ResourceType::Texture },
+    { "gif", ResourceType::Texture },
+    { "obj", ResourceType::Model },
+    { "vert", ResourceType::VertexShader },
+    { "frag", ResourceType::FragmentShader },
+    { "shader", ResourceType::Shader }
+};
+
 class IResource
 {
 public:
-    IResource(const std::filesystem::path& path) : p_path(path.generic_string()) {}
+    IResource(const std::filesystem::path& path);
     IResource(const IResource&) = delete;
     IResource(IResource&&) = delete;
     IResource& operator=(const IResource&) = delete;
@@ -21,6 +64,8 @@ public:
     virtual bool Load(ResourceManager* resourceManager) = 0;
     virtual bool SendToGPU(RHIRenderer* renderer) = 0;
     virtual void Unload() = 0;
+    
+    virtual ResourceType GetResourceType() const = 0;
 
     Core::UUID GetUUID() const { return p_uuid; }
     std::filesystem::path GetPath() const { return p_path; }
@@ -39,9 +84,11 @@ public:
     }
     
 public:
-    Event<> OnLoaded;
-    Event<> OnSentToGPU;
+    OnceEvent OnLoaded;
+    OnceEvent OnSentToGPU;
 protected:    
+    friend class ResourceManager;
+    
     std::filesystem::path p_path;
     Core::UUID p_uuid;
 

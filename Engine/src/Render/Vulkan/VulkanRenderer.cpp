@@ -565,8 +565,6 @@ static Uniforms SpirvReflectUniforms(const std::string& spirv)
 static std::optional<PushConstant> SpirvReflectPushConstants(const std::string& spirv)
 {
     size_t spirv_nbytes = spirv.size();
-    const void* spirv_code = spirv.data();
-
     if (spirv_nbytes % sizeof(uint32_t) != 0) {
         PrintError("SPIR-V binary is corrupt or truncated");
         return {};
@@ -575,7 +573,7 @@ static std::optional<PushConstant> SpirvReflectPushConstants(const std::string& 
     SpvReflectShaderModule module;
     SpvReflectResult result = spvReflectCreateShaderModule(
         spirv_nbytes,
-        reinterpret_cast<const uint32_t*>(spirv_code),
+        reinterpret_cast<const uint32_t*>(spirv.data()),
         &module);
 
     if (result != SPV_REFLECT_RESULT_SUCCESS) {
@@ -584,48 +582,48 @@ static std::optional<PushConstant> SpirvReflectPushConstants(const std::string& 
     }
 
     uint32_t pc_count = 0;
-    result = spvReflectEnumeratePushConstantBlocks(&module, &pc_count, NULL);
+    result = spvReflectEnumeratePushConstantBlocks(&module, &pc_count, nullptr);
     assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
-    SpvReflectBlockVariable** pc_blocks =
-        static_cast<SpvReflectBlockVariable**>(malloc(pc_count * sizeof(SpvReflectBlockVariable*)));
-
-    if (pc_blocks == NULL) {
+    if (pc_count == 0) {
         spvReflectDestroyShaderModule(&module);
-        PrintError("Failed to allocate memory for SPIR-V Reflect Push Constant blocks");
+        return {};
+    }
+
+    SpvReflectBlockVariable** pc_blocks =
+        static_cast<SpvReflectBlockVariable**>(
+            malloc(pc_count * sizeof(SpvReflectBlockVariable*)));
+
+    if (!pc_blocks) {
+        PrintError("Allocation failure");
+        spvReflectDestroyShaderModule(&module);
         return {};
     }
 
     result = spvReflectEnumeratePushConstantBlocks(&module, &pc_count, pc_blocks);
     assert(result == SPV_REFLECT_RESULT_SUCCESS);
-    
-    if (pc_count == 0)
-    {
-        return {};
-    }
+
     assert(pc_count == 1);
 
-    std::vector<PushConstants> pushConstants;
     PushConstant pc;
     const SpvReflectBlockVariable* block = pc_blocks[0];
 
     pc.name = block->name ? block->name : "";
     pc.size = block->size;
-    
+
     if (block->member_count > 0 && block->members) {
         pc.members.reserve(block->member_count);
-        for (uint32_t m = 0; m < block->member_count; ++m) {
+        for (uint32_t m = 0; m < block->member_count; m++) {
             UniformMember mem;
             ParseBlockVariable(&block->members[m], mem);
             pc.members.push_back(std::move(mem));
         }
     }
-    std::string key = pc.name.empty() ? ("push_constant") : pc.name;
 
     free(pc_blocks);
     spvReflectDestroyShaderModule(&module);
 
-    return {pc};
+    return pc;
 }
 
 Uniforms VulkanRenderer::GetUniforms(Shader* shader)

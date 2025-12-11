@@ -40,10 +40,10 @@ int main(int argc, char** argv, char** envp)
 {
 #if defined(_MSC_VER) && !defined(NDEBUG)
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-    // _CrtSetBreakAlloc(2368);
+    // _CrtSetBreakAlloc(2814);
 #endif
 
-    //TODO: Fix memory leaks
+    //TODO: Fix material
     return Run(argc, argv, envp);
 }
 #endif
