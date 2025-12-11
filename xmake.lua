@@ -120,7 +120,7 @@ target("Engine")
         add_packages("vulkansdk")
         add_packages("spirv-reflect")
         add_packages("shaderc")
-        if is_plat("windows") and is_mode("debug") then
+        if is_plat("windows", "mingw") and is_mode("debug") then
             add_links("shaderc_combinedd")
         else
             add_links("shaderc_combined")

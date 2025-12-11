@@ -1,7 +1,6 @@
 ﻿name: MacOS Build
 
 on:
-  pull_request:
   push:
     paths-ignore:
       - '.gitignore'
@@ -18,7 +17,7 @@ jobs:
         kind: [binary]
 
     runs-on: ${{ matrix.os }}
-    if: ${{ !contains(github.event.head_commit.message, 'ci skip') }}
+    if: ${{ contains(github.event.head_commit.message, 'ci run') || contains(github.event.head_commit.message, 'ci macos') }}
 
     steps:
       - name: Get current date as package key
