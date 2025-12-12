@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "EngineAPI.h"
 #include <memory>
 
 #include "Resource/ResourceManager.h"
@@ -7,7 +8,7 @@
 #include "Scene/ComponentHandler.h"
 #include "Scene/Scene.h"
 
-class Engine
+class ENGINE_API Engine
 {
 public:
     static void Create();

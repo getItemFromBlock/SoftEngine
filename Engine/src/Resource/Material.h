@@ -1,10 +1,13 @@
 #pragma once
+#include <memory>
 #include <galaxymath/Maths.h>
 
 #include "IResource.h"
 
 #include "Utils/Type.h"
 #include "Render/Vulkan/VulkanMaterial.h"
+
+#include "Render/RHI/RHIMaterial.h"
 
 class Shader;
 class Texture;

@@ -83,15 +83,15 @@ set_languages("c++latest")
 set_rundir("$(projectdir)")
 
 target("Engine")
-    set_default(true)
-    set_kind("binary")
+    set_kind("shared")
+    add_defines("ENGINE_EXPORTS")
     
     add_files("Engine/src/**.cpp")
     add_headerfiles("Engine/src/**.h", "Engine/src/**.hpp")
     add_includedirs("Engine/src")
 
     -- Always add base packages
-    add_packages("imgui", "galaxymath", "stb", "thread-pool")
+    add_packages("galaxymath", "stb", "thread-pool")
     
     -- Add Window API packages
     if has_config("glfw") then
@@ -169,7 +169,14 @@ target("Engine")
 target_end()
 
 target("Editor")
+    set_default(true)
+    set_kind("binary")
+    
+    add_deps("Engine")
+    
     add_files("Editor/src/**.cpp")
     add_headerfiles("Editor/src/**.h", "Editor/src/**.hpp")
-    add_includedirs("Editor/src")
+    add_includedirs("Editor/src",  "Engine/src")
+    
+    add_packages("imgui", "galaxymath", "stb", "thread-pool")
 target_end()
