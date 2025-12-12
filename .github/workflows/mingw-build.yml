@@ -16,7 +16,7 @@ jobs:
         arch: [x86_64]
         mode: [debug, release]
         kind: [binary]
-
+  
     runs-on: tenki-standard-autoscale
     if: ${{ contains(github.event.head_commit.message, 'ci run') || contains(github.event.head_commit.message, 'ci mingw') }}
 
