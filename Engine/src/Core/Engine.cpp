@@ -134,21 +134,29 @@ void Engine::Run()
         m_scene->OnUpdate(deltaTime);
         if (!m_renderer->BeginFrame())
             continue;
+
+        OnRender.Invoke();
+        
+        // ImGui::Begin("Test");
+        // ImGui::End();
         
         m_renderer->ClearColor();
 
         m_scene->OnRender(m_renderer.get());
         
+        OnEndFrame.Invoke();
         m_renderer->EndFrame();
     }
 }
 
-void Engine::Cleanup() const
+void Engine::Cleanup()
 {
     // Wait for GPU to finish rendering before cleaning
     m_renderer->WaitForGPU();
     
     ThreadPool::WaitUntilAllTasksFinished();
+    
+    OnCleanup.Invoke();
 
     m_resourceManager->CreateCache();
     m_resourceManager->Clear();

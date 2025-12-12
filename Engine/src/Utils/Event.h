@@ -1,10 +1,11 @@
 #pragma once
+#include "EngineAPI.h"
 #include <functional>
 #include <vector>
 #include <mutex>
 
 template<typename... Args>
-class Event {
+class ENGINE_API Event {
 public:
     Event() = default;
     Event(const Event&) = delete;
@@ -57,7 +58,7 @@ protected:
 };
 
 // Event that runs only once
-class OnceEvent : public Event<> {
+class ENGINE_API OnceEvent : public Event<> {
 public:
     using Event::Event; 
     using Callback = std::function<void()>;

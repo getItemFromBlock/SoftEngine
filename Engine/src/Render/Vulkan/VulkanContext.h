@@ -7,7 +7,7 @@
 
 #include "Render/RHI/RHIContext.h"
 
-class VulkanContext : public RHIContext
+class ENGINE_API VulkanContext : public RHIContext
 {
 public:
     VulkanContext() = default;

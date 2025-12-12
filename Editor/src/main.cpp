@@ -1,15 +1,15 @@
 #include <iostream>
-#include "Core/Engine.h"
+
+#include "Core/Editor.h"
 
 int Run(int argc, char** argv, char** envp)
 {
     (void)argc; (void)argv; (void)envp;
 
-    Engine::Create();
-    Engine* engine = Engine::Get();
-    engine->Initialize();
-    engine->Run();
-    engine->Cleanup();
+    Editor editor;
+    editor.Initialize();
+    editor.Run();
+    editor.Cleanup();
     return 0;
 }
 

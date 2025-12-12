@@ -8,6 +8,8 @@
 #include "Scene/ComponentHandler.h"
 #include "Scene/Scene.h"
 
+#include "Utils/Event.h"
+
 class ENGINE_API Engine
 {
 public:
@@ -15,13 +17,16 @@ public:
 
     bool Initialize();
     void Run();
-    void Cleanup() const;
+    void Cleanup();
     
     static Engine* Get();
 
     Window* GetWindow() const { return m_window.get(); }
     RHIRenderer* GetRenderer() const { return m_renderer.get(); }
 
+    Event<> OnRender;
+    Event<> OnCleanup;
+    Event<> OnEndFrame;
 private:
     bool m_ready = false;
     std::unique_ptr<Window> m_window;

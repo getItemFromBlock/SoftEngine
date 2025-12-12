@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "EngineAPI.h"
 #include <memory>
 #include <vector>
 
@@ -36,7 +37,7 @@ enum class RenderAPI
     Metal,
 };
 
-class RHIRenderer
+class ENGINE_API RHIRenderer
 {
 public:
     RHIRenderer() = default;

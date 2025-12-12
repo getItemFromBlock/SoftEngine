@@ -1,5 +1,6 @@
 ﻿#pragma once
 #ifdef RENDER_API_VULKAN
+#include "EngineAPI.h"
 
 #include <mutex>
 #include <vulkan/vulkan.h>
@@ -7,7 +8,7 @@
 
 class VulkanDevice;
 
-class VulkanCommandPool
+class ENGINE_API VulkanCommandPool
 {
 public:
     VulkanCommandPool() = default;

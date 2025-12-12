@@ -1,5 +1,6 @@
 ﻿#pragma once
 #ifdef RENDER_API_VULKAN
+#include "EngineAPI.h"
 #include <mutex>
 #include <vulkan/vulkan_core.h>
 #include <optional>
@@ -9,7 +10,7 @@
 class VulkanCommandPool;
 class VulkanTexture;
 
-struct VulkanQueue
+struct ENGINE_API VulkanQueue
 {
     VulkanQueue(VkQueue _queue) : handle(_queue) {}
     
@@ -18,7 +19,7 @@ struct VulkanQueue
 };
 
 
-class VulkanDevice {
+class ENGINE_API VulkanDevice {
 public:
     VulkanDevice() = default;
     ~VulkanDevice();

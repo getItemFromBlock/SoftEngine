@@ -1,8 +1,9 @@
 ﻿#pragma once
+#include "EngineAPI.h"
 
 class Window;
 
-class RHIContext
+class ENGINE_API RHIContext
 {
 public:
     RHIContext() = default;

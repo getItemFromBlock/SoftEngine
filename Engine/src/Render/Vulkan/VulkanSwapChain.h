@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "VulkanDevice.h"
 #ifdef RENDER_API_VULKAN
+#include "EngineAPI.h"
 
 #include <vulkan/vulkan.h>
 #include <vector>
@@ -9,7 +10,7 @@
 class VulkanDevice;
 class Window;
 
-class VulkanSwapChain
+class ENGINE_API VulkanSwapChain
 {
 public:
     VulkanSwapChain() = default;

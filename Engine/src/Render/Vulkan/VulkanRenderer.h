@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "EngineAPI.h"
 #include <memory>
 
 #include "VulkanDescriptorSetLayout.h"
@@ -37,7 +38,7 @@ struct UniformBufferObject
     Mat4 Projection;
 };
 
-class VulkanRenderer : public RHIRenderer
+class ENGINE_API VulkanRenderer : public RHIRenderer
 {
 public:
     VulkanRenderer() = default;
@@ -85,6 +86,11 @@ public:
     
     uint32_t GetFrameIndex() const { return m_currentFrame; }
     VkCommandBuffer GetCommandBuffer() const { return m_commandPool->GetCommandBuffer(m_currentFrame); }
+    
+    VulkanContext* GetContext() const { return m_context.get(); }
+    VulkanDevice* GetDevice() const { return m_device.get(); }
+    VulkanRenderPass* GetRenderPass() const { return m_renderPass.get(); }
+    VulkanSwapChain* GetSwapChain() const { return m_swapChain.get(); }
 private:
     void RecreateSwapChain();
 
@@ -104,6 +110,7 @@ private:
     uint32_t m_imageIndex = 0;
     
     SafePtr<Texture> m_defaultTexture;
+    VkDescriptorPool m_imGuiPool;
 
     static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
     uint32_t m_currentFrame = 0;

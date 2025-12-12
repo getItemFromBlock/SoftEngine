@@ -1,4 +1,6 @@
 #pragma once
+#include "EngineAPI.h"
+
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -52,7 +54,7 @@ namespace Debug
         }
     }
 
-    class Log
+    class ENGINE_API Log
     {
     public:
         ~Log() = default;

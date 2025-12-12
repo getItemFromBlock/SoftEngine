@@ -21,7 +21,7 @@
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 
-class WindowGLFW : public Window
+class ENGINE_API WindowGLFW : public Window
 {
 public:
     WindowGLFW() = default;

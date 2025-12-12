@@ -77,7 +77,63 @@ add_requires("galaxymath")
 add_requires("thread-pool")
 
 -- Define macros
-add_defines("IMGUI_DEFINE_MATH_OPERATORS", "IMGUI_IMPLEMENTATION", "NOMINMAX")
+add_defines("NOMINMAX")
+
+if has_config("glfw") then
+    add_packages("glfw")
+    add_defines("WINDOW_API_GLFW")
+end
+
+if has_config("sdl") then
+    add_packages("libsdl2")
+    add_defines("WINDOW_API_SDL")
+end
+
+-- Add Render API packages and defines
+if has_config("opengl") then
+    add_defines("RENDER_API_OPENGL")
+    if is_plat("windows") then
+        add_links("opengl32")
+    elseif is_plat("linux") then
+        add_links("GL")
+    elseif is_plat("macosx") then
+        add_frameworks("OpenGL")
+    end
+end
+
+if has_config("vulkan") then
+    add_packages("vulkansdk")
+    add_packages("spirv-reflect")
+    add_packages("shaderc")
+    if is_plat("windows", "mingw") and is_mode("debug") then
+        add_links("shaderc_combinedd")
+    else
+        add_links("shaderc_combined")
+    end
+
+    add_defines("RENDER_API_VULKAN")
+    if is_plat("windows") then
+        add_links("vulkan-1")
+    elseif is_plat("linux") or is_plat("macosx") then
+        add_links("vulkan")
+    end
+end
+
+if has_config("directx") then
+    add_defines("RENDER_API_DIRECTX")
+    if is_plat("windows") then
+        add_links("d3d11", "dxgi", "d3dcompiler")
+    else
+        print("Warning: DirectX is only available on Windows")
+    end
+end
+
+-- Platform-specific settings
+if is_plat("windows") then
+    add_syslinks("user32", "gdi32", "shell32")
+elseif is_plat("macosx") then
+    add_frameworks("Cocoa", "IOKit", "CoreVideo")
+end
 
 set_languages("c++latest")
 set_rundir("$(projectdir)")
@@ -92,63 +148,6 @@ target("Engine")
 
     -- Always add base packages
     add_packages("galaxymath", "stb", "thread-pool")
-    
-    -- Add Window API packages
-    if has_config("glfw") then
-        add_packages("glfw")
-        add_defines("WINDOW_API_GLFW")
-    end
-    
-    if has_config("sdl") then
-        add_packages("libsdl2")
-        add_defines("WINDOW_API_SDL")
-    end
-    
-    -- Add Render API packages and defines
-    if has_config("opengl") then
-        add_defines("RENDER_API_OPENGL")
-        if is_plat("windows") then
-            add_links("opengl32")
-        elseif is_plat("linux") then
-            add_links("GL")
-        elseif is_plat("macosx") then
-            add_frameworks("OpenGL")
-        end
-    end
-    
-    if has_config("vulkan") then
-        add_packages("vulkansdk")
-        add_packages("spirv-reflect")
-        add_packages("shaderc")
-        if is_plat("windows", "mingw") and is_mode("debug") then
-            add_links("shaderc_combinedd")
-        else
-            add_links("shaderc_combined")
-        end
-
-        add_defines("RENDER_API_VULKAN")
-        if is_plat("windows") then
-            add_links("vulkan-1")
-        elseif is_plat("linux") or is_plat("macosx") then
-            add_links("vulkan")
-        end
-    end
-    
-    if has_config("directx") then
-        add_defines("RENDER_API_DIRECTX")
-        if is_plat("windows") then
-            add_links("d3d11", "dxgi", "d3dcompiler")
-        else
-            print("Warning: DirectX is only available on Windows")
-        end
-    end
-    
-    -- Platform-specific settings
-    if is_plat("windows") then
-        add_syslinks("user32", "gdi32", "shell32")
-    elseif is_plat("macosx") then
-        add_frameworks("Cocoa", "IOKit", "CoreVideo")
-    end
     
     add_cxxflags("-Wall", "-Wextra")
     

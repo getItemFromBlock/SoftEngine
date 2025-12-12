@@ -21,6 +21,13 @@
 #include <spirv_reflect.h>
 #include <shaderc/shaderc.hpp>
 
+// using namespace GALAXY::Math;
+// #include <galaxymath/Maths.h>
+//
+// #include <imgui.h>
+// #include <imgui_impl_glfw.h>
+// #include <imgui_impl_vulkan.h>
+
 #include "VulkanDepthBuffer.h"
 #include "VulkanDescriptorSetLayout.h"
 #include "VulkanIndexBuffer.h"
@@ -38,6 +45,9 @@
 #include "Resource/VertexShader.h"
 
 #include "Utils/Type.h"
+
+
+#include "Core/Window/WindowGLFW.h"
 
 VulkanRenderer::~VulkanRenderer() = default;
 
@@ -81,20 +91,6 @@ bool VulkanRenderer::Initialize(Window* window)
             return false;
         }
 
-        VkDescriptorSetLayoutBinding uboLayoutBinding{};
-        uboLayoutBinding.binding = 0;
-        uboLayoutBinding.descriptorCount = 1;
-        uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        uboLayoutBinding.pImmutableSamplers = nullptr;
-        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-        VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-        samplerLayoutBinding.binding = 1;
-        samplerLayoutBinding.descriptorCount = 1;
-        samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        samplerLayoutBinding.pImmutableSamplers = nullptr;
-        samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
         m_depthBuffer = std::make_unique<VulkanDepthBuffer>();
         if (!m_depthBuffer->Initialize(m_device.get(), m_swapChain->GetExtent()))
         {
@@ -132,6 +128,57 @@ bool VulkanRenderer::Initialize(Window* window)
         {
             m_framebufferResized = true;
         });
+        
+        /*
+        VkDescriptorPoolSize pool_sizes[] =
+        {
+            { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+            { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+            { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+            { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+        };
+
+        VkDescriptorPoolCreateInfo pool_info = {};
+        pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+        pool_info.maxSets = 1000;
+        pool_info.poolSizeCount = std::size(pool_sizes);
+        pool_info.pPoolSizes = pool_sizes;
+
+        vkCreateDescriptorPool(m_device->GetDevice(), &pool_info, nullptr, &m_imGuiPool);
+        
+        // 1. Setup Dear ImGui context
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO(); (void)io;
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard
+
+        // 2. Setup Platform/Renderer backends
+        ImGui_ImplGlfw_InitForVulkan(dynamic_cast<WindowGLFW*>(window)->GetHandle(), true); // Replace with ImplSDL2 if using SDL
+
+        ImGui_ImplVulkan_InitInfo init_info = {};
+        init_info.Instance = m_context->GetInstance();
+        init_info.PhysicalDevice = m_device->GetPhysicalDevice();
+        init_info.Device = m_device->GetDevice();
+        init_info.QueueFamily = m_device->GetGraphicsQueueFamily();
+        init_info.Queue = m_device->GetGraphicsQueue().handle;
+        init_info.PipelineCache = VK_NULL_HANDLE;
+        init_info.DescriptorPool = m_imGuiPool; // The pool you created above
+        init_info.RenderPass = m_renderPass->GetRenderPass();    // Your main render pass
+        init_info.Subpass = 0;
+        init_info.MinImageCount = 2;          // >= 2
+        init_info.ImageCount = m_swapChain->GetImageCount();
+        init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+
+        ImGui_ImplVulkan_Init(&init_info);
+        */
 
         PrintLog("Vulkan renderer initialized successfully");
         return true;
@@ -154,6 +201,16 @@ void VulkanRenderer::WaitForGPU()
 
 void VulkanRenderer::Cleanup()
 {
+    // ImGui_ImplVulkan_Shutdown();
+    // ImGui_ImplGlfw_Shutdown();
+    // ImGui::DestroyContext();
+
+    if (m_imGuiPool != VK_NULL_HANDLE && m_device)
+    {
+        vkDestroyDescriptorPool(m_device->GetDevice(), m_imGuiPool, nullptr);
+        m_imGuiPool = VK_NULL_HANDLE;
+    }
+    
     m_syncObjects.reset();
     m_commandPool.reset();
     m_framebuffer.reset();
@@ -234,6 +291,11 @@ bool VulkanRenderer::BeginFrame()
     
     std::mutex& mutex = m_commandPool->GetMutex();
     mutex.lock();
+    
+    // Start a new ImGui frame
+    // ImGui_ImplVulkan_NewFrame();
+    // ImGui_ImplGlfw_NewFrame();
+    // ImGui::NewFrame();
     return true;
 }
 
@@ -251,7 +313,15 @@ bool VulkanRenderer::MultiThreadSendToGPU()
 }
 
 void VulkanRenderer::EndFrame()
-{
+{    
+    // ImGui::Render();
+    // ImDrawData* draw_data = ImGui::GetDrawData();
+    // if (draw_data && draw_data->CmdListsCount > 0)
+    // {
+        // VkCommandBuffer commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
+        // ImGui_ImplVulkan_RenderDrawData(draw_data, commandBuffer);
+    // }
+    
     auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
     m_renderPass->End(commandBuffer);
     
