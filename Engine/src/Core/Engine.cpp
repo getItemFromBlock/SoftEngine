@@ -66,12 +66,12 @@ void Engine::Run()
 {
     m_scene = std::make_unique<Scene>();
     
-    SafePtr cubeModel = m_resourceManager->Load<Model>(RESOURCE_PATH"/models/Cube.obj");
+    SafePtr cubeModel = m_resourceManager->Load<Model>(RESOURCE_PATH"/models/Suzanne.obj");
     cubeModel->OnLoaded.Bind([&]()
     {
         SafePtr cubeMesh = m_resourceManager->GetResource<Mesh>(cubeModel->GetMeshes()[0]->GetPath());
     
-        size_t count = 3 * 3 * 3;
+        size_t count = std::pow(3, 3);
         float sqrtCount = std::pow(count, 1 / 3.f);
             
         for (int i = 0; i < count; i++)
@@ -108,6 +108,7 @@ void Engine::Run()
                 object->AddComponent<TestComponent>();
             }
         }
+        m_ready = true;
     });
     SafePtr cubeShader = m_resourceManager->GetDefaultShader();
 
@@ -125,7 +126,7 @@ void Engine::Run()
 
         m_resourceManager->UpdateResourceToSend();
 
-        if (!m_renderer->IsInitialized() || !cubeShader || !cubeShader->SentToGPU())
+        if (!m_renderer->IsInitialized() || !cubeShader || !cubeShader->SentToGPU() || !m_ready)
             continue;
         
         m_renderer->WaitUntilFrameFinished();

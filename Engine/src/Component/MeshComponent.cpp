@@ -37,7 +37,7 @@ void MeshComponent::OnRender(RHIRenderer* renderer)
     for (auto& material : m_materials)
     {
         auto shader = material->GetShader().get().get();
-        renderer->BindShader(shader, material.get().get());
+        renderer->BindMaterial(material.get().get());
 
         renderer->BindVertexBuffers(m_mesh->GetVertexBuffer(), m_mesh->GetIndexBuffer());
 

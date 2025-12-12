@@ -698,16 +698,17 @@ void VulkanRenderer::SendValue(UBOBinding binding, void* value, uint32_t size, S
     // uniformBuffer->WriteToMapped(value, size, m_currentFrame);
 }
 
-void VulkanRenderer::BindShader(Shader* shader, Material* material)
+void VulkanRenderer::BindMaterial(Material* material)
 {
+    auto shader = material->GetShader();
+    if (!shader)
+        return;
+    
     VulkanPipeline* pipeline = dynamic_cast<VulkanPipeline*>(shader->GetPipeline());
     auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
     pipeline->Bind(commandBuffer);
-    
-    // Bind pipeline
-    pipeline->Bind(commandBuffer);
 
-    material->Bind(commandBuffer, m_currentFrame);
+    material->Bind(this);
 
     // Set viewport and scissor dynamically
     VkViewport viewport{};
@@ -768,6 +769,17 @@ std::unique_ptr<RHIPipeline> VulkanRenderer::CreatePipeline(const Shader* shader
     std::unique_ptr<VulkanPipeline> pipeline = std::make_unique<VulkanPipeline>();
     pipeline->Initialize(m_device.get(), m_renderPass->GetRenderPass(), m_swapChain->GetExtent(), MAX_FRAMES_IN_FLIGHT, shader);
     return std::move(pipeline);
+}
+std::unique_ptr<RHIMaterial> VulkanRenderer::CreateMaterial(Shader* shader)
+{
+    VulkanPipeline* pipeline = dynamic_cast<VulkanPipeline*>(shader->GetPipeline());
+    auto material = std::make_unique<VulkanMaterial>(pipeline);
+    if (!material->Initialize(MAX_FRAMES_IN_FLIGHT, m_defaultTexture.get().get(), pipeline))
+    {
+        PrintError("Failed to initialize material from pipeline");
+        return nullptr;
+    }
+    return std::move(material);
 }
 
 void VulkanRenderer::SetDefaultTexture(const SafePtr<Texture>& texture)

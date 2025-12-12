@@ -30,5 +30,6 @@ public:
 private:
     VulkanDevice* m_device = nullptr;
     std::vector<VkDescriptorSet> m_descriptorSets;
+    VkDescriptorPool m_pool;
 };
 #endif

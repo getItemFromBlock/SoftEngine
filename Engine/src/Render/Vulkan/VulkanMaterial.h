@@ -8,29 +8,27 @@
 #include "VulkanDescriptorPool.h"
 #include "VulkanDescriptorSet.h"
 #include "VulkanUniformBuffer.h"
+#include "Render/RHI/RHIMaterial.h"
 
 class VulkanPipeline;
 class VulkanDevice;
 class Texture;
 
-// Material represents an instance of a shader/pipeline with specific data
-class VulkanMaterial
+class VulkanMaterial : public RHIMaterial
 {
 public:
     VulkanMaterial(VulkanPipeline* pipeline);
-    ~VulkanMaterial();
+    ~VulkanMaterial() override;
 
     bool Initialize(uint32_t maxFramesInFlight, Texture* defaultTexture, VulkanPipeline* pipeline);
-    void Cleanup();
+    void Cleanup() override;
 
-    // Update uniform data
-    void SetUniformData(uint32_t set, uint32_t binding, const void* data, size_t size, uint32_t frameIndex);
+    void SetUniformData(uint32_t set, uint32_t binding, const void* data, size_t size, RHIRenderer* renderer) override;
     void SetTexture(uint32_t set, uint32_t binding, Texture* texture, uint32_t frameIndex);
     
-    // Bind this material's descriptor sets
+    void Bind(RHIRenderer* renderer) override;
     void BindDescriptorSets(VkCommandBuffer commandBuffer, uint32_t frameIndex);
 
-    // Getters
     VulkanUniformBuffer* GetUniformBuffer(uint32_t set, uint32_t binding) const;
     VulkanDescriptorSet* GetDescriptorSet(uint32_t set) const;
     VulkanPipeline* GetPipeline() const { return m_pipeline; }

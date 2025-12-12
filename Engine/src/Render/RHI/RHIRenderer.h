@@ -68,6 +68,7 @@ public:
     virtual std::unique_ptr<RHIIndexBuffer> CreateIndexBuffer(const uint32_t* data, uint32_t size) = 0;
     virtual std::unique_ptr<RHIShaderBuffer> CreateShaderBuffer(const std::string& code) = 0;
     virtual std::unique_ptr<RHIPipeline> CreatePipeline(const Shader* shader) = 0;
+    virtual std::unique_ptr<RHIMaterial> CreateMaterial(Shader* shader) = 0;
     
     virtual std::string CompileShader(ShaderType type, const std::string& code) = 0;
     virtual Uniforms GetUniforms(Shader* shader) = 0;
@@ -75,7 +76,7 @@ public:
     
     virtual void SendTexture(UBOBinding binding, Texture* texture, Shader* shader) = 0;
     virtual void SendValue(UBOBinding binding, void* value, uint32_t size, Shader* shader) = 0;
-    virtual void BindShader(Shader* shader, Material* material) = 0;
+    virtual void BindMaterial(Material* material) = 0;
     
     virtual void SetDefaultTexture(const SafePtr<Texture>& texture) = 0;
     

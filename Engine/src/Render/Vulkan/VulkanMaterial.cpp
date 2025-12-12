@@ -2,57 +2,62 @@
 #ifdef RENDER_API_VULKAN
 
 #include "VulkanMaterial.h"
+
+#include <ranges>
+
 #include "VulkanPipeline.h"
 #include "VulkanDevice.h"
 #include "VulkanUniformBuffer.h"
 #include "VulkanDescriptorSet.h"
 #include "VulkanDescriptorPool.h"
+#include "VulkanRenderer.h"
 #include "VulkanTexture.h"
 #include "Resource/Texture.h"
 #include "Debug/Log.h"
 
 VulkanMaterial::VulkanMaterial(VulkanPipeline* pipeline)
     : m_pipeline(pipeline)
-    , m_device(pipeline->GetDevice())
-    , m_maxFramesInFlight(pipeline->GetMaxFramesInFlight())
+      , m_device(pipeline->GetDevice())
+      , m_maxFramesInFlight(pipeline->GetMaxFramesInFlight())
 {
-    // Copy uniform information from pipeline
     m_uniformsBySet = pipeline->GetUniformsBySet();
 }
 
 VulkanMaterial::~VulkanMaterial()
 {
-    Cleanup();
+    VulkanMaterial::Cleanup();
 }
 
 bool VulkanMaterial::Initialize(uint32_t maxFramesInFlight, Texture* defaultTexture, VulkanPipeline* pipeline)
 {
     try
     {
+        // Ensure stored frame count matches requested
+        m_maxFramesInFlight = maxFramesInFlight;
+
         auto descriptorTypeCounts = pipeline->GetDescriptorTypeCounts();
         auto descriptorSetLayouts = pipeline->GetDescriptorSetLayouts();
-        
-        // --- Create Shared Descriptor Pool ---
+
         std::vector<VkDescriptorPoolSize> poolSizes;
         poolSizes.reserve(descriptorTypeCounts.size());
         for (const auto& [type, count] : descriptorTypeCounts)
         {
             poolSizes.push_back({
-                .type = type, 
-                .descriptorCount = count * maxFramesInFlight
-            }); 
+                .type = type,
+                .descriptorCount = count * m_maxFramesInFlight
+            });
         }
 
         m_descriptorPool = std::make_unique<VulkanDescriptorPool>();
-        if (!m_descriptorPool->Initialize(m_device, poolSizes, 
-            static_cast<uint32_t>(maxFramesInFlight * descriptorSetLayouts.size())))
+        if (!m_descriptorPool->Initialize(m_device, poolSizes,
+                                          static_cast<uint32_t>(m_maxFramesInFlight * descriptorSetLayouts.size())))
         {
             PrintError("Failed to initialize shared descriptor pool!");
+            Cleanup();
             return false;
         }
-        
+
         // --- Create Uniform Buffers ---
-        // Iterate through all uniforms and create buffers for UBOs
         for (const auto& [set, uniforms] : m_uniformsBySet)
         {
             for (const auto& uniform : uniforms)
@@ -60,16 +65,17 @@ bool VulkanMaterial::Initialize(uint32_t maxFramesInFlight, Texture* defaultText
                 if (uniform.type == UniformType::NestedStruct)
                 {
                     UBOBinding key = {uniform.set, uniform.binding};
-                    
+
                     auto ubo = std::make_unique<VulkanUniformBuffer>();
                     if (!ubo->Initialize(m_device, uniform.size, m_maxFramesInFlight))
                     {
-                        PrintError("Failed to initialize uniform buffer for set %u binding %u", 
+                        PrintError("Failed to initialize uniform buffer for set %u binding %u",
                                    uniform.set, uniform.binding);
+                        Cleanup();
                         return false;
                     }
                     ubo->MapAll();
-                    
+
                     m_uniformBuffers[key] = std::move(ubo);
                 }
             }
@@ -82,12 +88,13 @@ bool VulkanMaterial::Initialize(uint32_t maxFramesInFlight, Texture* defaultText
         for (size_t i = 0; i < layouts.size(); ++i)
         {
             auto descriptorSet = std::make_unique<VulkanDescriptorSet>();
-            if (!descriptorSet->Initialize(m_device, 
-                                          m_descriptorPool->GetPool(),
-                                          layouts[i]->GetLayout(),
-                                          m_maxFramesInFlight))
+            if (!descriptorSet->Initialize(m_device,
+                                           m_descriptorPool->GetPool(),
+                                           layouts[i]->GetLayout(),
+                                           m_maxFramesInFlight))
             {
                 PrintError("Failed to initialize descriptor set %zu", i);
+                Cleanup();
                 return false;
             }
             m_descriptorSets.push_back(std::move(descriptorSet));
@@ -98,7 +105,14 @@ bool VulkanMaterial::Initialize(uint32_t maxFramesInFlight, Texture* defaultText
         {
             for (const auto& [set, uniforms] : m_uniformsBySet)
             {
+                // Reserve to avoid reallocation (stable addresses for p*Info pointers)
+                size_t uniformCount = uniforms.size();
                 std::vector<VkWriteDescriptorSet> writes;
+                writes.reserve(uniformCount);
+                std::vector<VkDescriptorBufferInfo> bufferInfos;
+                std::vector<VkDescriptorImageInfo> imageInfos;
+                bufferInfos.reserve(uniformCount);
+                imageInfos.reserve(uniformCount);
 
                 for (const auto& uniform : uniforms)
                 {
@@ -113,52 +127,63 @@ bool VulkanMaterial::Initialize(uint32_t maxFramesInFlight, Texture* defaultText
                     {
                         // Uniform buffer
                         write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-                        
+
                         UBOBinding key = {uniform.set, uniform.binding};
                         auto* ubo = m_uniformBuffers[key].get();
-                        
-                        VkDescriptorBufferInfo* bufferInfo = new VkDescriptorBufferInfo{};
-                        bufferInfo->buffer = ubo->GetBuffer(frameIdx);
-                        bufferInfo->offset = 0;
-                        bufferInfo->range = uniform.size;
-                        
-                        write.pBufferInfo = bufferInfo;
+                        if (!ubo)
+                        {
+                            PrintError("Uniform buffer missing for set %u binding %u", uniform.set, uniform.binding);
+                            Cleanup();
+                            return false;
+                        }
+
+                        bufferInfos.emplace_back();
+                        VkDescriptorBufferInfo& bufferInfo = bufferInfos.back();
+                        bufferInfo.buffer = ubo->GetBuffer(frameIdx);
+                        bufferInfo.offset = 0;
+                        bufferInfo.range = uniform.size;
+
+                        write.pBufferInfo = &bufferInfo;
                     }
-                    else if (uniform.type == UniformType::Sampler2D || 
+                    else if (uniform.type == UniformType::Sampler2D ||
                              uniform.type == UniformType::SamplerCube)
                     {
                         // Texture sampler
                         write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                        
-                        VkDescriptorImageInfo* imageInfo = new VkDescriptorImageInfo{};
-                        imageInfo->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                        
+
+                        imageInfos.emplace_back();
+                        VkDescriptorImageInfo& imageInfo = imageInfos.back();
+                        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
                         // Use default texture initially
                         if (defaultTexture)
                         {
                             auto* vulkanTexture = dynamic_cast<VulkanTexture*>(defaultTexture);
-                            imageInfo->imageView = vulkanTexture->GetImageView();
-                            imageInfo->sampler = vulkanTexture->GetSampler();
+                            imageInfo.imageView = vulkanTexture->GetImageView();
+                            imageInfo.sampler = vulkanTexture->GetSampler();
                         }
-                        
-                        write.pImageInfo = imageInfo;
+                        else
+                        {
+                            imageInfo.imageView = VK_NULL_HANDLE;
+                            imageInfo.sampler = VK_NULL_HANDLE;
+                        }
+
+                        write.pImageInfo = &imageInfo;
                     }
 
                     writes.push_back(write);
                 }
 
                 // Perform batch update
-                vkUpdateDescriptorSets(m_device->GetDevice(), 
-                                      static_cast<uint32_t>(writes.size()), 
-                                      writes.data(), 
-                                      0, nullptr);
-
-                // Clean up allocated info structures
-                for (auto& write : writes)
+                if (!writes.empty())
                 {
-                    if (write.pBufferInfo) delete write.pBufferInfo;
-                    if (write.pImageInfo) delete write.pImageInfo;
+                    vkUpdateDescriptorSets(m_device->GetDevice(),
+                                          static_cast<uint32_t>(writes.size()),
+                                          writes.data(),
+                                          0, nullptr);
                 }
+
+                // bufferInfos and imageInfos are RAII-managed and freed automatically
             }
         }
 
@@ -174,16 +199,38 @@ bool VulkanMaterial::Initialize(uint32_t maxFramesInFlight, Texture* defaultText
 
 void VulkanMaterial::Cleanup()
 {
+    for (auto& descriptor : m_descriptorSets)
+    {
+        if (descriptor)
+        {
+            descriptor->Cleanup();
+        }
+    }
     m_descriptorSets.clear();
+
+    if (m_descriptorPool)
+    {
+        m_descriptorPool->Cleanup();
+        m_descriptorPool.reset();
+    }
+
+    for (auto& uniformBuffer : m_uniformBuffers | std::views::values)
+    {
+        if (uniformBuffer)
+        {
+            uniformBuffer->Cleanup();
+        }
+    }
     m_uniformBuffers.clear();
 }
 
-void VulkanMaterial::SetUniformData(uint32_t set, uint32_t binding, const void* data, 
-                                   size_t size, uint32_t frameIndex)
+void VulkanMaterial::SetUniformData(uint32_t set, uint32_t binding, const void* data,
+                                    size_t size, RHIRenderer* renderer)
 {
+    uint32_t frameIndex = dynamic_cast<VulkanRenderer*>(renderer)->GetFrameIndex();
     UBOBinding key = {set, binding};
     auto it = m_uniformBuffers.find(key);
-    
+
     if (it != m_uniformBuffers.end())
     {
         it->second->UpdateData(data, size, frameIndex);
@@ -203,7 +250,7 @@ void VulkanMaterial::SetTexture(uint32_t set, uint32_t binding, Texture* texture
     }
 
     auto* vulkanTexture = dynamic_cast<VulkanTexture*>(texture);
-    
+
     VkDescriptorImageInfo imageInfo{};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     imageInfo.imageView = vulkanTexture->GetImageView();
@@ -220,24 +267,29 @@ void VulkanMaterial::SetTexture(uint32_t set, uint32_t binding, Texture* texture
 
     vkUpdateDescriptorSets(m_device->GetDevice(), 1, &write, 0, nullptr);
 }
+void VulkanMaterial::Bind(RHIRenderer* renderer)
+{
+    VulkanRenderer* vulkanRenderer = dynamic_cast<VulkanRenderer*>(renderer);
+    BindDescriptorSets(vulkanRenderer->GetCommandBuffer(), vulkanRenderer->GetFrameIndex());
+}
 
 void VulkanMaterial::BindDescriptorSets(VkCommandBuffer commandBuffer, uint32_t frameIndex)
 {
     std::vector<VkDescriptorSet> sets;
     sets.reserve(m_descriptorSets.size());
-    
+
     for (const auto& descriptorSet : m_descriptorSets)
     {
         sets.push_back(descriptorSet->GetDescriptorSet(frameIndex));
     }
 
-    vkCmdBindDescriptorSets(commandBuffer, 
-                           VK_PIPELINE_BIND_POINT_GRAPHICS,
-                           m_pipeline->GetPipelineLayout(),
-                           0, // First set
-                           static_cast<uint32_t>(sets.size()),
-                           sets.data(),
-                           0, nullptr);
+    vkCmdBindDescriptorSets(commandBuffer,
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            m_pipeline->GetPipelineLayout(),
+                            0, // First set
+                            static_cast<uint32_t>(sets.size()),
+                            sets.data(),
+                            0, nullptr);
 }
 
 VulkanUniformBuffer* VulkanMaterial::GetUniformBuffer(uint32_t set, uint32_t binding) const

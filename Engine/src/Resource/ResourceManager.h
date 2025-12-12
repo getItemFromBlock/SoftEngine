@@ -89,6 +89,7 @@ private:
     std::unordered_map<Core::UUID, std::shared_ptr<IResource>> m_resources;
     std::unordered_map<Hash, Core::UUID> m_hashToUUID;
     std::queue<Core::UUID> m_resourceToSend;
+    std::mutex m_mutex;
 
     Core::UUID m_defaultTexture;
     Core::UUID m_defaultShader;

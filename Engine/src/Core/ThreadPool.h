@@ -3,7 +3,7 @@
 
 #include <BS_thread_pool.hpp>
 
-#define MULTI_THREAD
+// #define MULTI_THREAD
 class ThreadPool
 {
 public:

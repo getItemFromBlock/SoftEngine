@@ -22,6 +22,7 @@ public:
     RHIRenderer* GetRenderer() const { return m_renderer.get(); }
 
 private:
+    bool m_ready = false;
     std::unique_ptr<Window> m_window;
     std::unique_ptr<RHIRenderer> m_renderer;
     std::unique_ptr<ResourceManager> m_resourceManager;

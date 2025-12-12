@@ -1,74 +1,105 @@
 #pragma once
 #include <functional>
+#include <vector>
+#include <mutex>
 
 template<typename... Args>
 class Event {
 public:
-	Event() = default;
-	Event& operator=(const Event& other) = default;
-	Event(const Event&) = default;
-	Event(Event&&) noexcept = default;
-	virtual ~Event() = default; 
+    Event() = default;
+    Event(const Event&) = delete;
+    Event& operator=(const Event&) = delete;
+    Event(Event&&) = default;
+    Event& operator=(Event&&) = default;
+    virtual ~Event() = default; 
 
-	using Callback = std::function<void(Args...)>;
+    using Callback = std::function<void(Args...)>;
 
-	virtual void Bind(Callback callback)
-	{
-		m_callbacks.push_back(callback);
-	}
+    virtual void Bind(Callback callback)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_callbacks.push_back(std::move(callback));
+    }
 
-	virtual void ClearBindings()
-	{
-		m_callbacks.clear();
-	}
+    virtual void ClearBindings()
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_callbacks.clear();
+    }
 
-	virtual void Invoke(Args... args)
-	{
-		for (auto& callback : m_callbacks)
-		{
-			callback(args...);
-		}
-	}
-	
-	void operator+=(Callback callback)
-	{
-		Bind(callback);
-	}
-	
-	void operator()(Args... args)
-	{
-		Invoke(args...);
-	}
-private:
-	std::vector<Callback> m_callbacks;
+    virtual void Invoke(Args... args)
+    {
+        std::vector<Callback> callbacksCopy;
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            callbacksCopy = m_callbacks; // copy under lock
+        }
+
+        for (auto& callback : callbacksCopy)
+        {
+            callback(args...);
+        }
+    }
+
+    void operator+=(Callback callback)
+    {
+        Bind(std::move(callback));
+    }
+
+    void operator()(Args... args)
+    {
+        Invoke(args...);
+    }
+
+protected:
+    std::vector<Callback> m_callbacks;
+    mutable std::mutex m_mutex;
 };
 
-// Event that run only once
-class OnceEvent : public Event<>
-{
+// Event that runs only once
+class OnceEvent : public Event<> {
 public:
-	using Event::Event; 
+    using Event::Event; 
+    using Callback = std::function<void()>;
 
-	using Callback = std::function<void()>;
-	
-	void Invoke() override
-	{
-		Event::Invoke();
-		m_called = true;
-		ClearBindings();
-	}
+    void Invoke() override
+    {
+        std::vector<Callback> callbacksCopy;
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            if (m_called) return;
+            callbacksCopy = m_callbacks;
+            m_called = true;
+            m_callbacks.clear();
+        }
 
-	void Bind(Callback callback) override
-	{		
-		Event::Bind(callback);
-		if (m_called)
-			Invoke();
-	}
-	
-	void Reset()
-	{
-		m_called = false;
-	}
+        for (auto& callback : callbacksCopy)
+            callback();
+    }
+
+    void Bind(Callback callback) override
+    {        
+        bool callNow = false;
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            if (!m_called) {
+                m_callbacks.push_back(std::move(callback));
+            } else {
+                callNow = true;
+            }
+        }
+
+        if (callNow)
+            callback();
+    }
+
+    void Reset()
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_called = false;
+    }
+
 private:
-	bool m_called = false;
+    bool m_called = false;
+    mutable std::mutex m_mutex;
 };

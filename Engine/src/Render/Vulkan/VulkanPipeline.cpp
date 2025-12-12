@@ -303,17 +303,6 @@ void VulkanPipeline::Bind(VkCommandBuffer commandBuffer)
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 }
 
-std::unique_ptr<VulkanMaterial> VulkanPipeline::CreateMaterial(Texture* defaultTexture)
-{
-    auto material = std::make_unique<VulkanMaterial>(this);
-    if (!material->Initialize(2, defaultTexture, this))
-    {
-        PrintError("Failed to initialize material from pipeline");
-        return nullptr;
-    }
-    return std::move(material);
-}
-
 VkShaderModule VulkanPipeline::CreateShaderModule(const std::vector<char>& code) const
 {
     if (code.empty() || (code.size() % 4) != 0)

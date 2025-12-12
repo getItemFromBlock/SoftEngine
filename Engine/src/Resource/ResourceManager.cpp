@@ -90,6 +90,7 @@ std::shared_ptr<IResource> ResourceManager::CreateResourceFromPath(const std::fi
 }
 void ResourceManager::UpdateResourceToSend()
 {
+    std::scoped_lock lock(m_mutex);
     if (m_resourceToSend.empty())
         return;
 
@@ -108,7 +109,7 @@ void ResourceManager::UpdateResourceToSend()
             }
             else
             {
-                AddResourceToSend(uuid);
+                m_resourceToSend.push(uuid);
             }
         }
     }
@@ -132,6 +133,7 @@ void ResourceManager::AddResourceToSend(Core::UUID uuid)
     }
     else
     {
+        std::scoped_lock lock(m_mutex);
         m_resourceToSend.push(uuid);
     }
 }
@@ -141,7 +143,14 @@ void ResourceManager::AddResourceToSend(const IResource* resource)
 }
 void ResourceManager::Clear()
 {
+    for (auto& resource : m_resources | std::views::values)
+    {
+        if (!resource)
+            continue;
+        resource->Unload();
+    }
     m_resources.clear();
+    m_hashToUUID.clear();
 }
 
 void ResourceManager::LoadDefaultShader(const std::filesystem::path& shaderPath)
@@ -165,6 +174,8 @@ void ResourceManager::LoadDefaultMaterial(const std::filesystem::path& materialP
     SafePtr<Material> material = CreateMaterial(materialPath);
 
     m_defaultMaterial = material->GetUUID();
+    
+    material->SetAttribute("color", Vec4f::One());
 }
 
 SafePtr<Material> ResourceManager::CreateMaterial(const std::filesystem::path& path)

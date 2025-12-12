@@ -73,10 +73,12 @@ public:
 
     void SendAllValues(RHIRenderer* renderer) const;
     
-    void Bind(VkCommandBuffer commandBuffer, uint32_t uint32) const;
+    void Bind(RHIRenderer* renderer) const;
 
 private:
-    std::unique_ptr<VulkanMaterial> m_handle;
+    void OnShaderChanged();
+private:
+    std::unique_ptr<RHIMaterial> m_handle;
     SafePtr<Shader> m_shader;
     
     MaterialAttributes m_attributes;

@@ -67,20 +67,24 @@ public:
     Uniforms GetUniforms(Shader* shader) override;
     PushConstants GetPushConstants(Shader* shader) override;
     
+    VulkanCommandPool* GetCommandPool() const { return m_commandPool.get(); }
+    
     void SendTexture(UBOBinding binding, Texture* texture, Shader* shader) override;
     void SendValue(UBOBinding binding, void* value, uint32_t size, Shader* shader) override;
-    void BindShader(Shader* shader, Material* material) override;
+    void BindMaterial(Material* material) override;
     
     std::unique_ptr<RHITexture> CreateTexture(const ImageLoader::Image& image) override;
     std::unique_ptr<RHIVertexBuffer> CreateVertexBuffer(const float* data, uint32_t size, uint32_t floatPerVertex) override;
     std::unique_ptr<RHIIndexBuffer> CreateIndexBuffer(const uint32_t* data, uint32_t size) override;
     std::unique_ptr<RHIShaderBuffer> CreateShaderBuffer(const std::string& code) override;
     std::unique_ptr<RHIPipeline> CreatePipeline(const Shader* shader) override;
+    std::unique_ptr<RHIMaterial> CreateMaterial(Shader* shader) override;
     
     void SetDefaultTexture(const SafePtr<Texture>& texture) override;
     void ClearColor() const override;
     
     uint32_t GetFrameIndex() const { return m_currentFrame; }
+    VkCommandBuffer GetCommandBuffer() const { return m_commandPool->GetCommandBuffer(m_currentFrame); }
 private:
     void RecreateSwapChain();
 

@@ -28,9 +28,6 @@ public:
     void Cleanup();
     void Bind(VkCommandBuffer commandBuffer);
 
-    // Create a material instance from this pipeline
-    std::unique_ptr<VulkanMaterial> CreateMaterial(Texture* defaultTexture);
-
     // Getters
     VkPipeline GetPipeline() const { return m_pipeline; }
     VkPipelineLayout GetPipelineLayout() const { return m_pipelineLayout; }
