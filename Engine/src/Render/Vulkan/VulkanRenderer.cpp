@@ -771,7 +771,7 @@ void VulkanRenderer::SendValue(UBOBinding binding, void* value, uint32_t size, S
 bool VulkanRenderer::BindMaterial(Material* material)
 {
     auto shader = material->GetShader();
-    if (!shader)
+    if (!shader || !shader->GetPipeline())
         return false;
     
     VulkanPipeline* pipeline = dynamic_cast<VulkanPipeline*>(shader->GetPipeline());

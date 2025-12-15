@@ -25,9 +25,10 @@ void Hierarchy::OnRender()
             ImGui::PushID(uuid);
             
             std::string name = gameObject->GetName();
-            if (ImGui::Selectable(name.c_str()))
+            if (ImGui::Selectable(name.c_str(), m_selectedObject == uuid))
             {
                 EOnObjectSelected.Invoke(uuid);
+                m_selectedObject = uuid;
             }
             
             ImGui::PopID();

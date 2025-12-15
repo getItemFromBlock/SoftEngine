@@ -59,7 +59,9 @@ void ImGuiHandler::Initialize(Window* window, RHIRenderer* renderer)
     ImGuiIO& io = ImGui::GetIO();
     (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad; 
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
     ImGui::StyleColorsDark();
 
@@ -126,20 +128,12 @@ void ImGuiHandler::EndFrame()
 #ifdef RENDER_API_VULKAN
     VulkanRenderer* vulkanRenderer = dynamic_cast<VulkanRenderer*>(m_renderer);
     
-    // Check if there's anything to render
     const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
     if (!is_minimized && draw_data->CmdListsCount > 0)
     {
         VulkanCommandPool* commandPool = vulkanRenderer->GetCommandPool();
         uint32_t currentFrame = vulkanRenderer->GetFrameIndex();
         VkCommandBuffer commandBuffer = commandPool->GetCommandBuffer(currentFrame);
-        
-        // IMPORTANT: ImGui rendering must happen inside a render pass
-        // Make sure your render pass is already begun before calling this
-        // The example shows this pattern:
-        // vkCmdBeginRenderPass(...);
-        // ImGui_ImplVulkan_RenderDrawData(...);
-        // vkCmdEndRenderPass(...);
         
         ImGui_ImplVulkan_RenderDrawData(draw_data, commandBuffer);
     }

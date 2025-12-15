@@ -71,7 +71,7 @@ if has_config("opengl") then
     imgui_configs.opengl = true
 end
 
-add_requires("imgui v1.92.5", {configs = imgui_configs, debug = true})
+add_requires("imgui v1.92.5-docking", {configs = imgui_configs, debug = true})
 add_requires("stb")
 add_requires("galaxymath")
 add_requires("thread-pool")

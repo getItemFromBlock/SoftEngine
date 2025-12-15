@@ -49,6 +49,7 @@ public:
 
     template<typename T>
     std::vector<SafePtr<T>> GetComponents(GameObject* gameObject);
+    std::vector<SafePtr<IComponent>> GetComponents(const GameObject* gameObject);
 
     template<typename T>
     bool HasComponent(GameObject* gameObject);

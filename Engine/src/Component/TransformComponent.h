@@ -14,7 +14,7 @@ enum class Space
 class TransformComponent : public IComponent
 {
 public:
-    using IComponent::IComponent;
+    DECLARE_COMPONENT_TYPE(TransformComponent)
     
     void OnUpdate(float deltaTime) override;
     

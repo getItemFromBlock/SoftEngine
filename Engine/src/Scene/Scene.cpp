@@ -122,6 +122,29 @@ void Scene::RemoveChild(GameObject* object, GameObject* child)
     object->m_childrenUUID.erase(it);
 }
 
+std::vector<SafePtr<IComponent>> Scene::GetComponents(const GameObject* gameObject)
+{
+    std::vector<SafePtr<IComponent>> result;
+
+    if (!gameObject)
+        return result;
+
+    std::scoped_lock lock(m_componentsMutex);
+
+    for (auto& componentList : m_components | std::views::values)
+    {
+        for (auto& component : componentList)
+        {
+            if (component->GetGameObject() == gameObject)
+            {
+                result.emplace_back(component);
+            }
+        }
+    }
+
+    return result;
+}
+
 void Scene::DestroyGameObject(GameObject* gameObject)
 {
     std::scoped_lock lock(m_gameObjectsMutex);

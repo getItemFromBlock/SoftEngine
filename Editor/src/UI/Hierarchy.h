@@ -15,4 +15,6 @@ public:
     Event<Core::UUID> EOnObjectSelected;
 private:
     SceneHolder* m_sceneHolder;
+    
+    Core::UUID m_selectedObject = UUID_INVALID;
 };

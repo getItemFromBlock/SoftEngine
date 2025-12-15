@@ -8,7 +8,7 @@ class Material;
 class MeshComponent : public IComponent
 {
 public:
-    using IComponent::IComponent;
+    DECLARE_COMPONENT_TYPE(MeshComponent)
     
     void OnUpdate(float deltaTime) override;
     void OnRender(RHIRenderer* renderer) override;

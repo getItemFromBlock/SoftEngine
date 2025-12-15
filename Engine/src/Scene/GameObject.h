@@ -21,6 +21,8 @@ public:
 
     template<typename T>
     SafePtr<T> AddComponent();
+    
+    std::vector<SafePtr<IComponent>> GetComponents() const;
 
     template<typename T>
     bool HasComponent() const;
@@ -33,7 +35,7 @@ public:
     void SetName(const std::string& name) { m_name = name; }
     std::string GetName() const { return m_name; }
     
-    SafePtr<GameObject> GetParent();
+    SafePtr<GameObject> GetParent() const;
     
     Scene* GetScene() const { return &m_scene; }
 private:

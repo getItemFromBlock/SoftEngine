@@ -3,6 +3,17 @@
 
 class RHIRenderer;
 class GameObject;
+
+#define DECLARE_COMPONENT_TYPE(T) \
+    T() = default; \
+    T(GameObject* gameObject) : IComponent(gameObject) {} \
+    T& operator=(const T& other) = default;\
+    T(const T&) = default;\
+    T(T&&) noexcept = default;\
+    virtual ~T() override = default;\
+    std::string GetTypeName() const override { return #T; } 
+    
+
 class IComponent
 {
 public:
@@ -12,6 +23,8 @@ public:
     IComponent(const IComponent&) = default;
     IComponent(IComponent&&) noexcept = default;
     virtual ~IComponent() = default;
+    
+    virtual std::string GetTypeName() const { return "IComponent"; }
     
     virtual void OnCreate() {}
     virtual void OnStart() {}
