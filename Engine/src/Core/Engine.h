@@ -2,13 +2,11 @@
 #include "EngineAPI.h"
 #include <memory>
 
-#include "Resource/ResourceManager.h"
 #include "Core/Window.h"
+#include "Resource/ResourceManager.h"
 #include "Render/RHI/RHIRenderer.h"
 #include "Scene/ComponentHandler.h"
-#include "Scene/Scene.h"
-
-#include "Utils/Event.h"
+#include "Scene/SceneHolder.h"
 
 struct ENGINE_API EngineDesc
 {
@@ -25,23 +23,20 @@ public:
     void Update();
     void Render();
     void EndFrame();
-    // void Run();
+    void WaitBeforeClean();
     void Cleanup();
     
     static Engine* Get();
 
     Window* GetWindow() const { return m_window; }
     RHIRenderer* GetRenderer() const { return m_renderer.get(); }
-
-    Event<> OnRender;
-    Event<> OnCleanup;
-    Event<> OnEndFrame;
+    SceneHolder* GetSceneHolder() const { return m_sceneHolder.get(); }
 private:
     Window* m_window;
     std::unique_ptr<RHIRenderer> m_renderer;
     std::unique_ptr<ResourceManager> m_resourceManager;
     std::unique_ptr<ComponentRegister> m_componentRegister;
-    std::unique_ptr<Scene> m_scene;
+    std::unique_ptr<SceneHolder> m_sceneHolder;
     
     inline static std::unique_ptr<Engine> s_instance = nullptr;
     

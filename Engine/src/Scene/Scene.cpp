@@ -63,6 +63,7 @@ void Scene::OnUpdate(float deltaTime)
 SafePtr<GameObject> Scene::CreateGameObject(GameObject* parent)
 {
     std::shared_ptr object = std::make_shared<GameObject>(*this);
+    object->SetName("GameObject");
     
     {
         std::scoped_lock lock(m_gameObjectsMutex);

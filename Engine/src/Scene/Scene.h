@@ -21,6 +21,7 @@ struct CameraData
     Mat4 VP;
 };
 
+using GameObjectList = std::unordered_map<Core::UUID, std::shared_ptr<GameObject>>;
 class Scene
 {
 public:
@@ -33,6 +34,7 @@ public:
     void OnRender(RHIRenderer* renderer);
     void OnUpdate(float deltaTime);
 
+    const GameObjectList& GetGameObjects() const { return m_gameObjects; }
     SafePtr<GameObject> CreateGameObject(GameObject* parent = nullptr);
     SafePtr<GameObject> GetGameObject(Core::UUID UUID) const;
     SafePtr<GameObject> GetRootObject() const;
@@ -61,12 +63,14 @@ public:
 #pragma endregion 
 
     const CameraData& GetCameraData() const { return m_cameraData; }
+    
+private:
     void UpdateCamera(float deltaTime) const;
 private:
     friend GameObject;
 
     Core::UUID m_rootUUID = UUID_INVALID;
-    std::unordered_map<Core::UUID, std::shared_ptr<GameObject>> m_gameObjects;
+    GameObjectList m_gameObjects;
     std::unordered_map<ComponentID, std::vector<std::shared_ptr<IComponent>>> m_components;
     
     CameraData m_cameraData;

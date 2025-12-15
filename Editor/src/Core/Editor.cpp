@@ -20,30 +20,16 @@ void Editor::Initialize()
     
     m_engine = Engine::Create();
     m_engine->Initialize(desc);
+    
     m_imguiHandler = std::make_unique<ImGuiHandler>();
     m_imguiHandler->Initialize(m_window.get(), m_engine->GetRenderer());
-    //
-    // m_engine->OnRender += [&]()
-    // {
-    //     m_imguiHandler->BeginFrame();
-    //     OnRender();
-    // };
-    //
-    // m_engine->OnEndFrame += [&]()
-    // {
-    //     m_imguiHandler->EndFrame();
-    // };
-    //
-    // m_engine->OnCleanup += [&]()
-    // {
-    //     m_imguiHandler->Cleanup();
-    // };
+    
+    m_windowManager = std::make_unique<EditorWindowManager>();
+    m_windowManager->Initialize(m_engine);
 }
 
 void Editor::Run()
-{
-    // m_engine->Run();
-    
+{    
     while (!m_window->ShouldClose())
     {
         m_window->PollEvents();
@@ -65,11 +51,12 @@ void Editor::Run()
 
 void Editor::OnRender()
 {
-    ImGui::ShowDemoWindow();
+    m_windowManager->Render();
 }
 
 void Editor::Cleanup()
 {
+    m_engine->WaitBeforeClean();
     m_imguiHandler->Cleanup();
     m_engine->Cleanup();
 }

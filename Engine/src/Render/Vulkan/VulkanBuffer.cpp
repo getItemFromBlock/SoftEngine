@@ -1,6 +1,8 @@
 ﻿#include "VulkanBuffer.h"
 #ifdef RENDER_API_VULKAN
 
+#include <cassert>
+
 #include "VulkanDevice.h"
 #include <stdexcept>
 #include <cstring>
@@ -39,6 +41,17 @@ bool VulkanBuffer::Initialize(VulkanDevice* device, VkDeviceSize size,
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, properties);
+    
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(
+        m_device->GetPhysicalDevice(), &memProperties);
+
+    VkMemoryPropertyFlags actualFlags =
+        memProperties.memoryTypes[allocInfo.memoryTypeIndex].propertyFlags;
+
+    assert(actualFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    assert(actualFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
 
     if (vkAllocateMemory(m_device->GetDevice(), &allocInfo, nullptr, &m_bufferMemory) != VK_SUCCESS)
     {
