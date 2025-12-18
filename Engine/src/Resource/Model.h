@@ -2,7 +2,11 @@
 #include <vector>
 
 #include "IResource.h"
+#include "Utils/Type.h"
 
+class Material;
+class Scene;
+class GameObject;
 class Mesh;
 
 class Model : public IResource
@@ -14,7 +18,12 @@ public:
     bool SendToGPU(RHIRenderer* renderer) override;
     void Unload() override;
     
-    std::vector<Mesh*> GetMeshes() const { return m_meshes; }
+    const std::vector<SafePtr<Mesh>>& GetMeshes() const { return m_meshes; }
+    
+    static SafePtr<GameObject> CreateGameObject(Model* model, Scene* scene);
+
 private:
-    std::vector<Mesh*> m_meshes;
+    std::vector<SafePtr<Mesh>> m_meshes;
+    
+    std::vector<SafePtr<Material>> m_materials = {};
 };

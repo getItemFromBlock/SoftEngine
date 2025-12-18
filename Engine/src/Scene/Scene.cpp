@@ -72,7 +72,7 @@ SafePtr<GameObject> Scene::CreateGameObject(GameObject* parent)
         m_gameObjects.emplace(object->GetUUID(), object);
     }
     
-    SetParent(object.get(), parent ? parent : (m_rootUUID != UUID_INVALID ? GetRootObject().get().get() : nullptr));
+    SetParent(object.get(), parent ? parent : (m_rootUUID != UUID_INVALID ? GetRootObject().getPtr() : nullptr));
     
     return object;
 }
@@ -101,7 +101,7 @@ void Scene::SetParent(GameObject* object, GameObject* parent)
     {
         SafePtr<GameObject> prevParent = GetGameObject(object->m_parentUUID);
         if (prevParent)
-            RemoveChild(prevParent.get().get(), object);
+            RemoveChild(prevParent.getPtr(), object);
     }
 
     if (parent)

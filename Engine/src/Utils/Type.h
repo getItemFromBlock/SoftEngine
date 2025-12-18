@@ -67,6 +67,10 @@ public:
         return ptr;
     }
     
+    T* getPtr() const {
+        return weak.lock().get();
+    }
+    
     // Reset the SafePtr
     void reset() {
         weak.reset();

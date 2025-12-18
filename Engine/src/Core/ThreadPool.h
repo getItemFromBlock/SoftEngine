@@ -4,6 +4,8 @@
 
 #include <BS_thread_pool.hpp>
 
+#include "Debug/Log.h"
+
 #define MULTI_THREAD
 class ThreadPool
 {
@@ -22,7 +24,17 @@ public:
     static std::future<R> Enqueue(F&& task)
     {
 #ifdef MULTI_THREAD
-        return s_instance->m_threadPool->submit_task(std::forward<F>(task));
+        try
+        {
+            auto value =  s_instance->m_threadPool->submit_task(std::forward<F>(task));
+            value.get();
+            return value;
+        }
+        catch (const std::exception& e)
+        {
+            PrintError("ThreadPool: %s", e.what());
+            return std::future<R>();
+        }
 #else
         task();
         return std::future<R>();

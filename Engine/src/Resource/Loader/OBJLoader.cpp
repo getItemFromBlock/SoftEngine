@@ -48,7 +48,7 @@ bool OBJLoader::Parse(Model& model)
 		{
 			std::string mtlFileName;
 			iss >> mtlFileName;
-			model.materials = MTLLoader::Load(mtlFileName);
+			model.materials = MTLLoader::Load(model.path.parent_path() / mtlFileName);
 		}
 		if (token == "usemtl")
 		{

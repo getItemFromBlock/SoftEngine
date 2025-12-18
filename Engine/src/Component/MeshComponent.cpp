@@ -40,18 +40,27 @@ void MeshComponent::OnRender(RHIRenderer* renderer)
 
     auto transformComponent = p_gameObject->GetComponent<TransformComponent>();
     auto model = transformComponent->GetWorldMatrix();
-    for (auto& material : m_materials)
+    // Render each submesh with its corresponding material
+    size_t materialCount = m_materials.size();
+        
+    auto subMeshes = m_mesh->GetSubMeshes();
+    for (size_t i = 0; i < subMeshes.size(); ++i)
     {
-        auto shader = material->GetShader().get().get();
-        if (!renderer->BindMaterial(material.get().get()))
+        size_t materialIndex = i % materialCount;
+        auto& material = m_materials[materialIndex];
+            
+        auto shader = material->GetShader().getPtr();
+        if (!renderer->BindMaterial(material.getPtr()))
             continue;
 
         renderer->BindVertexBuffers(m_mesh->GetVertexBuffer(), m_mesh->GetIndexBuffer());
 
         PushConstant pushConstant = shader->GetPushConstants()[ShaderType::Vertex];
         renderer->SendPushConstants(&model, sizeof(model), shader, pushConstant);
-        
-        renderer->DrawVertex(m_mesh->GetVertexBuffer(), m_mesh->GetIndexBuffer());
+            
+        renderer->DrawVertexSubMesh(m_mesh->GetIndexBuffer(), 
+                                   subMeshes[i].startIndex, 
+                                   subMeshes[i].count);
     }
 }
 

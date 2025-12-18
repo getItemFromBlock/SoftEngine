@@ -2,9 +2,21 @@
 
 #include "Mesh.h"
 #include "ResourceManager.h"
+
+#include "Component/MeshComponent.h"
+#include "Core/Engine.h"
+
 #include "Loader/OBJLoader.h"
 
 #include "Debug/Log.h"
+
+#include "Scene/GameObject.h"
+#include "Scene/Scene.h"
+
+#include "Utils/Color.h"
+#include "Utils/File.h"
+
+#include "Resource/Texture.h"
 
 bool Model::Load(ResourceManager* resourceManager)
 {
@@ -17,11 +29,42 @@ bool Model::Load(ResourceManager* resourceManager)
             return false;
         }
         
+        std::unordered_map<std::string, SafePtr<Material>> materials;
+        for (auto& mat : model.materials)
+        {
+            std::filesystem::path matPath = p_path / mat.name;
+            if (File::Exist(matPath))
+            {
+                resourceManager->Load<Material>(matPath);
+            }
+            else
+            {
+                SafePtr<Material> matResource = resourceManager->CreateMaterial(matPath);
+                
+                if (mat.albedo.has_value())
+                {
+                    auto texture = resourceManager->Load<Texture>(p_path.parent_path() / mat.albedo.value());
+                    matResource->SetAttribute("albedoSampler", texture);
+                }
+                matResource->SetAttribute("color", static_cast<Vec4f>(Color(mat.diffuse, mat.transparency)));
+                
+                materials[mat.name.generic_string()] = matResource;
+            }
+        }
+        
         for (auto& mesh : model.meshes)
         {
             SafePtr<Mesh> meshResource = resourceManager->AddResource(std::make_shared<Mesh>(p_path / mesh.name));
             
-            m_meshes.push_back(meshResource.get().get());
+            meshResource->m_subMeshes.reserve(mesh.subMeshes.size());
+            for (const auto& subMesh : mesh.subMeshes)
+            {
+                meshResource->m_subMeshes.push_back(SubMesh(subMesh.startIndex, subMesh.count));
+                if (subMesh.materialName.has_value())
+                    m_materials.push_back(materials[subMesh.materialName.value()]);
+            }
+            
+            m_meshes.push_back(meshResource);
             
             meshResource->m_vertices = mesh.finalVertices;
             for (const Vec3i& idx : mesh.indices)
@@ -31,8 +74,8 @@ bool Model::Load(ResourceManager* resourceManager)
                 meshResource->m_indices.push_back(idx.z);
             }
             meshResource->SetLoaded();
-            resourceManager->AddResourceToSend(meshResource.get().get());
-        } 
+            resourceManager->AddResourceToSend(meshResource.getPtr());
+        }
         return true;
     }
     else
@@ -50,4 +93,28 @@ bool Model::SendToGPU(RHIRenderer* renderer)
 
 void Model::Unload()
 {
+}
+
+SafePtr<GameObject> Model::CreateGameObject(Model* model, Scene* scene)
+{
+    auto resourceManager = Engine::Get()->GetResourceManager();
+    SafePtr<GameObject> go = scene->CreateGameObject();
+    go->SetName(model->GetName());
+    for (size_t i = 0; i < model->m_meshes.size(); i++)
+    {
+        SafePtr<GameObject> child = scene->CreateGameObject(go.getPtr());
+        SafePtr<MeshComponent> meshComp = child->AddComponent<MeshComponent>();
+        auto subMeshes = model->m_meshes[i]->GetSubMeshes();
+        for (size_t j = 0; j < subMeshes.size(); j++)
+        {
+            if (j >= model->m_materials.size())
+            {
+                meshComp->AddMaterial(resourceManager->GetDefaultMaterial());
+                continue;
+            }
+            meshComp->AddMaterial(model->m_materials[j].get());
+        }
+        meshComp->SetMesh(model->m_meshes[i]);
+    }
+    return go;
 }

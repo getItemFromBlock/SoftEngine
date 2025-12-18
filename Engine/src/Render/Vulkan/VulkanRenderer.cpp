@@ -405,6 +405,13 @@ void VulkanRenderer::DrawVertex(RHIVertexBuffer* _vertexBuffer, RHIIndexBuffer* 
     vkCmdDrawIndexed(commandBuffer, indexBuffer->GetIndexCount(), 1, 0, 0, 0);
 }
 
+void VulkanRenderer::DrawVertexSubMesh(RHIIndexBuffer* _indexBuffer, uint32_t startIndex, uint32_t indexCount)
+{
+    VkCommandBuffer commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
+    
+    vkCmdDrawIndexed(commandBuffer, indexCount, 1, startIndex, 0, 0);
+}
+
 std::string VulkanRenderer::CompileShader(ShaderType type, const std::string& code)
 {
     shaderc_shader_kind kind;
@@ -847,7 +854,7 @@ std::unique_ptr<RHIMaterial> VulkanRenderer::CreateMaterial(Shader* shader)
 {
     VulkanPipeline* pipeline = dynamic_cast<VulkanPipeline*>(shader->GetPipeline());
     auto material = std::make_unique<VulkanMaterial>(pipeline);
-    if (!material->Initialize(MAX_FRAMES_IN_FLIGHT, m_defaultTexture.get().get(), pipeline))
+    if (!material->Initialize(MAX_FRAMES_IN_FLIGHT, m_defaultTexture.getPtr(), pipeline))
     {
         PrintError("Failed to initialize material from pipeline");
         return nullptr;

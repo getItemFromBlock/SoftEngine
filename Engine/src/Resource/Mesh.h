@@ -76,6 +76,8 @@ public:
 
     RHIVertexBuffer* GetVertexBuffer() const { return m_vertexBuffer.get(); }
     RHIIndexBuffer* GetIndexBuffer() const { return m_indexBuffer.get(); }
+    
+    const std::vector<SubMesh>& GetSubMeshes() const { return m_subMeshes; }
 private:
     friend class Model;
     

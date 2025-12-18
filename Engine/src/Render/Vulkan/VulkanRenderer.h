@@ -59,6 +59,7 @@ public:
     void SendPushConstants(void* data, size_t size, Shader* shader, PushConstant pushConstant) const override;
     void BindVertexBuffers(RHIVertexBuffer* _vertexBuffer, RHIIndexBuffer* _indexBuffer) const override;
     void DrawVertex(RHIVertexBuffer* _vertexBuffer, RHIIndexBuffer* _indexBuffer) override;
+    void DrawVertexSubMesh(RHIIndexBuffer* _indexBuffer, uint32_t startIndex, uint32_t indexCount) override;
     
     void DrawFrame() override;
     

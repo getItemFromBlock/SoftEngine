@@ -28,7 +28,7 @@ void Hierarchy::DisplayObject(GameObject* object)
     {
         for (auto& child : object->GetChildren())
         {
-            DisplayObject(child.get().get());
+            DisplayObject(child.getPtr());
         }
         ImGui::TreePop();
     }
@@ -43,7 +43,7 @@ void Hierarchy::OnRender()
     
     if (ImGui::Begin("Hierarchy"))
     {
-        DisplayObject(scene->GetRootObject().get().get());
+        DisplayObject(scene->GetRootObject().getPtr());
     }
     ImGui::End();
 }

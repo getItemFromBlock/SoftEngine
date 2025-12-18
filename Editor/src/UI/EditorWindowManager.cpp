@@ -2,6 +2,7 @@
 
 #include "Hierarchy.h"
 #include "Inspector.h"
+#include "ResourcesWindow.h"
 
 void EditorWindowManager::Initialize(Engine* engine)
 {
@@ -18,6 +19,7 @@ void EditorWindowManager::Initialize(Engine* engine)
     
     m_windows.push_back(std::move(hierarchy));
     m_windows.push_back(std::move(inspector));
+    m_windows.push_back(std::make_unique<ResourcesWindow>(engine));
 }
 
 void EditorWindowManager::RenderMainDock()

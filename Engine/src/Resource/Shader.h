@@ -109,8 +109,8 @@ public:
     PushConstants GetPushConstants() const {return m_pushConstants;}
     Uniform GetUniform(const std::string& name) { return m_uniforms[name]; }
     Uniforms GetUniforms() const { return m_uniforms; }
-    VertexShader* GetVertexShader() const { return m_vertexShader.get().get(); }
-    FragmentShader* GetFragmentShader() const { return m_fragmentShader.get().get(); }
+    VertexShader* GetVertexShader() const { return m_vertexShader.getPtr(); }
+    FragmentShader* GetFragmentShader() const { return m_fragmentShader.getPtr(); }
     
     void SendTexture(UBOBinding binding, Texture* texture, RHIRenderer* renderer);
     void SendValue(UBOBinding binding, void* value, uint32_t size, RHIRenderer* renderer);

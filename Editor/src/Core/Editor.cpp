@@ -37,46 +37,10 @@ void Editor::Initialize()
     
     auto resourceManager = m_engine->GetResourceManager();
     auto currentScene = m_engine->GetSceneHolder()->GetCurrentScene();
-    SafePtr cubeModel = resourceManager->Load<Model>(RESOURCE_PATH"/models/Cube.obj");
-    cubeModel = resourceManager->Load<Model>(RESOURCE_PATH"/models/Suzanne.obj");
-    cubeModel->EOnLoaded.Bind([cubeModel, this, resourceManager, currentScene]()
+    auto model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Tests/GLADoS.obj");
+    model->EOnLoaded.Bind([model, this, resourceManager, currentScene]()
     {
-        SafePtr cubeMesh = resourceManager->GetResource<Mesh>(cubeModel->GetMeshes()[0]->GetPath());
-    
-        size_t count = std::pow(3, 3);
-        int sqrtCount = std::pow(count, 1 / 3.f);
-            
-        auto mat = resourceManager->GetDefaultMaterial();
-        mat->SetAttribute("albedoSampler", resourceManager->GetDefaultTexture());
-        mat->SetAttribute("color", (Vec4f)Color::Red);
-        for (int i = 0; i < count; i++)
-        {
-            float hue = i * 360 / count;
-            
-            SafePtr<GameObject> object = currentScene->CreateGameObject();
-            
-            SafePtr<TransformComponent> transform = object->GetComponent<TransformComponent>();
-            
-            int N = sqrtCount;
-
-            int ix = (i % N);
-            int iy = (i / N) % N;
-            int iz = (i / (N * N));
-
-            float cx = (N - 1) * 0.5f;
-
-            float x = (ix - cx) * 2.5f;
-            float y = (iy - cx) * 2.5f;
-            float z = (iz - cx) * 2.5f;
-            
-            transform->SetLocalPosition(Vec3f(x, y, z));
-            
-            SafePtr<MeshComponent> meshComp = object->AddComponent<MeshComponent>();
-            meshComp->SetMesh(cubeMesh);
-            meshComp->AddMaterial(mat);
-            
-            object->AddComponent<TestComponent>();
-        }
+        auto go = Model::CreateGameObject(model.getPtr(), currentScene);
     });
 }
 

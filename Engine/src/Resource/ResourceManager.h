@@ -35,6 +35,7 @@ public:
 
     template<typename T>
     std::shared_ptr<T> GetResource(const Core::UUID& uuid) const;
+    const std::unordered_map<Core::UUID, std::shared_ptr<IResource>>& GetResources() const { return m_resources; }
     
     template<typename T>
     std::vector<std::shared_ptr<T>> GetAll() const;
