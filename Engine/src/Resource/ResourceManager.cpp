@@ -169,6 +169,13 @@ void ResourceManager::LoadDefaultTexture(const std::filesystem::path& texturePat
     m_renderer->SetDefaultTexture(texture);
 }
 
+void ResourceManager::LoadBlankTexture(const std::filesystem::path& texturePath)
+{
+    SafePtr<Texture> texture = Load<Texture>(texturePath, false);
+
+    m_blankTexture = texture->GetUUID();
+}
+
 void ResourceManager::LoadDefaultMaterial(const std::filesystem::path& materialPath)
 {
     SafePtr<Material> material = CreateMaterial(materialPath);
@@ -176,15 +183,20 @@ void ResourceManager::LoadDefaultMaterial(const std::filesystem::path& materialP
     m_defaultMaterial = material->GetUUID();
     
     material->SetAttribute("color", Vec4f::One());
+    material->SetAttribute("albedoSampler", GetBlankTexture());
 }
 
 SafePtr<Material> ResourceManager::CreateMaterial(const std::filesystem::path& path)
 {
     std::shared_ptr<Material> material = std::make_shared<Material>(path);
     std::shared_ptr<Shader> shader = GetDefaultShader();
-    material->SetShader(shader);
-
+    
+    material->SetLoaded();
+    material->SetSentToGPU();
+    
     AddResource(material);
+    
+    material->SetShader(shader);
 
     return material;
 }
@@ -197,6 +209,11 @@ std::shared_ptr<Shader> ResourceManager::GetDefaultShader() const
 std::shared_ptr<Texture> ResourceManager::GetDefaultTexture() const
 {
     return GetResource<Texture>(m_defaultTexture);
+}
+
+std::shared_ptr<Texture> ResourceManager::GetBlankTexture() const
+{
+    return GetResource<Texture>(m_blankTexture);
 }
 
 std::shared_ptr<Material> ResourceManager::GetDefaultMaterial() const

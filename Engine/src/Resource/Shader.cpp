@@ -17,9 +17,15 @@ BaseShader::~BaseShader()
 bool BaseShader::Load(ResourceManager* resourceManager)
 {
     UNUSED(resourceManager);
+    
+    if (!File::Exist(p_path))
+    {
+        PrintError("Failed to read shader source from file: %s", p_path.c_str());
+        return false;
+    }
 
     std::filesystem::path compiledPath = GetCompiledPath();
-    if (File::Exist(compiledPath))
+    if (File::Exist(compiledPath) && File::GetLastWriteTime(compiledPath) > File::GetLastWriteTime(p_path))
     {
         File file(compiledPath);
         if (!file.ReadAllText(p_content))
@@ -106,7 +112,7 @@ bool Shader::Load(ResourceManager* resourceManager)
         PrintError("Failed to load vertex shader: %s", vertexShaderPath.c_str());
         return false;
     }
-    m_vertexShader->OnSentToGPU.Bind([this](){OnShaderSent();});
+    m_vertexShader->EOnSentToGPU.Bind([this](){OnShaderSent();});
     
     m_fragmentShader = resourceManager->Load<FragmentShader>(fragmentShaderPath);
     if (!m_fragmentShader)
@@ -114,7 +120,7 @@ bool Shader::Load(ResourceManager* resourceManager)
         PrintError("Failed to load fragment shader: %s", fragmentShaderPath.c_str());
         return false;
     }
-    m_fragmentShader->OnSentToGPU.Bind([this](){OnShaderSent();});
+    m_fragmentShader->EOnSentToGPU.Bind([this](){OnShaderSent();});
     
     return true;
 }

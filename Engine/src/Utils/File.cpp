@@ -27,6 +27,16 @@ bool File::Exist(const std::filesystem::path& path)
     return std::filesystem::exists(path);
 }
 
+std::filesystem::file_time_type File::GetLastWriteTime(const std::filesystem::path& path)
+{
+    return std::filesystem::last_write_time(path);
+}
+
+std::filesystem::file_time_type File::GetLastWriteTime() const
+{
+    return GetLastWriteTime(m_path);
+}
+
 bool File::ReadAllBytes(std::vector<uint8_t>& out) const
 {
     std::ifstream file(m_path, std::ios::binary | std::ios::ate);

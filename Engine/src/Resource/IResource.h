@@ -88,17 +88,17 @@ public:
     void SetLoaded()
     {
         p_isLoaded = true;
-        OnLoaded.Invoke();
+        EOnLoaded.Invoke();
     }
     void SetSentToGPU()
     {
         p_sendToGPU = true;
-        OnSentToGPU.Invoke();
+        EOnSentToGPU.Invoke();
     }
     
 public:
-    OnceEvent OnLoaded;
-    OnceEvent OnSentToGPU;
+    OnceEvent EOnLoaded;
+    OnceEvent EOnSentToGPU;
 protected:    
     friend class ResourceManager;
     

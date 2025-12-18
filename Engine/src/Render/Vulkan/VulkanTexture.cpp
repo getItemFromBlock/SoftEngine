@@ -24,16 +24,12 @@ bool VulkanTexture::LoadFromFile(VulkanDevice* device, const std::string& filepa
     
     m_device = device;
     
-    //TODO: Move
-    int texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load(filepath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-    
-    if (!pixels) {
+    ImageLoader::Image image;
+    if (!ImageLoader::Load(filepath.c_str(), image))
         return false;
-    }
     
-    p_width = static_cast<uint32_t>(texWidth);
-    p_height = static_cast<uint32_t>(texHeight);
+    p_width = static_cast<uint32_t>(image.size.x);
+    p_height = static_cast<uint32_t>(image.size.y);
     VkDeviceSize imageSize = p_width * p_height * 4;
     
     VulkanBuffer stagingBuffer;
@@ -41,17 +37,17 @@ bool VulkanTexture::LoadFromFile(VulkanDevice* device, const std::string& filepa
     if (!stagingBuffer.Initialize(m_device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
     {
-        stbi_image_free(pixels);
+        ImageLoader::ImageFree(image);
         return false;
     }
     
     // Copy pixel data to staging buffer
-    if (!CopyDataToBuffer(stagingBuffer, pixels, imageSize)) {
-        stbi_image_free(pixels);
+    if (!CopyDataToBuffer(stagingBuffer, image.data, imageSize)) {
+        ImageLoader::ImageFree(image);
         return false;
     }
     
-    stbi_image_free(pixels);
+    ImageLoader::ImageFree(image);
     
     // Create and setup image
     if (!CreateAndSetupImage(stagingBuffer.GetBuffer(), commandPool, graphicsQueue)) {

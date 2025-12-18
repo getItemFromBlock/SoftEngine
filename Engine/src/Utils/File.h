@@ -17,6 +17,9 @@ public:
     static bool ReadAllText(const std::filesystem::path& path, std::string& out);
     static bool Exist(const std::filesystem::path& path);
     
+    static std::filesystem::file_time_type GetLastWriteTime(const std::filesystem::path& path);
+    std::filesystem::file_time_type GetLastWriteTime() const;
+
     bool ReadAllBytes(std::vector<uint8_t>& out) const;
     bool ReadAllLines(std::vector<std::string>& out) const;
     bool ReadAllText(std::string& out) const;

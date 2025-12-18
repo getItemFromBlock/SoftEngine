@@ -24,7 +24,7 @@ public:
     void Cleanup() override;
 
     void SetUniformData(uint32_t set, uint32_t binding, const void* data, size_t size, RHIRenderer* renderer) override;
-    void SetTexture(uint32_t set, uint32_t binding, Texture* texture, uint32_t frameIndex);
+    void SetTexture(uint32_t set, uint32_t binding, Texture* texture, RHIRenderer* renderer);
     
     void Bind(RHIRenderer* renderer) override;
     void BindDescriptorSets(VkCommandBuffer commandBuffer, uint32_t frameIndex);

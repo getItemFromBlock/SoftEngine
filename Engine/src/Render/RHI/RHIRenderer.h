@@ -15,6 +15,7 @@
 
 #include "Utils/Type.h"
 
+class Mesh;
 class VertexShader;
 class FragmentShader;
 class Shader;

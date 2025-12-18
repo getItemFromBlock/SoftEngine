@@ -20,7 +20,6 @@ public:
     VulkanTexture(const VulkanTexture&) = default;
     VulkanTexture(VulkanTexture&&) noexcept = default;
     ~VulkanTexture() override;
-    
  
     bool LoadFromFile(VulkanDevice* device, const std::string& filepath,
                       VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);

@@ -28,11 +28,14 @@ void Material::SetShader(const SafePtr<Shader>& shader)
 {
     if (m_shader && m_shader->GetUUID() != shader->GetUUID())
     {
-        m_shader->OnSentToGPU.Unbind(m_shaderChangeEvent);
+        m_shader->EOnSentToGPU.Unbind(m_shaderChangeEvent);
     }
     
     m_shader = shader;
-    m_shaderChangeEvent = m_shader->OnSentToGPU.Bind([this] { OnShaderChanged(); });
+    m_shaderChangeEvent = m_shader->EOnSentToGPU.Bind([this]()
+    {
+        OnShaderChanged();
+    });
 }
 
 void Material::SetAttribute(const std::string& name, float attribute)
@@ -100,6 +103,16 @@ void Material::SetAttribute(const std::string& name, const SafePtr<Texture>& tex
     if (m_attributes.samplerAttributes.contains(name))
     {
         m_attributes.samplerAttributes[name] = texture;
+        
+        texture->EOnSentToGPU.Bind([this, texture, name]()
+        {
+            auto uniform = m_shader->GetUniform(name);
+            
+            auto renderer = Engine::Get()->GetRenderer();
+            auto rhiMat = dynamic_cast<VulkanMaterial*>(m_handle.get());
+            rhiMat->SetTexture(uniform.set, uniform.binding, 
+                               texture.get().get(), renderer);
+        });
     }
     else if (m_shader && !m_shader->SentToGPU())
     {
@@ -193,6 +206,15 @@ void Material::OnShaderChanged()
     m_attributes.Clear();
     Uniforms uniforms = m_shader->GetUniforms();
 
+    auto renderer = Engine::Get()->GetRenderer();
+
+    if (m_handle)
+    {
+        m_handle->Cleanup();
+        m_handle.release();
+    }
+    m_handle = renderer->CreateMaterial(m_shader.get().get());
+    
     for (Uniform& uniform : uniforms | std::views::values)
     {
         switch (uniform.type)
@@ -260,8 +282,19 @@ void Material::OnShaderChanged()
                 }
                 break;
             case UniformType::Sampler2D:
-                m_attributes.samplerAttributes[uniform.name] =
-                m_temporaryAttributes.samplerAttributes.contains(uniform.name) ? m_temporaryAttributes.samplerAttributes[uniform.name].value : SafePtr<Texture>{};
+                {
+                    m_attributes.samplerAttributes[uniform.name] =
+                       m_temporaryAttributes.samplerAttributes.contains(uniform.name) ? m_temporaryAttributes.samplerAttributes[uniform.name].value : SafePtr<Texture>{};
+                    
+                    auto texture = m_attributes.samplerAttributes[uniform.name].value.get().get();
+                    texture->EOnSentToGPU.Bind([this, uniform, texture]()
+                    {
+                        auto renderer = Engine::Get()->GetRenderer();
+                        auto rhiMat = dynamic_cast<VulkanMaterial*>(m_handle.get());
+                        rhiMat->SetTexture(uniform.set, uniform.binding, 
+                                           texture, renderer);
+                    });
+                }
                 break;
             case UniformType::SamplerCube:
                 break;
@@ -270,12 +303,4 @@ void Material::OnShaderChanged()
                 break;
         }
     }
-    auto renderer = Engine::Get()->GetRenderer();
-
-    if (m_handle)
-    {
-        m_handle->Cleanup();
-        m_handle.release();
-    }
-    m_handle = renderer->CreateMaterial(m_shader.get().get());
 }
