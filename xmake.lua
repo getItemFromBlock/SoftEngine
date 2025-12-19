@@ -138,7 +138,7 @@ end
 set_languages("c++latest")
 set_rundir("$(projectdir)")
 
--- add_defines("MULTI_THREAD")
+add_defines("MULTI_THREAD")
 
 target("Engine")
     set_kind("static")

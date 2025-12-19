@@ -21,6 +21,7 @@ std::unique_ptr<RHIRenderer> RHIRenderer::Create(RenderAPI api, Window* window)
     }
 
     renderer->p_renderAPI = api;
+    renderer->m_renderQueue = std::make_unique<RenderQueueManager>();
     if (renderer)
         renderer->Initialize(window);
     

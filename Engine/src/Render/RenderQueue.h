@@ -1,67 +1,106 @@
 ﻿#pragma once
-#include <iostream>
+#include <vector>
+#define RENDER_QUEUE
 #include <galaxymath/Maths.h>
 
-#include "Core/UUID.h"
+#include "Resource/Material.h"
+#include "Resource/Mesh.h"
+#include "Resource/Shader.h"
+#include "Utils/Type.h"
 
 class RHIRenderer;
-class Material;
+class GameObject;
 class Mesh;
+class Material;
+class Shader;
+class Renderer;
 
-struct SortKey
+struct RenderCommand
 {
-    uint64_t materialKey = UUID_INVALID;
-    uint64_t meshKey = UUID_INVALID;
+    Mesh* mesh;
+    size_t subMeshIndex;
+    uint32_t startIndex;
+    uint32_t indexCount;
     
-    bool operator!=(const SortKey& sortKey) const
-    {
-        return materialKey != sortKey.materialKey || meshKey != sortKey.meshKey;
-    }
-};
-
-class RenderCommand
-{
-public:
-    virtual ~RenderCommand() = default;
-    virtual bool BeforeExecute(RenderCommand* prevCommand) { return false; }
-    virtual void AfterExecute() {}
-    virtual void Execute(RenderCommand* prevCommand) = 0;
-
-public:
-    SortKey sortKey;
-};
-
-struct DrawCommandData
-{
+    Material* material;
+    Shader* shader;
+    
+    Mat4 modelMatrix;
+    
     uint64_t sortKey;
     
-    Mesh* mesh;
-    uint32_t subMeshIndex;
-    Material* material;
-    Mat4 transform;
-    
-    bool operator<(const DrawCommandData& other) const {
-        return sortKey < other.sortKey;
-    }
+    void GenerateSortKey();
+
+    void GenerateSortKeyWithDepth(float depth);
 };
 
-class DrawCommand : public RenderCommand
+struct RenderBatch
 {
-public:
-    DrawCommand(const DrawCommandData& _data);
-
-    bool BeforeExecute(RenderCommand* prevCommand) override;
-    void Execute(RenderCommand* prevCommand) override;
-    void AfterExecute() override;
+    Material* material;
+    Shader* shader;
+    Mesh* mesh;
+    
+    struct Instance
+    {
+        Mat4 modelMatrix;
+        uint32_t startIndex;
+        uint32_t indexCount;
+        size_t subMeshIndex;
+    };
+    
+    std::vector<Instance> instances;
 };
 
 class RenderQueue
 {
 public:
-    void AddCommand(const DrawCommandData& data);
+    enum class QueueType
+    {
+        Opaque,
+        Transparent,
+        UI
+    };
     
-    void ExecuteCommands(RHIRenderer* renderer);
+    RenderQueue(QueueType type) : m_type(type) {}
+    
+    void Submit(const RenderCommand& command);
+
+    void SubmitMeshRenderer(GameObject* gameObject, Mesh* mesh, const std::vector<SafePtr<Material>>& materials);
+
+    void Sort();
+
+    void Execute(RHIRenderer* renderer);
+
+    std::vector<RenderBatch> CreateBatches();
+
+    void ExecuteBatched(RHIRenderer* renderer);
+
+    void Clear();
+
+    size_t GetCommandCount() const { return m_commands.size(); }
+    
 private:
-    std::vector<DrawCommandData> m_drawCommands;
+    QueueType m_type;
+    std::vector<RenderCommand> m_commands;
+};
+
+class RenderQueueManager
+{
+public:
+    RenderQueueManager();
+
+    RenderQueue* GetOpaqueQueue() const { return m_opaqueQueue.get(); }
+    RenderQueue* GetTransparentQueue() const { return m_transparentQueue.get(); }
+    RenderQueue* GetUIQueue() const { return m_uiQueue.get(); }
     
+    void SortAll() const;
+
+    void ExecuteAll(RHIRenderer* renderer) const;
+
+    void ClearAll() const;
+
+private:
+    std::unique_ptr<RenderQueue> m_opaqueQueue;
+    std::unique_ptr<RenderQueue> m_transparentQueue;
+    std::unique_ptr<RenderQueue> m_uiQueue;
 };

@@ -767,19 +767,24 @@ void VulkanRenderer::SendValue(UBOBinding binding, void* value, uint32_t size, S
     // uniformBuffer->WriteToMapped(value, size, m_currentFrame);
 }
 
-bool VulkanRenderer::BindMaterial(Material* material)
+bool VulkanRenderer::BindShader(Shader* shader)
 {
-    auto shader = material->GetShader();
     if (!shader || !shader->GetPipeline())
         return false;
     
     VulkanPipeline* pipeline = dynamic_cast<VulkanPipeline*>(shader->GetPipeline());
     auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
     pipeline->Bind(commandBuffer);
+    
+    return true;
+}
 
+bool VulkanRenderer::BindMaterial(Material* material)
+{
     if (!material->Bind(this))
         return false;
 
+    auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
     // Set viewport and scissor dynamically
     VkViewport viewport{};
     viewport.x = 0.0f;

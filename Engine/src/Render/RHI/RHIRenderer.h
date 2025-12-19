@@ -80,14 +80,15 @@ public:
     
     virtual void SendTexture(UBOBinding binding, Texture* texture, Shader* shader) = 0;
     virtual void SendValue(UBOBinding binding, void* value, uint32_t size, Shader* shader) = 0;
+    virtual bool BindShader(Shader* shader) = 0;
     virtual bool BindMaterial(Material* material) = 0;
     
     virtual void SetDefaultTexture(const SafePtr<Texture>& texture) = 0;
     
-    // void Submit();
+    RenderQueueManager* GetRenderQueueManager() const { return m_renderQueue.get(); }
 protected:
     RenderAPI p_renderAPI;
     bool p_initialized = false;
-    std::unique_ptr<RenderQueue> m_renderQueue;
+    std::unique_ptr<RenderQueueManager> m_renderQueue;
     
 };

@@ -28,37 +28,15 @@ void MeshComponent::OnUpdate(float deltaTime)
     for (auto& material : m_materials)
     {
         material->SetAttribute("viewProj", VP);
-        
-        material->SendAllValues(renderer);
     }
 }
 
 void MeshComponent::OnRender(RHIRenderer* renderer) 
 {
-    /*
-    if (!m_mesh || !m_mesh->IsLoaded()) return;
-
-    auto transform = p_gameObject->GetComponent<TransformComponent>()->GetWorldMatrix();
-    auto subMeshes = m_mesh->GetSubMeshes();
-
-    for (size_t i = 0; i < subMeshes.size(); ++i) 
-    {
-        DrawCommandData data;
-        data.mesh = m_mesh.getPtr();
-        data.subMeshIndex = i;
-        data.material = m_materials[i % m_materials.size()].getPtr();
-        data.transform = transform;
-
-        // Generate Sort Key: 
-        // [ 8-bit Layer | 24-bit Pipeline ID | 32-bit Material ID ]
-        uint64_t pipelineID = data.material->GetShader()->GetID();
-        uint64_t materialID = data.material->GetID();
-        
-        data.sortKey = (pipelineID << 32) | materialID;
-
-        renderer->Submit(item);
-    }
-    */
+#ifdef RENDER_QUEUE
+    auto queue = renderer->GetRenderQueueManager()->GetOpaqueQueue();
+    queue->SubmitMeshRenderer(GetGameObject(), this->m_mesh.getPtr(), m_materials);
+#else
     if (!m_mesh || !m_mesh->IsLoaded() || !m_mesh->SentToGPU() || !m_mesh->GetVertexBuffer() || !m_mesh->GetIndexBuffer())
         return;
 
@@ -74,6 +52,8 @@ void MeshComponent::OnRender(RHIRenderer* renderer)
         auto& material = m_materials[materialIndex];
             
         auto shader = material->GetShader().getPtr();
+        if (!renderer->BindShader(shader))
+            continue;
         if (!renderer->BindMaterial(material.getPtr()))
             continue;
 
@@ -86,6 +66,7 @@ void MeshComponent::OnRender(RHIRenderer* renderer)
                                    subMeshes[i].startIndex, 
                                    subMeshes[i].count);
     }
+#endif
 }
 
 void MeshComponent::SetMesh(const SafePtr<Mesh>& mesh)

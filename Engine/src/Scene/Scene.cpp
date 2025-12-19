@@ -44,6 +44,11 @@ void Scene::OnRender(RHIRenderer* renderer)
                 component->OnRender(renderer);
         }
     }
+    
+    auto renderQueueManager = renderer->GetRenderQueueManager();
+    renderQueueManager->SortAll();
+    renderQueueManager->ExecuteAll(renderer);
+    renderQueueManager->ClearAll();
 }
 
 void Scene::OnUpdate(float deltaTime)

@@ -73,6 +73,7 @@ public:
     
     void SendTexture(UBOBinding binding, Texture* texture, Shader* shader) override;
     void SendValue(UBOBinding binding, void* value, uint32_t size, Shader* shader) override;
+    bool BindShader(Shader* shader) override;
     bool BindMaterial(Material* material) override;
     
     std::unique_ptr<RHITexture> CreateTexture(const ImageLoader::Image& image) override;

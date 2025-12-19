@@ -6,6 +6,7 @@ void ResourcesWindow::OnRender()
 {
     if (ImGui::Begin("Resources"))
     {
+        ImGui::Text("FPS: %f", ImGui::GetIO().Framerate);
         for (const auto& pair : p_engine->GetResourceManager()->GetResources())
         {
             ImGui::PushID(pair.first);
