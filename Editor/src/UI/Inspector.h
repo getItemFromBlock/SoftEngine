@@ -1,7 +1,7 @@
 #pragma once
 #include "EditorWindow.h"
 #include "Core/UUID.h"
-#include "Scene/ComponentDescriptor.h"
+#include "Scene/ClassDescriptor.h"
 #include "Utils/Type.h"
 
 class SceneHolder;
@@ -9,13 +9,13 @@ class SceneHolder;
 class Inspector : public EditorWindow
 {
 public:
-    Inspector(Engine* engine);
+    Inspector(Engine* engine, ImGuiHandler* handler);
     
     void OnRender() override;
     
     void SetSelectedObject(Core::UUID uuid);
 
-    void ShowComponent(const ComponentDescriptor& descriptor) const;
+    void ShowProperty(const ClassDescriptor& descriptor) const;
 private:
     void ShowMaterials(const Property& property) const;
     void ShowMesh(const Property& property) const;

@@ -61,6 +61,10 @@ public:
     bool SendToGPU(RHIRenderer* renderer) override;
     void Unload() override;
     
+    std::string GetName(bool extension = true) const override;
+    
+    void Describe(ClassDescriptor& descriptor) override;
+    
     void SetShader(const SafePtr<Shader>& shader);
     SafePtr<Shader> GetShader() const { return m_shader; }
 
@@ -79,6 +83,8 @@ public:
     MaterialAttributes GetAttributes() const { return m_attributes; }
 private:
     void OnShaderChanged();
+    
+    void SendTexture(Texture* texture, const Uniform& uniform) const;
 private:
     std::unique_ptr<RHIMaterial> m_handle;
     SafePtr<Shader> m_shader;

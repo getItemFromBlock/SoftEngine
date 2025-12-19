@@ -4,22 +4,22 @@
 #include "Inspector.h"
 #include "ResourcesWindow.h"
 
-void EditorWindowManager::Initialize(Engine* engine)
+void EditorWindowManager::Initialize(Engine* engine, ImGuiHandler* handler)
 {
-    auto hierarchy = std::make_unique<Hierarchy>(engine);
-    auto inspector = std::make_unique<Inspector>(engine);
+    auto hierarchy = std::make_unique<Hierarchy>(engine, handler);
+    auto inspector = std::make_unique<Inspector>(engine, handler);
 
     Hierarchy* hierarchyPtr = hierarchy.get();
     Inspector* inspectorPtr = inspector.get();
     
-    hierarchy->EOnObjectSelected += [inspectorPtr](const Core::UUID& uuid)
+    hierarchy->EOnObjectSelected.Bind([inspectorPtr](const Core::UUID& uuid)
     {
         inspectorPtr->SetSelectedObject(uuid);
-    };
+    });
     
     m_windows.push_back(std::move(hierarchy));
     m_windows.push_back(std::move(inspector));
-    m_windows.push_back(std::make_unique<ResourcesWindow>(engine));
+    m_windows.push_back(std::make_unique<ResourcesWindow>(engine, handler));
 }
 
 void EditorWindowManager::RenderMainDock()

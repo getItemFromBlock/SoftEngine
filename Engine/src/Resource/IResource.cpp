@@ -6,7 +6,9 @@ IResource::IResource(const std::filesystem::path& path)
     p_path = ResourceManager::SanitizePath(path);
 }
 
-std::string IResource::GetName() const
+std::string IResource::GetName(bool extension) const
 {
-    return p_path.filename().stem().generic_string().c_str();
+    if (!extension)
+        return p_path.filename().stem().generic_string();
+    return p_path.filename().generic_string();
 }

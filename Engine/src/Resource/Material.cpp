@@ -21,7 +21,41 @@ bool Material::SendToGPU(RHIRenderer* renderer)
 
 void Material::Unload()
 {
-    m_handle->Cleanup();
+    if (m_handle)
+        m_handle->Cleanup();
+}
+
+std::string Material::GetName(bool extension) const
+{
+    return IResource::GetName(extension);
+}
+
+void Material::Describe(ClassDescriptor& descriptor)
+{
+    for (auto& [name, attrib] : m_attributes.floatAttributes)
+    {
+        descriptor.AddFloat(name.c_str(), attrib.value);
+    }
+    for (auto& [name, attrib] : m_attributes.intAttributes)
+    {
+        descriptor.AddInt(name.c_str(), attrib.value);
+    }
+    for (auto& [name, attrib] : m_attributes.vec2Attributes)
+    {
+        descriptor.AddVec2f(name.c_str(), attrib.value);
+    }
+    for (auto& [name, attrib] : m_attributes.vec3Attributes)
+    {
+        descriptor.AddVec3f(name.c_str(), attrib.value);
+    }
+    for (auto& [name, attrib] : m_attributes.vec4Attributes)
+    {
+        descriptor.AddVec4f(name.c_str(), attrib.value);
+    }
+    for (auto& [name, attrib] : m_attributes.samplerAttributes)
+    {
+        descriptor.AddTexture(name.c_str(), attrib.value);
+    }
 }
 
 void Material::SetShader(const SafePtr<Shader>& shader)
@@ -30,7 +64,7 @@ void Material::SetShader(const SafePtr<Shader>& shader)
     {
         m_shader->EOnSentToGPU.Unbind(m_shaderChangeEvent);
     }
-    
+
     m_shader = shader;
     m_shaderChangeEvent = m_shader->EOnSentToGPU.Bind([this]()
     {
@@ -103,15 +137,12 @@ void Material::SetAttribute(const std::string& name, const SafePtr<Texture>& tex
     if (m_attributes.samplerAttributes.contains(name))
     {
         m_attributes.samplerAttributes[name] = texture;
-        
+
         texture->EOnSentToGPU.Bind([this, texture, name]()
         {
             auto uniform = m_shader->GetUniform(name);
-            
-            auto renderer = Engine::Get()->GetRenderer();
-            auto rhiMat = dynamic_cast<VulkanMaterial*>(m_handle.get());
-            rhiMat->SetTexture(uniform.set, uniform.binding, 
-                               texture.getPtr(), renderer);
+
+            SendTexture(texture.getPtr(), uniform);
         });
     }
     else if (m_shader && !m_shader->SentToGPU())
@@ -119,6 +150,7 @@ void Material::SetAttribute(const std::string& name, const SafePtr<Texture>& tex
         m_temporaryAttributes.samplerAttributes[name] = texture;
     }
 }
+
 void Material::SetAttribute(const std::string& name, const Mat4& attribute)
 {
     if (m_attributes.matrixAttributes.contains(name))
@@ -214,95 +246,113 @@ void Material::OnShaderChanged()
         m_handle.release();
     }
     m_handle = renderer->CreateMaterial(m_shader.getPtr());
-    
+
     for (Uniform& uniform : uniforms | std::views::values)
     {
         switch (uniform.type)
         {
-            case UniformType::NestedStruct:
-                for (UniformMember& member : uniform.members)
+        case UniformType::NestedStruct:
+            for (UniformMember& member : uniform.members)
+            {
+                switch (member.type)
                 {
-                    switch (member.type)
+                case UniformType::Float:
                     {
-                        case UniformType::Float:
-                        {
-                            float value = m_temporaryAttributes.floatAttributes.contains(member.name) ? m_temporaryAttributes.floatAttributes[member.name].value : 0.f;
-                            m_attributes.floatAttributes[member.name] = Attribute<float>(
-                                uniform.name,
-                                value
-                            );
-                        }
-                        break;
-                        case UniformType::Int:
-                        {
-                            int value = m_temporaryAttributes.intAttributes.contains(member.name) ? m_temporaryAttributes.intAttributes[member.name].value : 0.f;
-                            m_attributes.intAttributes[member.name] = Attribute<int>(
-                                uniform.name,
-                                value
-                            );
-                        }
-                        break;
-                        case UniformType::Vec2:
-                        {
-                            Vec2f value = m_temporaryAttributes.vec2Attributes.contains(member.name) ? m_temporaryAttributes.vec2Attributes[member.name].value : Vec2f::Zero();
-                            m_attributes.vec2Attributes[member.name] = Attribute<Vec2f>(
-                                uniform.name,
-                                value
-                            );
-                        }
-                        break;
-                        case UniformType::Vec3:
-                        {
-                            Vec3f value = m_temporaryAttributes.vec3Attributes.contains(member.name) ? m_temporaryAttributes.vec3Attributes[member.name].value : Vec3f::Zero();
-                            m_attributes.vec3Attributes[member.name] = Attribute<Vec3f>(
-                                uniform.name,
-                                value
-                            );
-                        }
-                        break;
-                        case UniformType::Vec4:
-                        {
-                            Vec4f value = m_temporaryAttributes.vec4Attributes.contains(member.name) ? m_temporaryAttributes.vec4Attributes[member.name].value : Vec4f::Zero();
-                            m_attributes.vec4Attributes[member.name] = Attribute<Vec4f>(
-                                uniform.name,
-                                value
-                            );
-                        }
-                        break;
-                        case UniformType::Mat4:
-                        {
-                            Mat4 value = m_temporaryAttributes.matrixAttributes.contains(member.name) ? m_temporaryAttributes.matrixAttributes[member.name].value : Mat4::Identity();
-                            m_attributes.matrixAttributes[member.name] = Attribute<Mat4>(
-                                uniform.name,
-                                value
-                            );
-                        }
-                        break;
+                        float value = m_temporaryAttributes.floatAttributes.contains(member.name)
+                                          ? m_temporaryAttributes.floatAttributes[member.name].value
+                                          : 0.f;
+                        m_attributes.floatAttributes[member.name] = Attribute<float>(
+                            uniform.name,
+                            value
+                        );
                     }
-                }
-                break;
-            case UniformType::Sampler2D:
-                {
-                    m_attributes.samplerAttributes[uniform.name] =
-                       m_temporaryAttributes.samplerAttributes.contains(uniform.name) ? m_temporaryAttributes.samplerAttributes[uniform.name].value : SafePtr<Texture>{};
-
-                    Texture* texture = m_attributes.samplerAttributes[uniform.name].value.getPtr();
-                    if (!texture)
-                        break;
-                    texture->EOnSentToGPU.Bind([this, uniform, texture]()
+                    break;
+                case UniformType::Int:
                     {
-                        auto renderer = Engine::Get()->GetRenderer();
-                        auto rhiMat = dynamic_cast<VulkanMaterial*>(m_handle.get());
-                        rhiMat->SetTexture(uniform.set, uniform.binding, 
-                                           texture, renderer);
-                    });
+                        int value = m_temporaryAttributes.intAttributes.contains(member.name)
+                                        ? m_temporaryAttributes.intAttributes[member.name].value
+                                        : 0.f;
+                        m_attributes.intAttributes[member.name] = Attribute<int>(
+                            uniform.name,
+                            value
+                        );
+                    }
+                    break;
+                case UniformType::Vec2:
+                    {
+                        Vec2f value = m_temporaryAttributes.vec2Attributes.contains(member.name)
+                                          ? m_temporaryAttributes.vec2Attributes[member.name].value
+                                          : Vec2f::Zero();
+                        m_attributes.vec2Attributes[member.name] = Attribute<Vec2f>(
+                            uniform.name,
+                            value
+                        );
+                    }
+                    break;
+                case UniformType::Vec3:
+                    {
+                        Vec3f value = m_temporaryAttributes.vec3Attributes.contains(member.name)
+                                          ? m_temporaryAttributes.vec3Attributes[member.name].value
+                                          : Vec3f::Zero();
+                        m_attributes.vec3Attributes[member.name] = Attribute<Vec3f>(
+                            uniform.name,
+                            value
+                        );
+                    }
+                    break;
+                case UniformType::Vec4:
+                    {
+                        Vec4f value = m_temporaryAttributes.vec4Attributes.contains(member.name)
+                                          ? m_temporaryAttributes.vec4Attributes[member.name].value
+                                          : Vec4f::Zero();
+                        m_attributes.vec4Attributes[member.name] = Attribute<Vec4f>(
+                            uniform.name,
+                            value
+                        );
+                    }
+                    break;
+                case UniformType::Mat4:
+                    {
+                        Mat4 value = m_temporaryAttributes.matrixAttributes.contains(member.name)
+                                         ? m_temporaryAttributes.matrixAttributes[member.name].value
+                                         : Mat4::Identity();
+                        m_attributes.matrixAttributes[member.name] = Attribute<Mat4>(
+                            uniform.name,
+                            value
+                        );
+                    }
+                    break;
                 }
-                break;
-            case UniformType::SamplerCube:
-                break;
-            default:
-                PrintError("Unknown uniform type: %d", static_cast<int>(uniform.type));
-                break;
+            }
+            break;
+        case UniformType::Sampler2D:
+            {
+                m_attributes.samplerAttributes[uniform.name] =
+                    m_temporaryAttributes.samplerAttributes.contains(uniform.name)
+                        ? m_temporaryAttributes.samplerAttributes[uniform.name].value
+                        : SafePtr<Texture>{};
+
+                Texture* texture = m_attributes.samplerAttributes[uniform.name].value.getPtr();
+                if (!texture)
+                    break;
+                texture->EOnSentToGPU.Bind([this, uniform, texture]()
+                {
+                    SendTexture(texture, uniform);
+                });
+            }
+            break;
+        case UniformType::SamplerCube:
+            break;
+        default:
+            PrintError("Unknown uniform type: %d", static_cast<int>(uniform.type));
+            break;
         }
     }
+}
+
+void Material::SendTexture(Texture* texture, const Uniform& uniform) const
+{
+    RHIRenderer* renderer = Engine::Get()->GetRenderer();
+    VulkanMaterial* rhiMat = dynamic_cast<VulkanMaterial*>(m_handle.get());
+    rhiMat->SetTexture(uniform.set, uniform.binding, texture, renderer);
 }

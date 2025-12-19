@@ -4,6 +4,10 @@
 
 #include "Core/UUID.h"
 
+class RHIRenderer;
+class Material;
+class Mesh;
+
 struct SortKey
 {
     uint64_t materialKey = UUID_INVALID;
@@ -29,14 +33,16 @@ public:
 
 struct DrawCommandData
 {
-    SortKey sortKey;
-    int vertexArrayID;
-    class Material* material = nullptr;
-    Mat4 modelMatrix;
-    Mat4 MVP;
-    bool hasLSM = false;
-    Mat4 LSM;
-    Vec3f ViewPos;
+    uint64_t sortKey;
+    
+    Mesh* mesh;
+    uint32_t subMeshIndex;
+    Material* material;
+    Mat4 transform;
+    
+    bool operator<(const DrawCommandData& other) const {
+        return sortKey < other.sortKey;
+    }
 };
 
 class DrawCommand : public RenderCommand
@@ -52,7 +58,10 @@ public:
 class RenderQueue
 {
 public:
+    void AddCommand(const DrawCommandData& data);
     
+    void ExecuteCommands(RHIRenderer* renderer);
 private:
+    std::vector<DrawCommandData> m_drawCommands;
     
 };

@@ -132,6 +132,8 @@ std::vector<std::shared_ptr<T>> ResourceManager::GetAll() const
     auto type = T::GetStaticResourceType();
     for (auto& resource : m_resources | std::views::values)
     {
+        if (!resource)
+            continue;
         if (resource->GetResourceType() == type)
         {
             resources.push_back(std::dynamic_pointer_cast<T>(resource));

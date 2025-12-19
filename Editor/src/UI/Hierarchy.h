@@ -4,12 +4,13 @@
 #include "Scene/GameObject.h"
 #include "Utils/Event.h"
 
+class ImGuiHandler;
 class SceneHolder;
 
 class Hierarchy : public EditorWindow
 {
 public:
-    Hierarchy(Engine* engine);
+    Hierarchy(Engine* engine, ImGuiHandler* handler);
 
     void OnRender() override;
     

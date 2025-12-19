@@ -4,6 +4,7 @@
 #include "Component/TransformComponent.h"
 
 #include "Core/Engine.h"
+#include "Core/ImGuiHandler.h"
 #include "Resource/ResourceManager.h"
 
 #include "Scene/GameObject.h"
@@ -11,7 +12,7 @@
 
 #include "Resource/Mesh.h"
 
-Inspector::Inspector(Engine* engine) : EditorWindow(engine)
+Inspector::Inspector(Engine* engine, ImGuiHandler* handler) : EditorWindow(engine, handler)
 {
     m_sceneHolder = engine->GetSceneHolder();
 }
@@ -51,9 +52,9 @@ void Inspector::OnRender()
 
                 if (open)
                 {
-                    ComponentDescriptor descriptor;
+                    ClassDescriptor descriptor;
                     component->Describe(descriptor);
-                    ShowComponent(descriptor);
+                    ShowProperty(descriptor);
                 }
                 ImGui::PopID();
             }
@@ -71,11 +72,12 @@ void Inspector::ShowMaterials(const Property& property) const
 {
     auto materials = static_cast<std::vector<SafePtr<Material>>*>(property.data);
     auto materialList = *materials;
+    size_t i = 0;
     for (SafePtr<Material>& material : materialList)
     {
         ImGui::PushID(material->GetUUID());
-        auto meshName = material->GetName();
-        if (ImGui::Button(meshName.c_str()))
+        ImGui::Text("Material %d", i++);
+        if (ImGui::Button(material->GetName().c_str()))
         {
             ImGui::OpenPopup("Material Popup");
         }
@@ -93,6 +95,13 @@ void Inspector::ShowMaterials(const Property& property) const
                 ImGui::PopID();
             }
             ImGui::EndPopup();
+        }
+        if (ImGui::TreeNode("Details"))
+        {
+            ClassDescriptor descriptor;
+            material->Describe(descriptor);
+            ShowProperty(descriptor);
+            ImGui::TreePop();
         }
         ImGui::PopID();
     }
@@ -145,7 +154,7 @@ void Inspector::ShowTransform(const Property& property) const
     }
 }
 
-void Inspector::ShowComponent(const ComponentDescriptor& descriptor) const
+void Inspector::ShowProperty(const ClassDescriptor& descriptor) const
 {
     for (auto& property : descriptor.properties)
     {
@@ -156,6 +165,9 @@ void Inspector::ShowComponent(const ComponentDescriptor& descriptor) const
             break;
         case PropertyType::Bool:
             ImGui::Checkbox(property.name.c_str(), static_cast<bool*>(property.data));
+            break;
+        case PropertyType::Int:
+            ImGui::InputInt(property.name.c_str(), static_cast<int*>(property.data));
             break;
         case PropertyType::Float:
             ImGui::DragFloat(property.name.c_str(), static_cast<float*>(property.data));
@@ -185,14 +197,25 @@ void Inspector::ShowComponent(const ComponentDescriptor& descriptor) const
         case PropertyType::Color4:
             ImGui::ColorEdit4(property.name.c_str(), &static_cast<Vec4f*>(property.data)->x);
             break;
+        case PropertyType::Texture:
+            {
+                auto texturePtr = static_cast<SafePtr<Texture>*>(property.data);
+                auto textureID = m_imguiHandler->GetTextureID(texturePtr->getPtr());
+                ImGui::Image(textureID, ImVec2(64, 64));
+                break;
+            }
         case PropertyType::Mesh:
             ShowMesh(property);
             break;
+        // case PropertyType::Material:
         case PropertyType::Materials:
             ShowMaterials(property);
             break;
         case PropertyType::Transform:
             ShowTransform(property);
+            break;
+        default:
+            PrintError("Property type not handle on Inspector");
             break;
         }
     }

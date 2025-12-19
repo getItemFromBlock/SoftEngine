@@ -4,7 +4,7 @@
 #include "Debug/Log.h"
 #include "Scene/GameObject.h"
 
-void TestComponent::Describe(ComponentDescriptor& d)
+void TestComponent::Describe(ClassDescriptor& d)
 {
     d.AddFloat("Speed", m_speed);
 }

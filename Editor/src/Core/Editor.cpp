@@ -14,6 +14,15 @@ Editor::Editor()
 {
 }
 
+Editor* Editor::Create()
+{
+    if (!s_instance)
+    {
+        s_instance = std::make_unique<Editor>();
+    }
+    return s_instance.get();
+}
+
 void Editor::Initialize()
 {
     WindowConfig config;
@@ -33,12 +42,12 @@ void Editor::Initialize()
     m_imguiHandler->Initialize(m_window.get(), m_engine->GetRenderer());
     
     m_windowManager = std::make_unique<EditorWindowManager>();
-    m_windowManager->Initialize(m_engine);
+    m_windowManager->Initialize(m_engine, m_imguiHandler.get());
     
     auto resourceManager = m_engine->GetResourceManager();
     auto currentScene = m_engine->GetSceneHolder()->GetCurrentScene();
-    auto model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Sponza/sponza.obj");
-    model->EOnLoaded.Bind([model, this, resourceManager, currentScene]()
+    auto model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Suzanne.obj");
+    model->EOnLoaded.Bind([model, this, currentScene]()
     {
         auto go = Model::CreateGameObject(model.getPtr(), currentScene);
     });

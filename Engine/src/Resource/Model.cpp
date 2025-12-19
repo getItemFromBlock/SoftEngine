@@ -100,6 +100,7 @@ SafePtr<GameObject> Model::CreateGameObject(Model* model, Scene* scene)
     auto resourceManager = Engine::Get()->GetResourceManager();
     SafePtr<GameObject> go = scene->CreateGameObject();
     go->SetName(model->GetName());
+	size_t materialIndex = 0;
     for (size_t i = 0; i < model->m_meshes.size(); i++)
     {
         SafePtr<GameObject> child = scene->CreateGameObject(go.getPtr());
@@ -113,7 +114,7 @@ SafePtr<GameObject> Model::CreateGameObject(Model* model, Scene* scene)
                 meshComp->AddMaterial(resourceManager->GetDefaultMaterial());
                 continue;
             }
-            meshComp->AddMaterial(model->m_materials[j].get());
+            meshComp->AddMaterial(model->m_materials[materialIndex++].get());
         }
         meshComp->SetMesh(model->m_meshes[i]);
     }

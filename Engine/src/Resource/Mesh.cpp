@@ -46,3 +46,8 @@ bool Mesh::SendToGPU(RHIRenderer* renderer)
 void Mesh::Unload()
 {
 }
+
+std::string Mesh::GetName(bool extension) const
+{
+    return IResource::GetName(extension);
+}

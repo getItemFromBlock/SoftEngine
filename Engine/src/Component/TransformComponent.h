@@ -16,7 +16,7 @@ class TransformComponent : public IComponent
 public:
     DECLARE_COMPONENT_TYPE(TransformComponent)
     
-    void Describe(ComponentDescriptor& d) override;
+    void Describe(ClassDescriptor& d) override;
 
     void OnUpdate(float deltaTime) override;
 

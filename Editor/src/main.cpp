@@ -6,10 +6,10 @@ int Run(int argc, char** argv, char** envp)
 {
     (void)argc; (void)argv; (void)envp;
 
-    Editor editor;
-    editor.Initialize();
-    editor.Run();
-    editor.Cleanup();
+    Editor* editor = Editor::Create();
+    editor->Initialize();
+    editor->Run();
+    editor->Cleanup();
     return 0;
 }
 
@@ -40,7 +40,7 @@ int main(int argc, char** argv, char** envp)
 {
 #if defined(_MSC_VER) && !defined(NDEBUG)
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-    // _CrtSetBreakAlloc(4083);
+    // _CrtSetBreakAlloc(3248);
 #endif
 
     return Run(argc, argv, envp);

@@ -62,9 +62,9 @@ public:
         Invoke(args...);
     }
 
-    void operator+=(Callback callback)
+    EventHandle operator+=(Callback callback)
     {
-        Bind(callback);    
+        return Bind(callback);    
     }
     
 protected:

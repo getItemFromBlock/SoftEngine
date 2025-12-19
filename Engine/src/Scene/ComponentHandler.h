@@ -9,7 +9,7 @@
 struct ComponentTypeInfo
 {
     std::unique_ptr<IComponent> (*Create)();
-    void (*Describe)(IComponent*, ComponentDescriptor&);
+    void (*Describe)(IComponent*, ClassDescriptor&);
 };
 
 using ComponentID = uint64_t;
@@ -27,7 +27,7 @@ public:
             []() -> std::unique_ptr<IComponent> {
                 return std::make_unique<T>();
             },
-            [](IComponent* c, ComponentDescriptor& d) {
+            [](IComponent* c, ClassDescriptor& d) {
                 static_cast<T*>(c)->Describe(d);
             }
         };

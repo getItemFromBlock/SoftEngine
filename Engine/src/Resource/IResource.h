@@ -4,6 +4,7 @@
 #include <string>
 
 #include "Core/UUID.h"
+#include "Scene/ClassDescriptor.h"
 #include "Utils/Event.h"
 
 class ResourceManager;
@@ -76,12 +77,14 @@ public:
     virtual bool SendToGPU(RHIRenderer* renderer) = 0;
     virtual void Unload() = 0;
     
+    virtual void Describe(ClassDescriptor& descriptor) {}
+    
     virtual ResourceType GetResourceType() const = 0;
 
     Core::UUID GetUUID() const { return p_uuid; }
     std::filesystem::path GetPath() const { return p_path; }
 
-    std::string GetName() const;
+    virtual std::string GetName(bool extension = false) const;
     bool IsLoaded() const { return p_isLoaded; }
     bool SentToGPU() const { return p_sendToGPU; }
     

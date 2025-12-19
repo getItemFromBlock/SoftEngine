@@ -113,6 +113,7 @@ void ResourceManager::UpdateResourceToSend()
             }
         }
     }
+    PrintLog("List size %d", m_resourceToSend.size());
 }
 void ResourceManager::AddResourceToSend(Core::UUID uuid)
 {

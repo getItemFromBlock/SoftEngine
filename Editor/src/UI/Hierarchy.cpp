@@ -4,11 +4,12 @@
 #include <ranges>
 
 #include "Core/Engine.h"
+#include "Core/ImGuiHandler.h"
 
 #include "Scene/GameObject.h"
 #include "Scene/Scene.h"
 
-Hierarchy::Hierarchy(Engine* engine): EditorWindow(engine)
+Hierarchy::Hierarchy(Engine* engine, ImGuiHandler* handler): EditorWindow(engine, handler)
 {
     m_sceneHolder = engine->GetSceneHolder();
 }

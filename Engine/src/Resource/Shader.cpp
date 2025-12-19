@@ -155,8 +155,5 @@ void Shader::SendValue(UBOBinding binding, void* value, uint32_t size, RHIRender
 
 void Shader::OnShaderSent()
 {
-    if (m_vertexShader->SentToGPU() && m_fragmentShader->SentToGPU())
-    {
-        
-    }
+
 }

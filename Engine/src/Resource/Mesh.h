@@ -73,6 +73,8 @@ public:
     bool Load(ResourceManager* resourceManager) override;
     bool SendToGPU(RHIRenderer* renderer) override;
     void Unload() override;
+    
+    std::string GetName(bool extension = true) const override;
 
     RHIVertexBuffer* GetVertexBuffer() const { return m_vertexBuffer.get(); }
     RHIIndexBuffer* GetIndexBuffer() const { return m_indexBuffer.get(); }

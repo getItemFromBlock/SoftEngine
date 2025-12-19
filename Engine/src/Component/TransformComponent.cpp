@@ -1,7 +1,7 @@
 ﻿#include "TransformComponent.h"
 #include "Scene/GameObject.h"
 
-void TransformComponent::Describe(ComponentDescriptor& d)
+void TransformComponent::Describe(ClassDescriptor& d)
 {
     d.AddProperty("", PropertyType::Transform, this);
 }

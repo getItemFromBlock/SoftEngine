@@ -1,9 +1,11 @@
 ﻿#include "ImGuiHandler.h"
 #include <iostream>
+#include <ranges>
 
 #include "Core/Window.h"
 #include "Core/Window/WindowGLFW.h"
 #include "Render/RHI/RHIRenderer.h"
+#include "Render/Vulkan/VulkanTexture.h"
 
 #ifdef RENDER_API_VULKAN
 #include "Render/Vulkan/VulkanRenderer.h"
@@ -100,6 +102,12 @@ void ImGuiHandler::Initialize(Window* window, RHIRenderer* renderer)
 
 void ImGuiHandler::Cleanup()
 {
+    for (auto& textureID : m_textureIDs | std::views::values)
+    {
+        ImGui_ImplVulkan_RemoveTexture(textureID);
+    }
+    m_textureIDs.clear();
+    
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
@@ -138,4 +146,25 @@ void ImGuiHandler::EndFrame()
         ImGui_ImplVulkan_RenderDrawData(draw_data, commandBuffer);
     }
 #endif
+}
+
+ImTextureRef ImGuiHandler::GetTextureID(Texture* texture)
+{
+    VkDescriptorSet ID;
+    auto it = m_textureIDs.find(texture->GetUUID());
+    if (it == m_textureIDs.end())
+    {
+        auto buffer = dynamic_cast<VulkanTexture*>(texture->GetBuffer());
+        ID = ImGui_ImplVulkan_AddTexture(
+            buffer->GetSampler(),
+            buffer->GetImageView(),
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        );
+        m_textureIDs[texture->GetUUID()] = ID;
+    }
+    else
+    {
+        ID = it->second;
+    }
+    return ImTextureRef(reinterpret_cast<ImTextureID>(ID));
 }

@@ -9,6 +9,7 @@
 #include "RHITexture.h"
 #include "RHIUniformBuffer.h"
 #include "RHIVertexBuffer.h"
+#include "Render/RenderQueue.h"
 #include "Resource/Material.h"
 
 #include "Resource/Shader.h"
@@ -83,8 +84,10 @@ public:
     
     virtual void SetDefaultTexture(const SafePtr<Texture>& texture) = 0;
     
+    // void Submit();
 protected:
     RenderAPI p_renderAPI;
     bool p_initialized = false;
+    std::unique_ptr<RenderQueue> m_renderQueue;
     
 };

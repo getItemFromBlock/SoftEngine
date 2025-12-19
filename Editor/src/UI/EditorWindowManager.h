@@ -4,11 +4,12 @@
 
 #include "EditorWindow.h"
 
+class ImGuiHandler;
+
 class EditorWindowManager
 {
 public:
-    
-    void Initialize(Engine* engine);
+    void Initialize(Engine* engine, ImGuiHandler* handler);
 
     void Render() const;
 private:

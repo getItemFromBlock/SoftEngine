@@ -10,7 +10,7 @@ class MeshComponent : public IComponent
 public:
     DECLARE_COMPONENT_TYPE(MeshComponent)
     
-    void Describe(ComponentDescriptor& d) override;
+    void Describe(ClassDescriptor& d) override;
     
     void OnUpdate(float deltaTime) override;
     void OnRender(RHIRenderer* renderer) override;

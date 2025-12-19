@@ -8,7 +8,7 @@ class TestComponent : public IComponent
 public:
     DECLARE_COMPONENT_TYPE(TestComponent)
     
-    void Describe(ComponentDescriptor& d) override;
+    void Describe(ClassDescriptor& d) override;
     
     void OnCreate() override;
     void OnUpdate(float deltaTime) override;

@@ -313,15 +313,7 @@ bool VulkanRenderer::MultiThreadSendToGPU()
 }
 
 void VulkanRenderer::EndFrame()
-{    
-    // ImGui::Render();
-    // ImDrawData* draw_data = ImGui::GetDrawData();
-    // if (draw_data && draw_data->CmdListsCount > 0)
-    // {
-        // VkCommandBuffer commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
-        // ImGui_ImplVulkan_RenderDrawData(draw_data, commandBuffer);
-    // }
-    
+{        
     auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
     m_renderPass->End(commandBuffer);
     

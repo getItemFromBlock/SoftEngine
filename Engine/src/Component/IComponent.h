@@ -2,7 +2,7 @@
 #include <galaxymath/Maths.h>
 
 #include "Core/UUID.h"
-#include "Scene/ComponentDescriptor.h"
+#include "Scene/ClassDescriptor.h"
 
 #define DECLARE_COMPONENT_TYPE_PARENT(T, P) \
     T() = default; \
@@ -32,7 +32,7 @@ public:
     virtual ~IComponent() = default;
     
     virtual const char* GetTypeName() const { return "IComponent"; }
-    virtual void Describe(ComponentDescriptor& d) {}
+    virtual void Describe(ClassDescriptor& d) {}
 
     virtual void OnCreate() {}
     virtual void OnStart() {}

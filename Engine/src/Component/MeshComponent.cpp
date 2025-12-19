@@ -9,7 +9,7 @@
 #include "TransformComponent.h"
 #include "Utils/Color.h"
 
-void MeshComponent::Describe(ComponentDescriptor& d)
+void MeshComponent::Describe(ClassDescriptor& d)
 {
     d.AddProperty("Mesh", PropertyType::Mesh, &m_mesh);
     d.AddProperty("Materials", PropertyType::Materials, &m_materials);
@@ -33,8 +33,32 @@ void MeshComponent::OnUpdate(float deltaTime)
     }
 }
 
-void MeshComponent::OnRender(RHIRenderer* renderer)
+void MeshComponent::OnRender(RHIRenderer* renderer) 
 {
+    /*
+    if (!m_mesh || !m_mesh->IsLoaded()) return;
+
+    auto transform = p_gameObject->GetComponent<TransformComponent>()->GetWorldMatrix();
+    auto subMeshes = m_mesh->GetSubMeshes();
+
+    for (size_t i = 0; i < subMeshes.size(); ++i) 
+    {
+        DrawCommandData data;
+        data.mesh = m_mesh.getPtr();
+        data.subMeshIndex = i;
+        data.material = m_materials[i % m_materials.size()].getPtr();
+        data.transform = transform;
+
+        // Generate Sort Key: 
+        // [ 8-bit Layer | 24-bit Pipeline ID | 32-bit Material ID ]
+        uint64_t pipelineID = data.material->GetShader()->GetID();
+        uint64_t materialID = data.material->GetID();
+        
+        data.sortKey = (pipelineID << 32) | materialID;
+
+        renderer->Submit(item);
+    }
+    */
     if (!m_mesh || !m_mesh->IsLoaded() || !m_mesh->SentToGPU() || !m_mesh->GetVertexBuffer() || !m_mesh->GetIndexBuffer())
         return;
 

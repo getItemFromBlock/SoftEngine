@@ -6,7 +6,6 @@
 
 #include "Debug/Log.h"
 
-#define MULTI_THREAD
 class ThreadPool
 {
 public:
