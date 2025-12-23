@@ -1,6 +1,7 @@
 ﻿#include "Editor.h"
 
 #include "Component/MeshComponent.h"
+#include "Component/ParticleSystemComponent.h"
 #include "Component/TestComponent.h"
 #include "Component/TransformComponent.h"
 #include "Core/Engine.h"
@@ -53,7 +54,8 @@ void Editor::Initialize()
         auto go = Model::CreateGameObject(model.getPtr(), currentScene);
     });
     
-    auto computeShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/Compute/multiply.shader");
+    auto go = currentScene->CreateGameObject();
+    go->AddComponent<ParticleSystemComponent>();
 }
 
 void Editor::Run()

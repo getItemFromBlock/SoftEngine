@@ -57,17 +57,20 @@ bool VulkanMaterial::Initialize(uint32_t maxFramesInFlight, Texture* defaultText
             return false;
         }
 
-        // --- Create Uniform Buffers ---
+        // --- Create Uniform Buffers (including Storage Buffers) ---
         for (const auto& [set, uniforms] : m_uniformsBySet)
         {
             for (const auto& uniform : uniforms)
             {
-                if (uniform.type == UniformType::NestedStruct)
+                // Create buffers for both NestedStruct (UBO) and StorageBuffer (SSBO)
+                if (uniform.type == UniformType::NestedStruct || 
+                    uniform.type == UniformType::StorageBuffer)
                 {
                     UBOBinding key = {uniform.set, uniform.binding};
 
                     auto ubo = std::make_unique<VulkanUniformBuffer>();
-                    if (!ubo->Initialize(m_device, uniform.size, m_maxFramesInFlight))
+                    auto type = uniform.type == UniformType::StorageBuffer ? VK_BUFFER_USAGE_STORAGE_BUFFER_BIT : VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+                    if (!ubo->Initialize(m_device, uniform.size, m_maxFramesInFlight, type))
                     {
                         PrintError("Failed to initialize uniform buffer for set %u binding %u",
                                    uniform.set, uniform.binding);
@@ -170,6 +173,28 @@ bool VulkanMaterial::Initialize(uint32_t maxFramesInFlight, Texture* defaultText
 
                         write.pImageInfo = &imageInfo;
                     }
+                    else if (uniform.type == UniformType::StorageBuffer)
+                    {
+                        // Storage buffer
+                        write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+
+                        UBOBinding key = {uniform.set, uniform.binding};
+                        auto* ubo = m_uniformBuffers[key].get();
+                        if (!ubo)
+                        {
+                            PrintError("Storage buffer missing for set %u binding %u", uniform.set, uniform.binding);
+                            Cleanup();
+                            return false;
+                        }
+
+                        bufferInfos.emplace_back();
+                        VkDescriptorBufferInfo& bufferInfo = bufferInfos.back();
+                        bufferInfo.buffer = ubo->GetBuffer(frameIdx);
+                        bufferInfo.offset = 0;
+                        bufferInfo.range = uniform.size;
+
+                        write.pBufferInfo = &bufferInfo;
+                    }
 
                     writes.push_back(write);
                 }
@@ -182,8 +207,6 @@ bool VulkanMaterial::Initialize(uint32_t maxFramesInFlight, Texture* defaultText
                                           writes.data(),
                                           0, nullptr);
                 }
-
-                // bufferInfos and imageInfos are RAII-managed and freed automatically
             }
         }
 
@@ -278,6 +301,7 @@ void VulkanMaterial::SetTexture(uint32_t set, uint32_t binding, Texture* texture
         vkUpdateDescriptorSets(m_device->GetDevice(), 1, &write, 0, nullptr);
     }
 }
+
 void VulkanMaterial::Bind(RHIRenderer* renderer)
 {
     VulkanRenderer* vulkanRenderer = dynamic_cast<VulkanRenderer*>(renderer);
@@ -297,7 +321,7 @@ void VulkanMaterial::BindDescriptorSets(VkCommandBuffer commandBuffer, uint32_t 
     vkCmdBindDescriptorSets(commandBuffer,
                             VK_PIPELINE_BIND_POINT_GRAPHICS,
                             m_pipeline->GetPipelineLayout(),
-                            0, // First set
+                            0,
                             static_cast<uint32_t>(sets.size()),
                             sets.data(),
                             0, nullptr);
@@ -313,6 +337,96 @@ VulkanUniformBuffer* VulkanMaterial::GetUniformBuffer(uint32_t set, uint32_t bin
 VulkanDescriptorSet* VulkanMaterial::GetDescriptorSet(uint32_t set) const
 {
     return (set < m_descriptorSets.size()) ? m_descriptorSets[set].get() : nullptr;
+}
+
+void VulkanMaterial::SetStorageBuffer(
+    uint32_t set, uint32_t binding,
+    VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range,
+    RHIRenderer* renderer)
+{
+    VulkanRenderer* vkRenderer = Cast<VulkanRenderer>(renderer);
+    uint32_t frameIndex = vkRenderer->GetFrameIndex();
+
+    VkDescriptorBufferInfo info{};
+    info.buffer = buffer;
+    info.offset = offset;
+    info.range  = range;
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = m_descriptorSets[set]->GetDescriptorSet(frameIndex);
+    write.dstBinding = binding;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    write.descriptorCount = 1;
+    write.pBufferInfo = &info;
+
+    vkUpdateDescriptorSets(m_device->GetDevice(), 1, &write, 0, nullptr);
+}
+
+
+void VulkanMaterial::BindForCompute(VkCommandBuffer commandBuffer, uint32_t frameIndex)
+{
+    std::vector<VkDescriptorSet> sets;
+    sets.reserve(m_descriptorSets.size());
+
+    for (const auto& descriptorSet : m_descriptorSets)
+    {
+        sets.push_back(descriptorSet->GetDescriptorSet(frameIndex));
+    }
+
+    vkCmdBindDescriptorSets(commandBuffer,
+                            VK_PIPELINE_BIND_POINT_COMPUTE,
+                            m_pipeline->GetPipelineLayout(),
+                            0,
+                            static_cast<uint32_t>(sets.size()),
+                            sets.data(),
+                            0,
+                            nullptr);
+}
+
+void VulkanMaterial::DispatchCompute(RHIRenderer* renderer, uint32_t groupCountX, 
+                                     uint32_t groupCountY, uint32_t groupCountZ)
+{
+    VulkanRenderer* vulkanRenderer = dynamic_cast<VulkanRenderer*>(renderer);
+    VkCommandBuffer cmdBuf = vulkanRenderer->GetCommandBuffer();
+    uint32_t frameIndex = vulkanRenderer->GetFrameIndex();
+
+    m_pipeline->Bind(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE);
+    BindForCompute(cmdBuf, frameIndex);
+    vkCmdDispatch(cmdBuf, groupCountX, groupCountY, groupCountZ);
+}
+
+void VulkanMaterial::SetPushConstants(RHIRenderer* renderer, const void* data, 
+                                      uint32_t size, uint32_t offset)
+{
+    VulkanRenderer* vulkanRenderer = dynamic_cast<VulkanRenderer*>(renderer);
+    VkCommandBuffer cmdBuf = vulkanRenderer->GetCommandBuffer();
+
+    // Note: You may want to make shader stages configurable
+    // For now, using COMPUTE_BIT as this is in compute shader context
+    vkCmdPushConstants(cmdBuf,
+                       m_pipeline->GetPipelineLayout(),
+                       VK_SHADER_STAGE_COMPUTE_BIT,
+                       offset,
+                       size,
+                       data);
+}
+
+void VulkanMaterial::SetStorageBufferData(uint32_t set, uint32_t binding, const void* data,
+                                          size_t size, RHIRenderer* renderer)
+{
+    uint32_t frameIndex = dynamic_cast<VulkanRenderer*>(renderer)->GetFrameIndex();
+    UBOBinding key = {set, binding};
+    auto it = m_uniformBuffers.find(key);
+
+    if (it != m_uniformBuffers.end())
+    {
+        it->second->UpdateData(data, size, frameIndex);
+    }
+    else
+    {
+        PrintError("Storage buffer not found for set %u binding %u", set, binding);
+    }
 }
 
 #endif

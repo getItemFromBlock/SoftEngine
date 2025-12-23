@@ -73,6 +73,7 @@ public:
     virtual std::unique_ptr<RHIShaderBuffer> CreateShaderBuffer(const std::string& code) = 0;
     virtual std::unique_ptr<RHIPipeline> CreatePipeline(const Shader* shader) = 0;
     virtual std::unique_ptr<RHIMaterial> CreateMaterial(Shader* shader) = 0;
+    virtual std::unique_ptr<ComputeDispatch> CreateDispatch(Shader* shader) = 0;
     
     virtual std::string CompileShader(ShaderType type, const std::string& code) = 0;
     virtual Uniforms GetUniforms(Shader* shader) = 0;

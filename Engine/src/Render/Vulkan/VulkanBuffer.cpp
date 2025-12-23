@@ -46,13 +46,6 @@ bool VulkanBuffer::Initialize(VulkanDevice* device, VkDeviceSize size,
     vkGetPhysicalDeviceMemoryProperties(
         m_device->GetPhysicalDevice(), &memProperties);
 
-    VkMemoryPropertyFlags actualFlags =
-        memProperties.memoryTypes[allocInfo.memoryTypeIndex].propertyFlags;
-
-    assert(actualFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-    assert(actualFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-
     if (vkAllocateMemory(m_device->GetDevice(), &allocInfo, nullptr, &m_bufferMemory) != VK_SUCCESS)
     {
         return false;

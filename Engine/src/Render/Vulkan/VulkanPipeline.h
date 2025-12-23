@@ -29,7 +29,7 @@ public:
     bool InitializeComputePipeline(const ComputeShader* computeShader);
 
     void Cleanup();
-    void Bind(VkCommandBuffer commandBuffer);
+    void Bind(VkCommandBuffer commandBuffer, VkPipelineBindPoint bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS);
 
     // Getters
     VkPipeline GetPipeline() const { return m_pipeline; }

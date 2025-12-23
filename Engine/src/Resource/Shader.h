@@ -6,6 +6,7 @@
 #include "Render/RHI/RHIShaderBuffer.h"
 #include "Render/RHI/RHIUniformBuffer.h"
 
+class ComputeDispatch;
 class Texture;
 class FragmentShader;
 class VertexShader;
@@ -123,6 +124,8 @@ public:
     RHIPipeline* GetPipeline() const { return m_pipeline.get(); }
     
     bool IsGraphic() const { return m_graphic; }
+    
+    std::unique_ptr<ComputeDispatch> CreateDispatch(RHIRenderer* renderer);
 private:
 private:
     SafePtr<VertexShader> m_vertexShader;

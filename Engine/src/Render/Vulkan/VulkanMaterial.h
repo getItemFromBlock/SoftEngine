@@ -31,6 +31,12 @@ public:
 
     VulkanUniformBuffer* GetUniformBuffer(uint32_t set, uint32_t binding) const;
     VulkanDescriptorSet* GetDescriptorSet(uint32_t set) const;
+    void SetStorageBuffer(uint32_t set, uint32_t binding, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range,
+                          RHIRenderer* renderer);
+    void BindForCompute(VkCommandBuffer commandBuffer, uint32_t frameIndex);
+    void DispatchCompute(RHIRenderer* renderer, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+    void SetPushConstants(RHIRenderer* renderer, const void* data, uint32_t size, uint32_t offset);
+    void SetStorageBufferData(uint32_t set, uint32_t binding, const void* data, size_t size, RHIRenderer* renderer);
     VulkanPipeline* GetPipeline() const { return m_pipeline; }
 
 private:

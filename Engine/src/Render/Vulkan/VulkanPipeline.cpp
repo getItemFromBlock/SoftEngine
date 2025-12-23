@@ -296,10 +296,10 @@ void VulkanPipeline::Cleanup()
     }
 }
 
-void VulkanPipeline::Bind(VkCommandBuffer commandBuffer)
+void VulkanPipeline::Bind(VkCommandBuffer commandBuffer, VkPipelineBindPoint bindPoint)
 {
     if (m_pipeline != VK_NULL_HANDLE)
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+        vkCmdBindPipeline(commandBuffer, bindPoint, m_pipeline);
 }
 
 VkShaderModule VulkanPipeline::CreateShaderModule(const std::vector<char>& code) const

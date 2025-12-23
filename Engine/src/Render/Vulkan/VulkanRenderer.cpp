@@ -28,6 +28,7 @@
 // #include <imgui_impl_glfw.h>
 // #include <imgui_impl_vulkan.h>
 
+#include "VulkanComputeDispatch.h"
 #include "VulkanDepthBuffer.h"
 #include "VulkanDescriptorSetLayout.h"
 #include "VulkanIndexBuffer.h"
@@ -107,7 +108,7 @@ bool VulkanRenderer::Initialize(Window* window)
             PrintError("Failed to initialize framebuffers!");
             return false;
         }
-        
+
         m_commandPool = std::make_unique<VulkanCommandPool>();
         if (!m_commandPool->Initialize(m_device.get(), MAX_FRAMES_IN_FLIGHT))
         {
@@ -129,7 +130,7 @@ bool VulkanRenderer::Initialize(Window* window)
         {
             m_framebufferResized = true;
         });
-        
+
         /*
         VkDescriptorPoolSize pool_sizes[] =
         {
@@ -211,7 +212,7 @@ void VulkanRenderer::Cleanup()
         vkDestroyDescriptorPool(m_device->GetDevice(), m_imGuiPool, nullptr);
         m_imGuiPool = VK_NULL_HANDLE;
     }
-    
+
     m_syncObjects.reset();
     m_commandPool.reset();
     m_framebuffer.reset();
@@ -232,7 +233,6 @@ void VulkanRenderer::WaitUntilFrameFinished()
 
 void VulkanRenderer::Update()
 {
-    
 }
 
 bool VulkanRenderer::BeginFrame()
@@ -258,10 +258,10 @@ bool VulkanRenderer::BeginFrame()
 
     m_commandPool->Reset(m_currentFrame);
     m_commandPool->BeginRecording(m_currentFrame);
-    
+
     std::mutex& mutex = m_commandPool->GetMutex();
     mutex.lock();
-    
+
     // Start a new ImGui frame
     // ImGui_ImplVulkan_NewFrame();
     // ImGui_ImplGlfw_NewFrame();
@@ -283,10 +283,10 @@ bool VulkanRenderer::MultiThreadSendToGPU()
 }
 
 void VulkanRenderer::EndFrame()
-{        
+{
     auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
     m_renderPass->End(commandBuffer);
-    
+
     auto& mutex = m_commandPool->GetMutex();
     mutex.unlock();
     m_commandPool->EndRecording(m_currentFrame);
@@ -309,12 +309,12 @@ void VulkanRenderer::EndFrame()
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
     VkResult result;
-    {        
+    {
         std::scoped_lock lock(*m_device->GetGraphicsQueue().mutex);
         result = vkQueueSubmit(m_device->GetGraphicsQueue().handle, 1, &submitInfo,
                                m_syncObjects->GetInFlightFence(m_currentFrame));
     }
-    
+
     if (result != VK_SUCCESS)
     {
         throw std::runtime_error("Failed to submit draw command buffer!");
@@ -342,8 +342,10 @@ void VulkanRenderer::SendPushConstants(void* data, size_t size, Shader* shader, 
     auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
     VulkanPipeline* pipeline = dynamic_cast<VulkanPipeline*>(shader->GetPipeline());
     vkCmdPushConstants(commandBuffer, pipeline->GetPipelineLayout(),
-        pushConstant.shaderType == ShaderType::Vertex ? VK_SHADER_STAGE_VERTEX_BIT : VK_SHADER_STAGE_FRAGMENT_BIT, 
-        pushConstant.offset, size, data);
+                       pushConstant.shaderType == ShaderType::Vertex
+                           ? VK_SHADER_STAGE_VERTEX_BIT
+                           : VK_SHADER_STAGE_FRAGMENT_BIT,
+                       pushConstant.offset, size, data);
 }
 
 void VulkanRenderer::BindVertexBuffers(RHIVertexBuffer* _vertexBuffer, RHIIndexBuffer* _indexBuffer) const
@@ -363,14 +365,14 @@ void VulkanRenderer::DrawVertex(RHIVertexBuffer* _vertexBuffer, RHIIndexBuffer* 
 {
     VkCommandBuffer commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
     VulkanIndexBuffer* indexBuffer = static_cast<VulkanIndexBuffer*>(_indexBuffer);
-    
+
     vkCmdDrawIndexed(commandBuffer, indexBuffer->GetIndexCount(), 1, 0, 0, 0);
 }
 
 void VulkanRenderer::DrawVertexSubMesh(RHIIndexBuffer* _indexBuffer, uint32_t startIndex, uint32_t indexCount)
 {
     VkCommandBuffer commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
-    
+
     vkCmdDrawIndexed(commandBuffer, indexCount, 1, startIndex, 0, 0);
     p_triangleCount += indexCount / 3;
 }
@@ -391,16 +393,17 @@ std::string VulkanRenderer::CompileShader(ShaderType type, const std::string& co
         break;
     default:
         PrintError("Invalid shader type");
-        return "";    
+        return "";
     }
-    
+
     shaderc::Compiler compiler;
     shaderc::CompileOptions options;
 
     shaderc::SpvCompilationResult module =
         compiler.CompileGlslToSpv(code, kind, "shader.glsl", options);
 
-    if (module.GetCompilationStatus() != shaderc_compilation_status_success) {
+    if (module.GetCompilationStatus() != shaderc_compilation_status_success)
+    {
         PrintError("Shader compilation failed: %s", module.GetErrorMessage().c_str());;
         return {};
     }
@@ -412,7 +415,7 @@ std::string VulkanRenderer::CompileShader(ShaderType type, const std::string& co
     return std::string(begin, end);
 }
 
-static void ParseBlockVariable(const SpvReflectBlockVariable* var, UniformMember &out)
+static void ParseBlockVariable(const SpvReflectBlockVariable* var, UniformMember& out)
 {
     if (!var) return;
 
@@ -430,86 +433,121 @@ static void ParseBlockVariable(const SpvReflectBlockVariable* var, UniformMember
     out.offset = var->offset;
     out.size = var->size;
 
-    if (var->type_description) {
+    if (var->type_description)
+    {
         const SpvReflectTypeDescription* type_desc = var->type_description;
-        
-        if (type_desc->type_flags & SPV_REFLECT_TYPE_FLAG_STRUCT) {
+
+        if (type_desc->type_flags & SPV_REFLECT_TYPE_FLAG_STRUCT)
+        {
             out.type = UniformType::NestedStruct;
         }
-        else if (type_desc->type_flags & SPV_REFLECT_TYPE_FLAG_MATRIX) {
-            if (type_desc->traits.numeric.matrix.column_count == 2 && 
-                type_desc->traits.numeric.matrix.row_count == 2) {
+        else if (type_desc->type_flags & SPV_REFLECT_TYPE_FLAG_MATRIX)
+        {
+            if (type_desc->traits.numeric.matrix.column_count == 2 &&
+                type_desc->traits.numeric.matrix.row_count == 2)
+            {
                 out.type = UniformType::Mat2;
-            } else if (type_desc->traits.numeric.matrix.column_count == 3 && 
-                       type_desc->traits.numeric.matrix.row_count == 3) {
+            }
+            else if (type_desc->traits.numeric.matrix.column_count == 3 &&
+                type_desc->traits.numeric.matrix.row_count == 3)
+            {
                 out.type = UniformType::Mat3;
-            } else if (type_desc->traits.numeric.matrix.column_count == 4 && 
-                       type_desc->traits.numeric.matrix.row_count == 4) {
+            }
+            else if (type_desc->traits.numeric.matrix.column_count == 4 &&
+                type_desc->traits.numeric.matrix.row_count == 4)
+            {
                 out.type = UniformType::Mat4;
-            } else {
+            }
+            else
+            {
                 out.type = UniformType::Unknown;
             }
         }
         // Check for vector types
-        else if (type_desc->type_flags & SPV_REFLECT_TYPE_FLAG_VECTOR) {
+        else if (type_desc->type_flags & SPV_REFLECT_TYPE_FLAG_VECTOR)
+        {
             uint32_t component_count = type_desc->traits.numeric.vector.component_count;
-            
-            if (type_desc->type_flags & SPV_REFLECT_TYPE_FLAG_FLOAT) {
+
+            if (type_desc->type_flags & SPV_REFLECT_TYPE_FLAG_FLOAT)
+            {
                 if (component_count == 2) out.type = UniformType::Vec2;
                 else if (component_count == 3) out.type = UniformType::Vec3;
                 else if (component_count == 4) out.type = UniformType::Vec4;
                 else out.type = UniformType::Unknown;
-            } else if (type_desc->type_flags & SPV_REFLECT_TYPE_FLAG_INT) {
+            }
+            else if (type_desc->type_flags & SPV_REFLECT_TYPE_FLAG_INT)
+            {
                 if (component_count == 2) out.type = UniformType::IVec2;
                 else if (component_count == 3) out.type = UniformType::IVec3;
                 else if (component_count == 4) out.type = UniformType::IVec4;
-            } else if (type_desc->type_flags & SPV_REFLECT_TYPE_FLAG_BOOL) {
+            }
+            else if (type_desc->type_flags & SPV_REFLECT_TYPE_FLAG_BOOL)
+            {
                 out.type = UniformType::Bool;
-            } else {
+            }
+            else
+            {
                 out.type = UniformType::Unknown;
             }
         }
-        else if (type_desc->type_flags & SPV_REFLECT_TYPE_FLAG_FLOAT) {
+        else if (type_desc->type_flags & SPV_REFLECT_TYPE_FLAG_FLOAT)
+        {
             out.type = UniformType::Float;
         }
-        else if (type_desc->type_flags & SPV_REFLECT_TYPE_FLAG_INT) {
-            if (type_desc->traits.numeric.scalar.signedness) {
+        else if (type_desc->type_flags & SPV_REFLECT_TYPE_FLAG_INT)
+        {
+            if (type_desc->traits.numeric.scalar.signedness)
+            {
                 out.type = UniformType::Int;
-            } else {
+            }
+            else
+            {
                 out.type = UniformType::UInt;
             }
         }
-        else if (type_desc->type_flags & SPV_REFLECT_TYPE_FLAG_BOOL) {
+        else if (type_desc->type_flags & SPV_REFLECT_TYPE_FLAG_BOOL)
+        {
             out.type = UniformType::Bool;
         }
-        else {
+        else
+        {
             out.type = UniformType::Unknown;
         }
-    } else {
+    }
+    else
+    {
         out.type = UniformType::Unknown;
     }
 
     uint32_t dims_count = 0;
     const uint32_t* dims_ptr = nullptr;
 
-    if (var->array.dims_count > 0) {
+    if (var->array.dims_count > 0)
+    {
         dims_count = var->array.dims_count;
         dims_ptr = var->array.dims;
-    } else if (var->type_description && var->type_description->traits.array.dims_count > 0) {
+    }
+    else if (var->type_description && var->type_description->traits.array.dims_count > 0)
+    {
         dims_count = var->type_description->traits.array.dims_count;
         dims_ptr = var->type_description->traits.array.dims;
     }
 
-    if (dims_count > 0 && dims_ptr) {
+    if (dims_count > 0 && dims_ptr)
+    {
         out.isArray = true;
         out.arrayDims.assign(dims_ptr, dims_ptr + dims_count);
-    } else {
+    }
+    else
+    {
         out.isArray = false;
     }
 
-    if (var->member_count > 0 && var->members) {
+    if (var->member_count > 0 && var->members)
+    {
         out.members.reserve(var->member_count);
-        for (uint32_t m = 0; m < var->member_count; ++m) {
+        for (uint32_t m = 0; m < var->member_count; ++m)
+        {
             UniformMember child;
             ParseBlockVariable(&var->members[m], child);
             out.members.push_back(std::move(child));
@@ -517,12 +555,115 @@ static void ParseBlockVariable(const SpvReflectBlockVariable* var, UniformMember
     }
 }
 
+// Helper function to calculate storage buffer size
+static size_t CalculateStorageBufferSize(const SpvReflectDescriptorBinding* binding)
+{
+    // If the block has a known size, use it
+    if (binding->block.size > 0)
+    {
+        return binding->block.size;
+    }
+
+    // For runtime-sized arrays (common in SSBOs), calculate size from members
+    size_t calculatedSize = 0;
+    bool hasRuntimeArray = false;
+
+    if (binding->block.member_count > 0 && binding->block.members)
+    {
+        for (uint32_t m = 0; m < binding->block.member_count; ++m)
+        {
+            const SpvReflectBlockVariable* member = &binding->block.members[m];
+
+            // Check if this is a runtime array (array with no explicit size)
+            if (member->array.dims_count > 0 && member->array.dims[member->array.dims_count - 1] == 0)
+            {
+                hasRuntimeArray = true;
+                // For runtime arrays, we need to handle this differently
+                // The size should be set dynamically when creating the buffer
+                // Use VK_WHOLE_SIZE or a reasonable default
+                calculatedSize = member->offset; // Size up to the runtime array
+                break;
+            }
+
+            // Calculate the end offset of this member
+            size_t memberEnd = member->offset + member->size;
+            if (memberEnd > calculatedSize)
+            {
+                calculatedSize = memberEnd;
+            }
+        }
+    }
+
+    // If we have a runtime array, return 0 to indicate dynamic sizing needed
+    if (hasRuntimeArray)
+    {
+        return 0; // Caller must set size manually
+    }
+
+    // Otherwise return the calculated size, or a default minimum
+    return calculatedSize > 0 ? calculatedSize : 256; // 256 bytes minimum default
+}
+
+// Alternative: Calculate size with explicit element count for runtime arrays
+static size_t CalculateStorageBufferSizeWithCount(const SpvReflectDescriptorBinding* binding,
+                                                  uint32_t runtimeArrayElementCount = 0)
+{
+    if (binding->block.size > 0 && runtimeArrayElementCount == 0)
+    {
+        return binding->block.size;
+    }
+
+    size_t totalSize = 0;
+
+    if (binding->block.member_count > 0 && binding->block.members)
+    {
+        for (uint32_t m = 0; m < binding->block.member_count; ++m)
+        {
+            const SpvReflectBlockVariable* member = &binding->block.members[m];
+
+            // Check for runtime array
+            if (member->array.dims_count > 0 &&
+                member->array.dims[member->array.dims_count - 1] == 0)
+            {
+                // Calculate size of elements before runtime array
+                totalSize = member->offset;
+
+                if (runtimeArrayElementCount > 0)
+                {
+                    // Add size for runtime array elements
+                    size_t elementSize = member->size;
+
+                    // Account for array stride if available
+                    if (member->array.stride > 0)
+                    {
+                        elementSize = member->array.stride;
+                    }
+
+                    totalSize += elementSize * runtimeArrayElementCount;
+                }
+
+                break;
+            }
+
+            // For fixed-size members
+            size_t memberEnd = member->offset + member->size;
+            if (memberEnd > totalSize)
+            {
+                totalSize = memberEnd;
+            }
+        }
+    }
+
+    return totalSize > 0 ? totalSize : 256;
+}
+
 static Uniforms SpirvReflectUniforms(const std::string& spirv)
 {
     size_t spirv_nbytes = spirv.size();
     const void* spirv_code = spirv.data();
 
-    if (spirv_nbytes % sizeof(uint32_t) != 0) {
+    if (spirv_nbytes % sizeof(uint32_t) != 0)
+    {
         PrintError("SPIR-V binary is corrupt or truncated");
         return {};
     }
@@ -532,7 +673,8 @@ static Uniforms SpirvReflectUniforms(const std::string& spirv)
                                                            reinterpret_cast<const uint32_t*>(spirv_code),
                                                            &module);
 
-    if (result != SPV_REFLECT_RESULT_SUCCESS) {
+    if (result != SPV_REFLECT_RESULT_SUCCESS)
+    {
         PrintError("Failed to create SPIR-V Reflect Shader Module");
         return {};
     }
@@ -544,7 +686,8 @@ static Uniforms SpirvReflectUniforms(const std::string& spirv)
     SpvReflectDescriptorBinding** bindings =
         static_cast<SpvReflectDescriptorBinding**>(malloc(binding_count * sizeof(SpvReflectDescriptorBinding*)));
 
-    if (bindings == NULL) {
+    if (bindings == NULL)
+    {
         spvReflectDestroyShaderModule(&module);
         PrintError("Failed to allocate memory for SPIR-V Reflect Descriptor Bindings");
         return {};
@@ -564,51 +707,68 @@ static Uniforms SpirvReflectUniforms(const std::string& spirv)
         u.name = binding->name ? binding->name : "";
         u.set = binding->set;
         u.binding = binding->binding;
-        u.size = binding->block.size;
 
-        switch (binding->descriptor_type) {
-            case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-                if (u.name.empty() && binding->type_description) {
-                    u.name = binding->type_description->type_name ? binding->type_description->type_name : u.name;
+        switch (binding->descriptor_type)
+        {
+        case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+            if (u.name.empty() && binding->type_description)
+            {
+                u.name = binding->type_description->type_name ? binding->type_description->type_name : u.name;
+            }
+            u.type = UniformType::NestedStruct;
+            u.size = binding->block.size;
+
+            if (binding->block.member_count > 0 && binding->block.members)
+            {
+                u.members.reserve(binding->block.member_count);
+                for (uint32_t m = 0; m < binding->block.member_count; ++m)
+                {
+                    UniformMember mem;
+                    ParseBlockVariable(&binding->block.members[m], mem);
+                    u.members.push_back(std::move(mem));
                 }
-                u.type = UniformType::NestedStruct;
+            }
+            break;
 
-                if (binding->block.member_count > 0 && binding->block.members) {
-                    u.members.reserve(binding->block.member_count);
-                    for (uint32_t m = 0; m < binding->block.member_count; ++m) {
-                        UniformMember mem;
-                        ParseBlockVariable(&binding->block.members[m], mem);
-                        u.members.push_back(std::move(mem));
-                    }
-                }
-                break;
+        case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+        case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+        case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER:
+            u.type = UniformType::Sampler2D;
+            u.size = 0; // Samplers don't have a size
+            break;
 
-            case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-            case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-            case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER:
-                u.type = UniformType::Sampler2D;
-                break;
-            case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-                if (u.name.empty() && binding->type_description) {
+        case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+            {
+                if (u.name.empty() && binding->type_description)
+                {
                     u.name = binding->type_description->type_name ? binding->type_description->type_name : u.name;
                 }
                 u.type = UniformType::StorageBuffer;
 
-                if (binding->block.member_count > 0 && binding->block.members) {
+                // Calculate storage buffer size
+                u.size = CalculateStorageBufferSize(binding);
+
+                if (binding->block.member_count > 0 && binding->block.members)
+                {
                     u.members.reserve(binding->block.member_count);
-                    for (uint32_t m = 0; m < binding->block.member_count; ++m) {
+                    for (uint32_t m = 0; m < binding->block.member_count; ++m)
+                    {
                         UniformMember mem;
                         ParseBlockVariable(&binding->block.members[m], mem);
                         u.members.push_back(std::move(mem));
                     }
                 }
                 break;
-            default:
-                u.type = UniformType::Unknown;
-                break;
+            }
+
+        default:
+            u.type = UniformType::Unknown;
+            u.size = 0;
+            break;
         }
 
-        if (u.type != UniformType::Unknown) {
+        if (u.type != UniformType::Unknown)
+        {
             uniforms[u.name] = std::move(u);
         }
     }
@@ -622,7 +782,8 @@ static Uniforms SpirvReflectUniforms(const std::string& spirv)
 static std::optional<PushConstant> SpirvReflectPushConstants(const std::string& spirv)
 {
     size_t spirv_nbytes = spirv.size();
-    if (spirv_nbytes % sizeof(uint32_t) != 0) {
+    if (spirv_nbytes % sizeof(uint32_t) != 0)
+    {
         PrintError("SPIR-V binary is corrupt or truncated");
         return {};
     }
@@ -633,7 +794,8 @@ static std::optional<PushConstant> SpirvReflectPushConstants(const std::string& 
         reinterpret_cast<const uint32_t*>(spirv.data()),
         &module);
 
-    if (result != SPV_REFLECT_RESULT_SUCCESS) {
+    if (result != SPV_REFLECT_RESULT_SUCCESS)
+    {
         PrintError("Failed to create SPIR-V Reflect Shader Module");
         return {};
     }
@@ -642,7 +804,8 @@ static std::optional<PushConstant> SpirvReflectPushConstants(const std::string& 
     result = spvReflectEnumeratePushConstantBlocks(&module, &pc_count, nullptr);
     assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
-    if (pc_count == 0) {
+    if (pc_count == 0)
+    {
         spvReflectDestroyShaderModule(&module);
         return {};
     }
@@ -651,7 +814,8 @@ static std::optional<PushConstant> SpirvReflectPushConstants(const std::string& 
         static_cast<SpvReflectBlockVariable**>(
             malloc(pc_count * sizeof(SpvReflectBlockVariable*)));
 
-    if (!pc_blocks) {
+    if (!pc_blocks)
+    {
         PrintError("Allocation failure");
         spvReflectDestroyShaderModule(&module);
         return {};
@@ -668,9 +832,11 @@ static std::optional<PushConstant> SpirvReflectPushConstants(const std::string& 
     pc.name = block->name ? block->name : "";
     pc.size = block->size;
 
-    if (block->member_count > 0 && block->members) {
+    if (block->member_count > 0 && block->members)
+    {
         pc.members.reserve(block->member_count);
-        for (uint32_t m = 0; m < block->member_count; m++) {
+        for (uint32_t m = 0; m < block->member_count; m++)
+        {
             UniformMember mem;
             ParseBlockVariable(&block->members[m], mem);
             pc.members.push_back(std::move(mem));
@@ -688,11 +854,11 @@ Uniforms VulkanRenderer::GetUniforms(Shader* shader)
     VertexShader* vertex = shader->GetVertexShader();
     FragmentShader* frag = shader->GetFragmentShader();
     ComputeShader* comp = shader->GetComputeShader();
-    
+
     Uniforms uniforms;
 
     Uniforms result = {};
-    
+
     if (vertex)
     {
         result = SpirvReflectUniforms(vertex->GetContent());
@@ -703,7 +869,7 @@ Uniforms VulkanRenderer::GetUniforms(Shader* shader)
             uniforms[uniform.name] = uniform;
         }
     }
-    
+
     if (frag)
     {
         result = SpirvReflectUniforms(frag->GetContent());
@@ -714,7 +880,7 @@ Uniforms VulkanRenderer::GetUniforms(Shader* shader)
             uniforms[uniform.name] = uniform;
         }
     }
-    
+
     if (comp)
     {
         result = SpirvReflectUniforms(comp->GetContent());
@@ -725,7 +891,7 @@ Uniforms VulkanRenderer::GetUniforms(Shader* shader)
             uniforms[uniform.name] = uniform;
         }
     }
-    
+
     return uniforms;
 }
 
@@ -733,8 +899,8 @@ PushConstants VulkanRenderer::GetPushConstants(Shader* shader)
 {
     VertexShader* vertex = shader->GetVertexShader();
     FragmentShader* frag = shader->GetFragmentShader();
-    ComputeShader* comp = shader->GetComputeShader(); 
-    
+    ComputeShader* comp = shader->GetComputeShader();
+
     PushConstants pushConstants;
     std::optional<PushConstant> pushConstant;
     if (vertex)
@@ -746,7 +912,7 @@ PushConstants VulkanRenderer::GetPushConstants(Shader* shader)
             pushConstants[ShaderType::Vertex] = pushConstant.value();
         }
     }
-    
+
     if (frag)
     {
         pushConstant = SpirvReflectPushConstants(frag->GetContent());
@@ -756,7 +922,7 @@ PushConstants VulkanRenderer::GetPushConstants(Shader* shader)
             pushConstants[ShaderType::Fragment] = pushConstant.value();
         }
     }
-    
+
     if (comp)
     {
         pushConstant = SpirvReflectPushConstants(comp->GetContent());
@@ -796,11 +962,11 @@ bool VulkanRenderer::BindShader(Shader* shader)
 {
     if (!shader || !shader->GetPipeline())
         return false;
-    
+
     VulkanPipeline* pipeline = dynamic_cast<VulkanPipeline*>(shader->GetPipeline());
     auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
     pipeline->Bind(commandBuffer);
-    
+
     return true;
 }
 
@@ -824,7 +990,7 @@ bool VulkanRenderer::BindMaterial(Material* material)
     scissor.offset = {0, 0};
     scissor.extent = m_swapChain->GetExtent();
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-    
+
     return true;
 }
 
@@ -869,9 +1035,11 @@ std::unique_ptr<RHIShaderBuffer> VulkanRenderer::CreateShaderBuffer(const std::s
 std::unique_ptr<RHIPipeline> VulkanRenderer::CreatePipeline(const Shader* shader)
 {
     std::unique_ptr<VulkanPipeline> pipeline = std::make_unique<VulkanPipeline>();
-    pipeline->Initialize(m_device.get(), m_renderPass->GetRenderPass(), m_swapChain->GetExtent(), MAX_FRAMES_IN_FLIGHT, shader);
+    pipeline->Initialize(m_device.get(), m_renderPass->GetRenderPass(), m_swapChain->GetExtent(), MAX_FRAMES_IN_FLIGHT,
+                         shader);
     return std::move(pipeline);
 }
+
 std::unique_ptr<RHIMaterial> VulkanRenderer::CreateMaterial(Shader* shader)
 {
     VulkanPipeline* pipeline = dynamic_cast<VulkanPipeline*>(shader->GetPipeline());
@@ -882,6 +1050,22 @@ std::unique_ptr<RHIMaterial> VulkanRenderer::CreateMaterial(Shader* shader)
         return nullptr;
     }
     return std::move(material);
+}
+
+std::unique_ptr<ComputeDispatch> VulkanRenderer::CreateDispatch(Shader* shader)
+{
+    auto vulkanPipeline = Cast<VulkanPipeline>(shader->GetPipeline());
+    std::unique_ptr<VulkanMaterial> material = std::make_unique<VulkanMaterial>(vulkanPipeline);
+    if (!material->Initialize(MAX_FRAMES_IN_FLIGHT, m_defaultTexture.getPtr(), vulkanPipeline))
+    {
+        PrintError("Failed to initialize Compute Dispatch");
+    }
+
+    auto dispatch = std::make_unique<ComputeDispatch>();
+
+    dispatch->SetMaterial(std::move(material));
+
+    return std::move(dispatch);
 }
 
 void VulkanRenderer::SetDefaultTexture(const SafePtr<Texture>& texture)
@@ -897,11 +1081,11 @@ void VulkanRenderer::SetDefaultTexture(const SafePtr<Texture>& texture)
 void VulkanRenderer::ClearColor() const
 {
     VkCommandBuffer commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
-    uint32_t imageIndex =  m_imageIndex;
+    uint32_t imageIndex = m_imageIndex;
     std::vector<VkClearValue> clearValues(2);
     clearValues[0].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
     clearValues[1].depthStencil = {.depth = 1.0f, .stencil = 0};
-    
+
     m_renderPass->Begin(commandBuffer, m_framebuffer->GetFramebuffer(imageIndex),
                         m_swapChain->GetExtent(), clearValues);
 }
@@ -922,7 +1106,7 @@ void VulkanRenderer::RecreateSwapChain()
     // Cleanup old swap chain resources
     m_framebuffer->Cleanup();
     m_swapChain->Cleanup();
-    
+
     m_depthBuffer->Cleanup();
 
     // Recreate swap chain
@@ -930,7 +1114,7 @@ void VulkanRenderer::RecreateSwapChain()
     {
         throw std::runtime_error("Failed to recreate swap chain!");
     }
-    
+
     if (!m_depthBuffer->Initialize(m_device.get(), m_swapChain->GetExtent()))
     {
         throw std::runtime_error("Failed to recreate depth buffer!");

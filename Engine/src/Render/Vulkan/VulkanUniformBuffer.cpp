@@ -11,7 +11,8 @@ VulkanUniformBuffer::~VulkanUniformBuffer()
     Cleanup();
 }
 
-bool VulkanUniformBuffer::Initialize(VulkanDevice* device, VkDeviceSize size, uint32_t frameCount)
+bool VulkanUniformBuffer::Initialize(VulkanDevice* device, VkDeviceSize size, 
+                                     uint32_t frameCount, VkBufferUsageFlags usageFlags)
 {
     if (!device || size == 0 || frameCount == 0)
     {
@@ -30,7 +31,7 @@ bool VulkanUniformBuffer::Initialize(VulkanDevice* device, VkDeviceSize size, ui
     {
         VulkanBuffer* buf = new VulkanBuffer();
         if (!buf->Initialize(device, size,
-                             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                             usageFlags,
                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
         {
             std::cerr << "VulkanUniformBuffer::Initialize - failed to create uniform buffer for frame " << i << "\n";

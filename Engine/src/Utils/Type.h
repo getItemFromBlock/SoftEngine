@@ -2,6 +2,12 @@
 #include <memory>
 #include <stdexcept>
 
+template<typename T, typename U>
+T* Cast(U* ptr)
+{
+    return dynamic_cast<T*>(ptr);
+}
+
 template<typename T>
 class SafePtr {
 private:

@@ -17,7 +17,8 @@ public:
     VulkanUniformBuffer() = default;
     ~VulkanUniformBuffer() override;
 
-    bool Initialize(VulkanDevice* device, VkDeviceSize size, uint32_t frameCount);
+    bool Initialize(VulkanDevice* device, VkDeviceSize size, 
+        uint32_t frameCount, VkBufferUsageFlags usageFlags = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
     void Cleanup();
 

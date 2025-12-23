@@ -180,3 +180,8 @@ void Shader::SendValue(UBOBinding binding, void* value, uint32_t size, RHIRender
 {
     renderer->SendValue(binding, value, size, this);
 }
+
+std::unique_ptr<ComputeDispatch> Shader::CreateDispatch(RHIRenderer* renderer)
+{
+    return std::move(renderer->CreateDispatch(this));
+}

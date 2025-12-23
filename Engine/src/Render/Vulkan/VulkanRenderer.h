@@ -82,6 +82,7 @@ public:
     std::unique_ptr<RHIShaderBuffer> CreateShaderBuffer(const std::string& code) override;
     std::unique_ptr<RHIPipeline> CreatePipeline(const Shader* shader) override;
     std::unique_ptr<RHIMaterial> CreateMaterial(Shader* shader) override;
+    std::unique_ptr<ComputeDispatch> CreateDispatch(Shader* shader) override;
     
     void SetDefaultTexture(const SafePtr<Texture>& texture) override;
     void ClearColor() const override;
