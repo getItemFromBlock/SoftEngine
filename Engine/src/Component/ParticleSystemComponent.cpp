@@ -1,111 +1,183 @@
 ﻿#include "ParticleSystemComponent.h"
-
-#include <utility>
-
 #include "Core/Engine.h"
 #include "Render/Vulkan/VulkanIndexBuffer.h"
 #include "Render/Vulkan/VulkanRenderer.h"
+#include "Render/Vulkan/VulkanVertexBuffer.h"
 #include "Scene/GameObject.h"
 #include "Utils/Color.h"
 #include "Utils/Random.h"
 
 void ParticleSystemComponent::Describe(ClassDescriptor& d)
 {
-    {
-        auto& property = d.AddInt("particleCount", m_particleCount);
-        property.setter = [this](void* data)
-        {
-            SetParticleCount(*static_cast<int*>(data));
-        };
-    }
-    
-    auto& property = d.AddProperty("Mesh", PropertyType::Mesh, &m_mesh);
-    property.setter = [this](void* data)
-    {
-        SetMesh(*static_cast<SafePtr<Mesh>*>(data));
-    };
+    auto& countProp = d.AddInt("particleCount", m_particleCount);
+    countProp.setter = [this](void* data) { SetParticleCount(*static_cast<int*>(data)); };
+
+    auto& meshProp = d.AddProperty("Mesh", PropertyType::Mesh, &m_mesh);
+    meshProp.setter = [this](void* data) { SetMesh(*static_cast<SafePtr<Mesh>*>(data)); };
 }
 
 void ParticleSystemComponent::OnCreate()
 {
     auto resourceManager = Engine::Get()->GetResourceManager();
     auto renderer = Engine::Get()->GetRenderer();
-    // auto shader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/Compute/multiply.shader");
 
+    auto computeShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/ParticleCompute/particle.shader");
     auto instancingShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/Instancing/instancing.shader");
-    m_material = resourceManager->CreateMaterial("Instancing");
+
+    m_material = resourceManager->CreateMaterial("ParticleInstancing");
     m_material->SetShader(instancingShader);
 
     m_mesh = resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cube.obj/Cube");
-
     SetParticleCount(50000);
+
+    computeShader->EOnSentToGPU.Bind([this, computeShader, renderer]()
+    {
+        m_compute = computeShader->CreateDispatch(renderer);
+        auto vkRenderer = Cast<VulkanRenderer>(renderer);
+        auto device = vkRenderer->GetDevice();
+
+        uint32_t count = static_cast<uint32_t>(m_particleCount);
+        VkDeviceSize particleBufferSize = sizeof(ParticleData) * count;
+        VkDeviceSize instanceBufferSize = sizeof(InstanceData) * count;
+
+        auto particleBuffer = std::make_unique<VulkanBuffer>();
+        particleBuffer->Initialize(device, particleBufferSize,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | 
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+        auto instanceBuffer = std::make_unique<VulkanBuffer>();
+        instanceBuffer->Initialize(device, instanceBufferSize,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+        auto stagingBuffer = std::make_unique<VulkanBuffer>();
+        stagingBuffer->Initialize(device, particleBufferSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+        std::vector<ParticleData> init(count);
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            Vec3f p = Random::PointOnSphere(10.f);
+            Vec3f d = Vec3f::Normalize(p);
+            init[i].position = Vec4f(p.x, p.y, p.z, 1.f);
+            init[i].velocity = Vec4f(d.x * 5.f, d.y * 5.f, d.z * 5.f, 0.f);
+            init[i].color = Color::FromHSV((float(i) / count) * 360.f, 1.f, 1.f);
+            init[i].padding = Vec4f(0.f);
+        }
+
+        stagingBuffer->CopyData(init.data(), particleBufferSize);
+
+        VkCommandBufferAllocateInfo alloc{};
+        alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        alloc.commandPool = vkRenderer->GetCommandPool()->GetCommandPool();
+        alloc.commandBufferCount = 1;
+
+        VkCommandBuffer cmd;
+        vkAllocateCommandBuffers(device->GetDevice(), &alloc, &cmd);
+
+        VkCommandBufferBeginInfo begin{};
+        begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        vkBeginCommandBuffer(cmd, &begin);
+
+        particleBuffer->CopyFrom(cmd, stagingBuffer.get(), particleBufferSize);
+
+        VkBufferMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+        barrier.buffer = particleBuffer->GetBuffer();
+        barrier.size = VK_WHOLE_SIZE;
+
+        vkCmdPipelineBarrier(cmd,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            0, 0, nullptr, 1, &barrier, 0, nullptr);
+
+        vkEndCommandBuffer(cmd);
+
+        VkSubmitInfo submit{};
+        submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submit.commandBufferCount = 1;
+        submit.pCommandBuffers = &cmd;
+
+        vkQueueSubmit(device->GetGraphicsQueue().handle, 1, &submit, VK_NULL_HANDLE);
+        vkQueueWaitIdle(device->GetGraphicsQueue().handle);
+
+        vkFreeCommandBuffers(device->GetDevice(),
+            vkRenderer->GetCommandPool()->GetCommandPool(), 1, &cmd);
+
+        m_initialUploadComplete = true;
+        m_stagingBuffer = std::move(stagingBuffer);
+        m_particleBuffer = std::move(particleBuffer);
+        m_instanceBuffer = std::move(instanceBuffer);
+    });
 }
 
 void ParticleSystemComponent::OnUpdate(float deltaTime)
 {
-    if (!m_buffersToCleanup.empty())
-    {
-        auto vulkanRenderer = Cast<VulkanRenderer>(Engine::Get()->GetRenderer());
-        vkDeviceWaitIdle(vulkanRenderer->GetDevice()->GetDevice());
-        
-        for (auto& buffer : m_buffersToCleanup)
-        {
-            buffer->Cleanup();
-        }
-        m_buffersToCleanup.clear();
-    }
+    if (!m_compute || !m_particleBuffer || !m_initialUploadComplete)
+        return;
     
-    if (!m_instanceBuffer) return;
-
-    auto renderer = Cast<VulkanRenderer>(Engine::Get()->GetRenderer());
-    auto device = renderer->GetDevice();
-
-    std::vector<InstanceData> stagingData(m_particleCount);
-    for (int i = 0; i < m_particleCount; i++)
+    if (m_needsRecreation)
     {
-        stagingData[i].position = m_positions[i];
-        stagingData[i].color = m_colors[i];
+        RecreateParticleBuffers();
+        m_needsRecreation = false;
+        return;
     }
 
-    VkDeviceSize bufferSize = sizeof(InstanceData) * m_particleCount;
-    m_instanceStaging->CopyData(stagingData.data(), bufferSize);
+    auto particleBuffer = Cast<VulkanBuffer>(m_particleBuffer.get());
+    auto instanceBuffer = Cast<VulkanBuffer>(m_instanceBuffer.get());
+    auto renderer = Cast<VulkanRenderer>(Engine::Get()->GetRenderer());
+    VkCommandBuffer cmd = renderer->GetCommandBuffer();
 
-    VkCommandBuffer commandBuffer = renderer->GetCommandBuffer();
+    VulkanMaterial* mat = Cast<VulkanMaterial>(m_compute->GetMaterial());
+
+    uint32_t count = static_cast<uint32_t>(m_particleCount);
+    
+    mat->SetStorageBuffer(0, 0, particleBuffer->GetBuffer(), 0, 
+        sizeof(ParticleData) * count, renderer);
+    mat->SetStorageBuffer(0, 1, instanceBuffer->GetBuffer(), 0, 
+        sizeof(InstanceData) * count, renderer);
+    
+    mat->BindForCompute(cmd, renderer->GetFrameIndex());
+
+    struct Push { float dt; uint32_t c; } push;
+    push.dt = deltaTime;
+    push.c = count;
+
+    vkCmdPushConstants(cmd, mat->GetPipeline()->GetPipelineLayout(),
+        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(Push), &push);
+
+    uint32_t groups = (count + 63) / 64;
+    mat->DispatchCompute(renderer, groups, 1, 1);
 
     VkBufferMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-    barrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier.buffer = m_instanceBuffer->GetBuffer();
-    barrier.offset = 0;
-    barrier.size = bufferSize;
-
-    vkCmdPipelineBarrier(commandBuffer,
-                         VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-                         VK_PIPELINE_STAGE_TRANSFER_BIT,
-                         0, 0, nullptr, 1, &barrier, 0, nullptr);
-
-    m_instanceBuffer->CopyFrom(commandBuffer, m_instanceStaging.get(), bufferSize);
-
-    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-    vkCmdPipelineBarrier(commandBuffer,
-                         VK_PIPELINE_STAGE_TRANSFER_BIT,
-                         VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-                         0, 0, nullptr, 1, &barrier, 0, nullptr);
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.buffer = instanceBuffer->GetBuffer();
+    barrier.size = VK_WHOLE_SIZE;
 
-    if (!m_mesh)
-        return;
+    vkCmdPipelineBarrier(cmd,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+        0, 0, nullptr, 1, &barrier, 0, nullptr);
 
-    CameraData cameraData = p_gameObject->GetScene()->GetCameraData();
-    auto transform = p_gameObject->GetTransform();
-    Mat4 VP = cameraData.VP;
-
-    m_material->SetAttribute("viewProj", VP);
+    CameraData cam = p_gameObject->GetScene()->GetCameraData();
+    m_material->SetAttribute("viewProj", cam.VP);
 }
 
 void ParticleSystemComponent::OnRender(RHIRenderer* renderer)
 {
+    if (!m_mesh || !m_instanceBuffer || !m_material || !m_initialUploadComplete)
+        return;
+
     if (!renderer->BindShader(m_material->GetShader().getPtr()))
         return;
 
@@ -113,71 +185,122 @@ void ParticleSystemComponent::OnRender(RHIRenderer* renderer)
     if (!renderer->BindMaterial(m_material.getPtr()))
         return;
 
-    renderer->DrawInstanced(m_mesh->GetIndexBuffer(), m_mesh->GetVertexBuffer(), m_instanceBuffer.get(), m_particleCount);
+    renderer->DrawInstanced(m_mesh->GetIndexBuffer(), m_mesh->GetVertexBuffer(), 
+        m_instanceBuffer.get(), m_particleCount);
 }
 
 void ParticleSystemComponent::OnDestroy()
 {
-    RHIRenderer* renderer = Engine::Get()->GetRenderer();
-    renderer->WaitForGPU();
-    
-    for (auto& buffer : m_buffersToCleanup)
-    {
-        if (buffer)
-            buffer->Cleanup();
-    }
-    m_buffersToCleanup.clear();
-    
-    if (m_instanceBuffer)
-        m_instanceBuffer->Cleanup();
-    if (m_instanceStaging)
-        m_instanceStaging->Cleanup();
+    Engine::Get()->GetRenderer()->WaitForGPU();
 
+    if (m_particleBuffer) Cast<VulkanBuffer>(m_particleBuffer.get())->Cleanup();
+    if (m_instanceBuffer) Cast<VulkanBuffer>(m_instanceBuffer.get())->Cleanup();
+    if (m_stagingBuffer) Cast<VulkanBuffer>(m_stagingBuffer.get())->Cleanup();
 }
 
 void ParticleSystemComponent::SetParticleCount(int count)
 {
-    if (count <= 0)
-        return;
-    m_particleCount = count;
-    
-    auto instancingShader = m_material->GetShader();
-    auto renderer = Engine::Get()->GetRenderer();
-    instancingShader->EOnSentToGPU.Bind([this, renderer]()
-    {
-        auto vulkanRenderer = Cast<VulkanRenderer>(renderer);
-        auto device = vulkanRenderer->GetDevice();
-        VkDeviceSize size = sizeof(InstanceData) * static_cast<VkDeviceSize>(m_particleCount);
-        
-        if (m_instanceStaging || m_instanceBuffer)
-        {
-            if (m_instanceStaging)
-                m_buffersToCleanup.push_back(std::move(m_instanceStaging));
-            if (m_instanceBuffer)
-                m_buffersToCleanup.push_back(std::move(m_instanceBuffer));
-        }
-        
-        m_instanceStaging = std::make_unique<VulkanBuffer>();
-        m_instanceStaging->Initialize(device, size,
-                                  VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    if (count <= 0) return;
+    if (count == m_particleCount) return;
 
-        m_instanceBuffer = std::make_unique<VulkanBuffer>();
-        m_instanceBuffer->Initialize(device, size,
-                                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        
-        m_positions.resize(m_particleCount);
-        m_colors.resize(m_particleCount);
-        
-        float t = 0.01f;
-        for (int i = 0; i < m_particleCount; i++) {
-            m_positions[i] = Random::PointOnSphere(10.f);
-            m_colors[i] = Color::FromHSV(t, 1.f, 1.f);
-            
-            t += (1.f / m_particleCount) * 360.f;
-        }
-    });
+    m_particleCount = count;
+
+    if (m_particleBuffer && m_initialUploadComplete) {
+        m_needsRecreation = true;
+    }
+}
+
+void ParticleSystemComponent::RecreateParticleBuffers()
+{
+    auto renderer = Cast<VulkanRenderer>(Engine::Get()->GetRenderer());
+    auto device = renderer->GetDevice();
+
+    renderer->WaitForGPU();
+
+    if (m_particleBuffer)
+        Cast<VulkanBuffer>(m_particleBuffer.get())->Cleanup();
+    if (m_instanceBuffer)
+        Cast<VulkanBuffer>(m_instanceBuffer.get())->Cleanup();
+    if (m_stagingBuffer)
+        Cast<VulkanBuffer>(m_stagingBuffer.get())->Cleanup();
+
+    uint32_t count = static_cast<uint32_t>(m_particleCount);
+    VkDeviceSize particleBufferSize = sizeof(ParticleData) * count;
+    VkDeviceSize instanceBufferSize = sizeof(InstanceData) * count;
+
+    auto particleBuffer = std::make_unique<VulkanBuffer>();
+    particleBuffer->Initialize(device, particleBufferSize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | 
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    auto instanceBuffer = std::make_unique<VulkanBuffer>();
+    instanceBuffer->Initialize(device, instanceBufferSize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    auto stagingBuffer = std::make_unique<VulkanBuffer>();
+    stagingBuffer->Initialize(device, particleBufferSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    std::vector<ParticleData> init(count);
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        Vec3f p = Random::PointOnSphere(10.f);
+        Vec3f d = Vec3f::Normalize(p);
+        init[i].position = Vec4f(p.x, p.y, p.z, 1.f);
+        init[i].velocity = Vec4f(d.x * 5.f, d.y * 5.f, d.z * 5.f, 0.f);
+        init[i].color = Color::FromHSV((float(i) / count) * 360.f, 1.f, 1.f);
+        init[i].padding = Vec4f(0.f);
+    }
+
+    stagingBuffer->CopyData(init.data(), particleBufferSize);
+
+    VkCommandBufferAllocateInfo alloc{};
+    alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    alloc.commandPool = renderer->GetCommandPool()->GetCommandPool();
+    alloc.commandBufferCount = 1;
+
+    VkCommandBuffer cmd;
+    vkAllocateCommandBuffers(device->GetDevice(), &alloc, &cmd);
+
+    VkCommandBufferBeginInfo begin{};
+    begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(cmd, &begin);
+
+    particleBuffer->CopyFrom(cmd, stagingBuffer.get(), particleBufferSize);
+
+    VkBufferMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+    barrier.buffer = particleBuffer->GetBuffer();
+    barrier.size = VK_WHOLE_SIZE;
+
+    vkCmdPipelineBarrier(cmd,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        0, 0, nullptr, 1, &barrier, 0, nullptr);
+
+    vkEndCommandBuffer(cmd);
+
+    VkSubmitInfo submit{};
+    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit.commandBufferCount = 1;
+    submit.pCommandBuffers = &cmd;
+
+    vkQueueSubmit(device->GetGraphicsQueue().handle, 1, &submit, VK_NULL_HANDLE);
+    vkQueueWaitIdle(device->GetGraphicsQueue().handle);
+
+    vkFreeCommandBuffers(device->GetDevice(),
+        renderer->GetCommandPool()->GetCommandPool(), 1, &cmd);
+
+    m_particleBuffer = std::move(particleBuffer);
+    m_instanceBuffer = std::move(instanceBuffer);
+    m_stagingBuffer = std::move(stagingBuffer);
 }
 
 void ParticleSystemComponent::SetMesh(SafePtr<Mesh> mesh)

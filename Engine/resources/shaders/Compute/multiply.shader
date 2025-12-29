@@ -1,3 +1,0 @@
-
-
-multiply.comp

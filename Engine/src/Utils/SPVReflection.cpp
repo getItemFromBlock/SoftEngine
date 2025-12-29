@@ -35,99 +35,119 @@ uint32_t SPV::VkFormatSize(VkFormat fmt)
     }
 }
 
-void SPV::ReflectVertexInputs(const std::string& spirv, std::vector<VkVertexInputAttributeDescription>& outAttributes,
-                              std::vector<VkVertexInputBindingDescription>& outBindings)
+void SPV::ReflectVertexInputs(const std::string& spirv,
+                             std::vector<VkVertexInputAttributeDescription>& outAttributes,
+                             std::vector<VkVertexInputBindingDescription>& outBindings)
 {
     const uint32_t* spirv_words = reinterpret_cast<const uint32_t*>(spirv.data());
     size_t word_count = spirv.size() / sizeof(uint32_t);
 
     SpvReflectShaderModule module;
-    SpvReflectResult res = spvReflectCreateShaderModule(word_count * 4, spirv_words, &module);
-    if (res != SPV_REFLECT_RESULT_SUCCESS) throw std::runtime_error("Failed to create SPIRV-Reflect module");
+    if (spvReflectCreateShaderModule(word_count * 4, spirv_words, &module) != SPV_REFLECT_RESULT_SUCCESS)
+        throw std::runtime_error("spvReflectCreateShaderModule failed");
 
     uint32_t var_count = 0;
-    res = spvReflectEnumerateInputVariables(&module, &var_count, NULL);
-    if (res != SPV_REFLECT_RESULT_SUCCESS)
-    {
-        spvReflectDestroyShaderModule(&module);
-        throw std::runtime_error("Failed to enumerate input variables");
-    }
+    if (spvReflectEnumerateInputVariables(&module, &var_count, nullptr) != SPV_REFLECT_RESULT_SUCCESS)
+        throw std::runtime_error("spvReflectEnumerateInputVariables failed");
 
     std::vector<SpvReflectInterfaceVariable*> vars(var_count);
-    res = spvReflectEnumerateInputVariables(&module, &var_count, vars.data());
-    if (res != SPV_REFLECT_RESULT_SUCCESS)
-    {
-        spvReflectDestroyShaderModule(&module);
-        throw std::runtime_error("Failed to enumerate input variables (2)");
-    }
+    if (spvReflectEnumerateInputVariables(&module, &var_count, vars.data()) != SPV_REFLECT_RESULT_SUCCESS)
+        throw std::runtime_error("spvReflectEnumerateInputVariables failed (2)");
 
     auto toLower = [](const char* s) {
         std::string r;
         if (!s) return r;
-        r.reserve(strlen(s));
-        for (const char* p = s; *p; ++p) r.push_back(static_cast<char>(std::tolower(*p)));
+        for (; *s; ++s) r.push_back(static_cast<char>(std::tolower(*s)));
         return r;
     };
 
-    std::map<uint32_t, uint32_t> bindingOffsets;
+    std::map<uint32_t, std::vector<VkVertexInputAttributeDescription>> perBindingAttrs;
+    std::map<uint32_t, uint32_t> bindingStrides;
     std::set<uint32_t> usedBindings;
-    outAttributes.clear();
 
-    for (uint32_t i = 0; i < var_count; ++i)
+    for (SpvReflectInterfaceVariable* var : vars)
     {
-        SpvReflectInterfaceVariable* var = vars[i];
-        if (var->decoration_flags & SPV_REFLECT_DECORATION_BUILT_IN) continue;
+        if (var->decoration_flags & SPV_REFLECT_DECORATION_BUILT_IN)
+            continue;
 
-        VkFormat baseFmt = SpvFormatToVkFormat(var->format);
-        if (baseFmt == VK_FORMAT_UNDEFINED) continue;
+        VkFormat baseFormat = SpvFormatToVkFormat(var->format);
+        if (baseFormat == VK_FORMAT_UNDEFINED)
+            continue;
 
         bool isMatrix = (var->type_description->type_flags & SPV_REFLECT_TYPE_FLAG_MATRIX) != 0;
+
         uint32_t columns = 1;
         uint32_t rows = 1;
         if (isMatrix) {
             columns = var->type_description->traits.numeric.matrix.column_count;
-            rows = var->type_description->traits.numeric.matrix.row_count;
+            rows    = var->type_description->traits.numeric.matrix.row_count;
         }
 
         std::string nameLower = toLower(var->name);
-        bool markInstance = false;
-        if (!nameLower.empty() && nameLower.find("instance") != std::string::npos) markInstance = true;
-        if (!markInstance && isMatrix && var->location >= 4) markInstance = true;
+        bool isInstance = false;
+        if (!nameLower.empty() && nameLower.find("instance") != std::string::npos)
+            isInstance = true;
+        if (!isInstance && isMatrix && var->location >= 4)
+            isInstance = true;
 
-        uint32_t binding = markInstance ? 1u : 0u;
+        uint32_t binding = isInstance ? 1u : 0u;
         usedBindings.insert(binding);
-        if (bindingOffsets.find(binding) == bindingOffsets.end()) bindingOffsets[binding] = 0;
 
-        VkFormat colFormat = baseFmt;
+        VkFormat columnFormat = baseFormat;
         if (columns > 1) {
-            if (rows == 4) colFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
-            else if (rows == 3) colFormat = VK_FORMAT_R32G32B32_SFLOAT;
+            if (rows == 4)      columnFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
+            else if (rows == 3) columnFormat = VK_FORMAT_R32G32B32_SFLOAT;
         }
 
-        for (uint32_t c = 0; c < columns; ++c) {
+        for (uint32_t c = 0; c < columns; ++c)
+        {
             VkVertexInputAttributeDescription attr{};
             attr.location = var->location + c;
-            attr.binding = binding;
-            attr.format = colFormat;
-            attr.offset = bindingOffsets[binding];
-            outAttributes.push_back(attr);
-            bindingOffsets[binding] += VkFormatSize(colFormat);
+            attr.binding  = binding;
+            attr.format   = columnFormat;
+            attr.offset   = 0;
+            perBindingAttrs[binding].push_back(attr);
         }
     }
 
-    std::sort(outAttributes.begin(), outAttributes.end(), [](const VkVertexInputAttributeDescription& a, const VkVertexInputAttributeDescription& b){
-        if (a.binding != b.binding) return a.binding < b.binding;
-        return a.location < b.location;
-    });
-
+    outAttributes.clear();
     outBindings.clear();
-    for (uint32_t b : usedBindings) {
+
+    for (uint32_t binding : usedBindings)
+    {
+        auto& attrs = perBindingAttrs[binding];
+
+        std::sort(attrs.begin(), attrs.end(),
+                  [](const VkVertexInputAttributeDescription& a,
+                     const VkVertexInputAttributeDescription& b) {
+                      return a.location < b.location;
+                  });
+
+        uint32_t offset = 0;
+        for (auto& attr : attrs)
+        {
+            attr.offset = offset;
+            offset += VkFormatSize(attr.format);
+            outAttributes.push_back(attr);
+        }
+
+        bindingStrides[binding] = offset;
+
         VkVertexInputBindingDescription bindingDesc{};
-        bindingDesc.binding = b;
-        bindingDesc.inputRate = (b == 1) ? VK_VERTEX_INPUT_RATE_INSTANCE : VK_VERTEX_INPUT_RATE_VERTEX;
-        bindingDesc.stride = bindingOffsets[b];
+        bindingDesc.binding   = binding;
+        bindingDesc.stride    = offset;
+        bindingDesc.inputRate = (binding == 1)
+                              ? VK_VERTEX_INPUT_RATE_INSTANCE
+                              : VK_VERTEX_INPUT_RATE_VERTEX;
         outBindings.push_back(bindingDesc);
     }
+
+    std::sort(outAttributes.begin(), outAttributes.end(),
+              [](const VkVertexInputAttributeDescription& a,
+                 const VkVertexInputAttributeDescription& b) {
+                  if (a.binding != b.binding) return a.binding < b.binding;
+                  return a.location < b.location;
+              });
 
     spvReflectDestroyShaderModule(&module);
 }
