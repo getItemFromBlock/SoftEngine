@@ -27,6 +27,9 @@ Scene::Scene()
 
         m_editorCameraData.frustum = m_editorCamera->GetFrustum();
         m_editorCameraData.VP = m_editorCamera->GetViewProjectionMatrix();
+        m_editorCameraData.forward = m_editorCamera->GetTransform()->GetForward();
+        m_editorCameraData.right = m_editorCamera->GetTransform()->GetRight();
+        m_editorCameraData.up = m_editorCamera->GetTransform()->GetUp();
     };
 }
 

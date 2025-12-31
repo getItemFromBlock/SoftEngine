@@ -1,6 +1,7 @@
 #include "Inspector.h"
 
 #include "Component/MeshComponent.h"
+#include "Component/ParticleSystemComponent.h"
 #include "Component/TransformComponent.h"
 
 #include "Core/Engine.h"
@@ -113,6 +114,8 @@ void Inspector::ShowMesh(const Property& property) const
     SafePtr<Mesh>* meshPtr = static_cast<SafePtr<Mesh>*>(property.data);
     SafePtr<Mesh> mesh = *meshPtr;
     auto meshName = mesh->GetName();
+    ImGui::TextUnformatted(property.name.c_str());
+    ImGui::SameLine();
     if (ImGui::Button(meshName.c_str()))
     {
         ImGui::OpenPopup("Mesh Popup");
@@ -156,6 +159,153 @@ void Inspector::ShowTransform(const Property& property) const
         transform->SetLocalScale(scale);
     }
 }
+
+template<typename T>
+bool DisplayWithType(const std::string& name, T* value)
+{
+    ImGui::TextUnformatted("Unknown");
+    return false;
+}
+
+template<>
+bool DisplayWithType(const std::string& name, float* value)
+{
+    return ImGui::DragFloat(name.c_str(), value);
+}
+
+template<>
+bool DisplayWithType(const std::string& name, Vec4f* value)
+{
+    return ImGui::ColorEdit4(name.c_str(), &value->x);
+}
+
+template <typename T>
+bool DisplayParticleValue(const std::string& name, ParticleProperty<T>& property)
+{
+    ImGui::PushID(name.c_str());
+    ImGui::TextUnformatted(name.c_str());
+    ImGui::SameLine();
+    bool result = false;
+    switch (property.type)
+    {
+    case ParticleProperty<T>::Type::Constant:
+        {
+            result |= DisplayWithType("##" + name, &property.value.min);
+        }
+        break;
+    case ParticleProperty<T>::Type::Random:
+        {
+            float itemWidth = ImGui::GetContentRegionAvail().x * 0.5f - ImGui::GetFrameHeight() * 1.5f;
+            ImGui::SetNextItemWidth(itemWidth);
+            result |= DisplayWithType("##1" + name, &property.value.min);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(itemWidth);
+            result |= DisplayWithType("##2" + name, &property.value.max);
+        }
+        break;
+    default: 
+        break;
+    }
+    ImGui::SameLine();
+    bool random = property.type == ParticleProperty<T>::Type::Random;
+    if (ImGui::Checkbox("##Random", &random))
+    {
+        result = true;
+        property.type = random ? ParticleProperty<T>::Type::Random : ParticleProperty<T>::Type::Constant;
+    }
+    ImGui::PopID();
+    return result;
+}
+
+void Inspector::ShowParticleSystem(const Property& property) const
+{
+    auto ps = static_cast<ParticleSystemComponent*>(property.data);
+    
+    if (!ps) return;
+
+    ParticleSettings& settings = ps->GetSettings();
+    
+    bool changed = false;
+    
+    bool isPlaying = ps->IsPlaying();
+    if (!isPlaying && ImGui::Button("Play"))
+    {
+        ps->Play();
+    }
+    else if (isPlaying && ImGui::Button("Pause"))
+    {
+        ps->Pause();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Restart"))
+    {
+        ps->Restart();
+    }
+    float currentTime = ps->GetPlaybackTime();
+    if (ImGui::SliderFloat("##PlaybackTime", &currentTime, 0, settings.general.duration))
+    {
+        ps->SetPlaybackTime(currentTime);
+    }
+    
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal);
+    
+    if (ImGui::CollapsingHeader("General", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ParticleSettings::General& general = settings.general;
+        ImGui::InputFloat("Duration", &general.duration);
+        ImGui::Checkbox("Looping", &general.looping);
+        changed |= ImGui::Checkbox("Prewarm", &general.preWarm);
+        changed |= DisplayParticleValue("Start Delay", general.startDelay);
+        changed |= DisplayParticleValue("Start Life Time", general.startLifeTime);
+        changed |= DisplayParticleValue("Start Speed", general.startSpeed);
+        changed |= DisplayParticleValue("Start Size", general.startSize);
+        changed |= ImGui::InputInt("Particle count", &general.particleCount);
+        changed |= DisplayParticleValue("Start Color", general.startColor);
+    }
+    
+    if (ImGui::CollapsingHeader("Emission"))
+    {
+        ParticleSettings::Emission& emission = settings.emission;
+        changed |= DisplayParticleValue("Rate Over Time", emission.rateOverTime); 
+    }
+    
+    if (ImGui::CollapsingHeader("Shape##Collapsing"))
+    {
+        ParticleSettings::Shape& shape = settings.shape;
+        int index = static_cast<int>(shape.type);
+        if (ImGui::Combo("Shape", &index, ParticleSettings::Shape::to_cstr()))
+        {
+            shape.type = static_cast<ParticleSettings::Shape::Type>(index);
+            changed = true;
+        }
+        switch (shape.type) {
+        case ParticleSettings::Shape::Type::None:
+            break;
+        case ParticleSettings::Shape::Type::Sphere:
+            changed |= ImGui::DragFloat("Radius", &shape.radius);
+            break;
+        case ParticleSettings::Shape::Type::Cube:
+            break;
+        case ParticleSettings::Shape::Type::Cone:
+            break;
+        }
+    }
+    
+    if (ImGui::CollapsingHeader("Rendering"))
+    {
+        ParticleSettings::Rendering& rendering = settings.rendering;
+        if (ImGui::Checkbox("Billboard", &rendering.billboard))
+        {
+            ps->SetBillboard(rendering.billboard);
+        }
+    }
+    
+    if (changed)
+    {
+        ps->ApplySettings();
+    }
+}
+
 void Inspector::ShowProperty(const ClassDescriptor& descriptor) const
 {
     for (auto& property : descriptor.properties)
@@ -291,6 +441,9 @@ void Inspector::ShowProperty(const ClassDescriptor& descriptor) const
             break;
         case PropertyType::Transform:
             ShowTransform(property);
+            break;
+        case PropertyType::ParticleSystem:
+            ShowParticleSystem(property);
             break;
         default:
             PrintError("Property type not handle on Inspector");

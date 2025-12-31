@@ -552,6 +552,7 @@ Uniforms SPV::SpirvReflectUniforms(const std::string& spirv)
                 u.name = binding->type_description->type_name ? binding->type_description->type_name : u.name;
             }
             u.type = UniformType::NestedStruct;
+            u.offset = binding->block.offset;
             u.size = binding->block.size;
 
             if (binding->block.member_count > 0 && binding->block.members)
@@ -570,6 +571,7 @@ Uniforms SPV::SpirvReflectUniforms(const std::string& spirv)
         case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
         case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER:
             u.type = UniformType::Sampler2D;
+            u.offset = 0;
             u.size = 0; // Samplers don't have a size
             break;
 
@@ -581,7 +583,7 @@ Uniforms SPV::SpirvReflectUniforms(const std::string& spirv)
                 }
                 u.type = UniformType::StorageBuffer;
 
-                // Calculate storage buffer size
+                u.offset = binding->block.offset;
                 u.size = CalculateStorageBufferSize(binding);
 
                 if (binding->block.member_count > 0 && binding->block.members)

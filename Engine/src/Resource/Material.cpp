@@ -1,5 +1,6 @@
 #include "Material.h"
 
+#include <map>
 #include <ranges>
 
 #include "Shader.h"
@@ -167,55 +168,83 @@ void Material::SendAllValues(RHIRenderer* renderer) const
 {
     if (!m_shader->IsLoaded() || !m_shader->SentToGPU())
         return;
+
     struct UniformBuffer
     {
         std::vector<uint8_t> data;
     };
 
-    std::unordered_map<std::string, UniformBuffer> customAttributes;
+    std::map<std::pair<uint32_t, uint32_t>, UniformBuffer> uniformBuffers;
 
-    auto AppendData = [&](const std::string& uniformName, const void* valuePtr, size_t size)
+    auto AppendData = [&](const std::string& uniformName, const std::string& memberName, const void* valuePtr, size_t size)
     {
-        auto& buffer = customAttributes[uniformName].data;
+        Uniform uniform = m_shader->GetUniform(uniformName);
+        auto key = std::make_pair(uniform.set, uniform.binding);
+        auto& buffer = uniformBuffers[key];
+
+        // Find the member with matching name
+        uint32_t memberOffset = 0;
+        bool found = false;
+        for (const auto& member : uniform.members)
+        {
+            if (member.name == memberName)
+            {
+                memberOffset = member.offset;
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            // Member not found, skip this attribute
+            return;
+        }
+
+        // Ensure buffer is large enough to hold data at memberOffset + size
+        size_t requiredSize = memberOffset + size;
+        if (buffer.data.size() < requiredSize)
+        {
+            buffer.data.resize(requiredSize, 0);
+        }
+
+        // Copy data at the correct offset
         const uint8_t* bytePtr = static_cast<const uint8_t*>(valuePtr);
-        buffer.insert(buffer.end(), bytePtr, bytePtr + size);
+        std::memcpy(buffer.data.data() + memberOffset, bytePtr, size);
     };
 
     for (auto& attrib : m_attributes.floatAttributes)
     {
-        AppendData(attrib.second.uniformName, &attrib.second.value, sizeof(float));
+        AppendData(attrib.second.uniformName, attrib.first, &attrib.second.value, sizeof(float));
     }
     for (auto& attrib : m_attributes.intAttributes)
     {
-        AppendData(attrib.second.uniformName, &attrib.second.value, sizeof(int));
+        AppendData(attrib.second.uniformName, attrib.first, &attrib.second.value, sizeof(int));
     }
     for (auto& attrib : m_attributes.vec2Attributes)
     {
-        AppendData(attrib.second.uniformName, &attrib.second.value, sizeof(Vec2f));
+        AppendData(attrib.second.uniformName, attrib.first, &attrib.second.value, sizeof(Vec2f));
     }
     for (auto& attrib : m_attributes.vec3Attributes)
     {
-        AppendData(attrib.second.uniformName, &attrib.second.value, sizeof(Vec3f));
+        AppendData(attrib.second.uniformName, attrib.first, &attrib.second.value, sizeof(Vec3f));
     }
     for (auto& attrib : m_attributes.vec4Attributes)
     {
-        AppendData(attrib.second.uniformName, &attrib.second.value, sizeof(Vec4f));
+        AppendData(attrib.second.uniformName, attrib.first, &attrib.second.value, sizeof(Vec4f));
     }
     for (auto& attrib : m_attributes.matrixAttributes)
     {
-        AppendData(attrib.second.uniformName, &attrib.second.value, sizeof(Mat4));
+        AppendData(attrib.second.uniformName, attrib.first, &attrib.second.value, sizeof(Mat4));
     }
 
-    for (auto& uniformData : customAttributes)
+    for (auto& [binding, buffer] : uniformBuffers)
     {
-        Uniform uniform = m_shader->GetUniform(uniformData.first);
-        auto binding = UBOBinding(uniform.set, uniform.binding);
-
         m_handle->SetUniformData(
-            binding.set,
-            binding.binding,
-            uniformData.second.data.data(),
-            uniformData.second.data.size(),
+            binding.first,
+            binding.second,
+            buffer.data.data(),
+            buffer.data.size(),
             renderer);
     }
 }

@@ -16,7 +16,7 @@ public:
 
     bool Initialize(VulkanDevice* device, VkDeviceSize size, 
                    VkBufferUsageFlags usage, VkMemoryPropertyFlags properties);
-    void Cleanup();
+    void Cleanup() override;
 
     void CopyData(const void* data, VkDeviceSize size);
     void CopyFrom(VkCommandBuffer commandBuffer, VulkanBuffer* srcBuffer, VkDeviceSize size);

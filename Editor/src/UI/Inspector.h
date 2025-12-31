@@ -20,6 +20,7 @@ private:
     void ShowMaterials(const Property& property) const;
     void ShowMesh(const Property& property) const;
     void ShowTransform(const Property& property) const;
+    void ShowParticleSystem(const Property& property) const;
     
 private:
     SceneHolder* m_sceneHolder;

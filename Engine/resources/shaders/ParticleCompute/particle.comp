@@ -3,10 +3,10 @@
 layout(local_size_x = 64) in;
 
 struct ParticleData {
-    vec4 position;  
-    vec4 velocity;  
-    vec4 color;     
-    vec4 padding;   
+    vec4 position;
+    vec4 velocity;
+    vec4 color;
+    vec4 padding;
 };
 
 struct InstanceData {
@@ -24,36 +24,38 @@ layout(set = 0, binding = 1) buffer Instances {
 
 layout(push_constant) uniform Push {
     float deltaTime;
+    float currentTime;
     uint  count;
 } pc;
 
-const vec3 GRAVITY = vec3(0.0, -9.81, 0.0);
-const float DRAG = 0.08;
-const vec3 BOUNDS_MIN = vec3(-50.0, -50.0, -50.0);
-const vec3 BOUNDS_MAX = vec3(50.0, 50.0, 50.0);
-const float BOUNCE_DAMPING = 0.65;
-
-void main() {
+void main()
+{
     uint id = gl_GlobalInvocationID.x;
-    if (id >= pc.count) return;
+    if (id >= pc.count)
+        return;
 
-    vec3 p = particles[id].position.xyz;
-    vec3 v = particles[id].velocity.xyz;
+    vec3 p0 = particles[id].position.xyz;
+    vec3 v0 = particles[id].velocity.xyz;
 
-    v += GRAVITY * pc.deltaTime;
-    v *= 1.0 / (1.0 + DRAG * pc.deltaTime);
-    p += v * pc.deltaTime;
+    float scale0   = particles[id].position.w;
+    float lifeTime = particles[id].velocity.w;
+    float startTime = particles[id].padding.x;
 
-    if (p.x < BOUNDS_MIN.x) { p.x = BOUNDS_MIN.x; v.x = -v.x * BOUNCE_DAMPING; }
-    if (p.x > BOUNDS_MAX.x) { p.x = BOUNDS_MAX.x; v.x = -v.x * BOUNCE_DAMPING; }
-    if (p.y < BOUNDS_MIN.y) { p.y = BOUNDS_MIN.y; v.y = -v.y * BOUNCE_DAMPING; }
-    if (p.y > BOUNDS_MAX.y) { p.y = BOUNDS_MAX.y; v.y = -v.y * BOUNCE_DAMPING; }
-    if (p.z < BOUNDS_MIN.z) { p.z = BOUNDS_MIN.z; v.z = -v.z * BOUNCE_DAMPING; }
-    if (p.z > BOUNDS_MAX.z) { p.z = BOUNDS_MAX.z; v.z = -v.z * BOUNCE_DAMPING; }
+    float t = pc.currentTime - startTime;
+    bool alive = (t >= 0.0) && (t <= lifeTime);
 
-    particles[id].position = vec4(p, 1.0);
-    particles[id].velocity = vec4(v, 0.0);
+    vec3 g = vec3(0.0, -9.81, 0.0);
 
-    instances[id].position = particles[id].position;
-    instances[id].color = particles[id].color;
+    vec3 p = p0;
+    float scale = 0.0;
+
+    if (alive)
+    {
+        p = p0 + v0 * t + 0.5 * g * t * t;
+        scale = scale0;
+    }
+
+    instances[id].position = vec4(p, scale);
+    instances[id].color    = particles[id].color;
 }
+

@@ -9,4 +9,5 @@ public:
     RHIBuffer(RHIBuffer&&) noexcept = default;
     virtual ~RHIBuffer() = default;
     
+    virtual void Cleanup() {}
 };

@@ -50,6 +50,7 @@ void Editor::Initialize()
     auto currentScene = m_engine->GetSceneHolder()->GetCurrentScene();
     auto model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Cube.obj");
     resourceManager->Load<Model>(RESOURCE_PATH"/models/Suzanne.obj");
+    resourceManager->Load<Model>(RESOURCE_PATH"/models/Plane.obj");
     model->EOnLoaded.Bind([model, this, currentScene]()
     {
         // auto go = Model::CreateGameObject(model.getPtr(), currentScene);

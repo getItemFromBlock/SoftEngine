@@ -19,6 +19,9 @@ class GameObject;
 struct CameraData
 {    
     Mat4 VP;
+    Vec3f forward;
+    Vec3f up;
+    Vec3f right;
     Frustum frustum;
 };
 

@@ -84,6 +84,7 @@ struct Uniform {
     std::string name;
     uint32_t set = 0;
     uint32_t binding = 0;
+    uint32_t offset = 0;
     uint32_t size = 0;
     UniformType type = UniformType::None;
     std::vector<UniformMember> members;

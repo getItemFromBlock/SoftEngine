@@ -1,41 +1,135 @@
 ﻿#include "Random.h"
-#include <random>
 #include <cmath>
-#include <SDL_stdinc.h>
 
-static std::mt19937& GetGenerator()
+Random::Random()
+    : m_generator(std::random_device{}())
 {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    return gen;
 }
 
-float Random::Float(float min, float max)
+Random::Random(Seed seed)
+    : m_generator(seed)
 {
-    std::uniform_real_distribution<float> dis(min, max);
-    return dis(GetGenerator());
 }
 
-int Random::Int(int min, int max)
+void Random::SeedWith(Seed seed)
 {
-    std::uniform_int_distribution<int> dis(min, max);
-    return dis(GetGenerator());
+    m_generator.seed(seed);
 }
 
-Vec3f Random::Vector3(float min, float max)
+float Random::Range(float min, float max)
 {
-    return Vec3f(Float(min, max), Float(min, max), Float(min, max));
+    if (min > max) std::swap(min, max);
+    std::uniform_real_distribution<float> d(min, std::nextafter(max, std::numeric_limits<float>::max()));
+    return d(m_generator);
+}
+
+int Random::Range(int min, int max)
+{
+    if (min > max) std::swap(min, max);
+    std::uniform_int_distribution<int> d(min, max);
+    return d(m_generator);
+}
+
+Vec2f Random::Range(Vec2f min, Vec2f max)
+{
+    return { Range(min.x, max.x), Range(min.y, max.y) };
+}
+
+Vec3f Random::Range(Vec3f min, Vec3f max)
+{
+    return { Range(min.x, max.x), Range(min.y, max.y), Range(min.z, max.z) };
+}
+
+Vec4f Random::Range(Vec4f min, Vec4f max)
+{
+    return { Range(min.x, max.x), Range(min.y, max.y), Range(min.z, max.z), Range(min.w, max.w) };
+}
+
+Color Random::Range(Color a, Color b)
+{
+    float t = Range(0.f, 1.f);
+    return a + (b - a) * t;
 }
 
 Vec3f Random::PointOnSphere(float radius)
 {
-    std::uniform_real_distribution<float> dist(0.f, 1.f);
-    float theta = dist(GetGenerator()) * 2.f * M_PI;   // azimuthal angle
-    float phi   = acos(1.f - 2.f * dist(GetGenerator())); // polar angle
+    std::normal_distribution<float> d(0.f, 1.f);
+    
+    Vec3f point(d(m_generator), d(m_generator), d(m_generator));
+    float length = std::sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
+    
+    if (length < 1e-10f) {
+        return Vec3f(radius, 0.f, 0.f);
+    }
+    
+    return point * (radius / length);
+}
 
-    float x = sin(phi) * cos(theta);
-    float y = sin(phi) * sin(theta);
-    float z = cos(phi);
+Vec3f Random::PointInSphere(float radius)
+{
+    std::uniform_real_distribution<float> d(-1.f, 1.f);
+    
+    Vec3f point;
+    float lengthSq;
+    
+    do {
+        point = Vec3f(d(m_generator), d(m_generator), d(m_generator));
+        lengthSq = point.x * point.x + point.y * point.y + point.z * point.z;
+    } while (lengthSq > 1.f || lengthSq < 1e-10f);
+    
+    return point * radius;
+}
 
-    return Vec3f(x, y, z) * radius;
+Random& Random::Global()
+{
+    static Random instance;
+    return instance;
+}
+
+float Random::Range(float min, float max, Seed seed)
+{
+    Random rng(seed);
+    return rng.Range(min, max);
+}
+
+int Random::Range(int min, int max, Seed seed)
+{
+    Random rng(seed);
+    return rng.Range(min, max);
+}
+
+Vec2f Random::Range(Vec2f min, Vec2f max, Seed seed)
+{
+    Random rng(seed);
+    return rng.Range(min, max);
+}
+
+Vec3f Random::Range(Vec3f min, Vec3f max, Seed seed)
+{
+    Random rng(seed);
+    return rng.Range(min, max);
+}
+
+Vec4f Random::Range(Vec4f min, Vec4f max, Seed seed)
+{
+    Random rng(seed);
+    return rng.Range(min, max);
+}
+
+Color Random::Range(Color a, Color b, Seed seed)
+{
+    Random rng(seed);
+    return rng.Range(a, b);
+}
+
+Vec3f Random::PointOnSphere(float radius, Seed seed)
+{
+    Random rng(seed);
+    return rng.PointOnSphere(radius);
+}
+
+Vec3f Random::PointInSphere(float radius, Seed seed)
+{
+    Random rng(seed);
+    return rng.PointInSphere(radius);
 }

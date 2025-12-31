@@ -26,7 +26,8 @@ enum class PropertyType
     Mesh,
     Material,
     Materials,
-    Transform
+    Transform,
+    ParticleSystem
 };
 
 struct Property
