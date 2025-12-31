@@ -100,6 +100,7 @@ public:
     uint32_t GetMaxFramesInFlight() const { return MAX_FRAMES_IN_FLIGHT; }
 private:
     void RecreateSwapChain();
+    void TransitionImageForPresent() const;
 
 private:
     Window* m_window = nullptr;

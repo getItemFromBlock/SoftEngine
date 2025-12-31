@@ -54,6 +54,7 @@ private:
     bool PickPhysicalDevice(VkInstance instance, VkSurfaceKHR surface);
     int RateDeviceSuitability(VkPhysicalDevice device) const;
     bool IsDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface) const;
+    bool CheckDynamicRenderingSupport(VkPhysicalDevice device) const;
     bool CheckDeviceExtensionSupport(VkPhysicalDevice device) const;
     QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) const;
     void CreateLogicalDevice(VkSurfaceKHR surface);

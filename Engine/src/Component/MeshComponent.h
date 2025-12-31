@@ -18,6 +18,8 @@ public:
     void SetMesh(const SafePtr<Mesh>& mesh);
     
     void AddMaterial(const SafePtr<Material>& material);
+    
+    std::vector<SafePtr<Material>> GetMaterials() const { return m_materials; }
 private:
     std::vector<SafePtr<Material>> m_materials;
     SafePtr<Mesh> m_mesh;

@@ -82,20 +82,27 @@ void ImGuiHandler::Initialize(Window* window, RHIRenderer* renderer)
     init_info.MinImageCount = 2;
     init_info.ImageCount = vulkanRenderer->GetSwapChain()->GetImageCount();
     init_info.Allocator = nullptr;
-    init_info.PipelineInfoMain.RenderPass = vulkanRenderer->GetRenderPass()->GetRenderPass();
-    init_info.PipelineInfoMain.Subpass = 0;
-    init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-    
     init_info.CheckVkResultFn = check_vk_result;
+    
+    init_info.UseDynamicRendering = true;
+    
+    VkPipelineRenderingCreateInfoKHR pipeline_rendering_create_info = {};
+    pipeline_rendering_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
+    pipeline_rendering_create_info.colorAttachmentCount = 1;
+    VkFormat colorFormat = vulkanRenderer->GetRenderPass()->GetColorFormat();
+    pipeline_rendering_create_info.pColorAttachmentFormats = &colorFormat;
+    pipeline_rendering_create_info.depthAttachmentFormat = vulkanRenderer->GetRenderPass()->GetDepthFormat();
+    
+    init_info.PipelineInfoMain.PipelineRenderingCreateInfo = pipeline_rendering_create_info;
 
     bool result = ImGui_ImplVulkan_Init(&init_info);
     if (!result)
     {
         std::cerr << "Failed to initialize ImGui Vulkan backend!" << std::endl;
     }
+
 #endif
     
-    // After getting the physical device
     VkPhysicalDeviceProperties deviceProps;
     vkGetPhysicalDeviceProperties(m_device->GetPhysicalDevice(), &deviceProps);
 }

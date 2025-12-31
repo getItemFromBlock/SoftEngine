@@ -6,7 +6,6 @@
 #include "VulkanSwapChain.h"
 #include "VulkanRenderPass.h"
 #include "VulkanPipeline.h"
-#include "VulkanFramebuffer.h"
 #include "VulkanCommandPool.h"
 #include "VulkanSyncObjects.h"
 #include "VulkanDescriptorPool.h"
@@ -20,13 +19,6 @@
 #include <ranges>
 #include <spirv_reflect.h>
 #include <shaderc/shaderc.hpp>
-
-// using namespace GALAXY::Math;
-// #include <galaxymath/Maths.h>
-//
-// #include <imgui.h>
-// #include <imgui_impl_glfw.h>
-// #include <imgui_impl_vulkan.h>
 
 #include "VulkanComputeDispatch.h"
 #include "VulkanDepthBuffer.h"
@@ -46,7 +38,6 @@
 #include "Resource/VertexShader.h"
 
 #include "Utils/Type.h"
-
 
 #include "Core/Window/WindowGLFW.h"
 #include "Resource/ComputeShader.h"
@@ -100,16 +91,7 @@ bool VulkanRenderer::Initialize(Window* window)
             PrintError("Failed to initialize depth buffer!");
             return false;
         }
-
-        m_framebuffer = std::make_unique<VulkanFramebuffer>();
-        if (!m_framebuffer->Initialize(m_device.get(), m_renderPass->GetRenderPass(),
-                                       m_swapChain->GetImageViews(),
-                                       m_swapChain->GetExtent(), m_depthBuffer.get()))
-        {
-            PrintError("Failed to initialize framebuffers!");
-            return false;
-        }
-
+        
         m_commandPool = std::make_unique<VulkanCommandPool>();
         if (!m_commandPool->Initialize(m_device.get(), MAX_FRAMES_IN_FLIGHT))
         {
@@ -132,58 +114,7 @@ bool VulkanRenderer::Initialize(Window* window)
             m_framebufferResized = true;
         });
 
-        /*
-        VkDescriptorPoolSize pool_sizes[] =
-        {
-            { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
-            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-            { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
-            { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
-            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
-            { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
-        };
-
-        VkDescriptorPoolCreateInfo pool_info = {};
-        pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-        pool_info.maxSets = 1000;
-        pool_info.poolSizeCount = std::size(pool_sizes);
-        pool_info.pPoolSizes = pool_sizes;
-
-        vkCreateDescriptorPool(m_device->GetDevice(), &pool_info, nullptr, &m_imGuiPool);
-        
-        // 1. Setup Dear ImGui context
-        IMGUI_CHECKVERSION();
-        ImGui::CreateContext();
-        ImGuiIO& io = ImGui::GetIO(); (void)io;
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard
-
-        // 2. Setup Platform/Renderer backends
-        ImGui_ImplGlfw_InitForVulkan(dynamic_cast<WindowGLFW*>(window)->GetHandle(), true); // Replace with ImplSDL2 if using SDL
-
-        ImGui_ImplVulkan_InitInfo init_info = {};
-        init_info.Instance = m_context->GetInstance();
-        init_info.PhysicalDevice = m_device->GetPhysicalDevice();
-        init_info.Device = m_device->GetDevice();
-        init_info.QueueFamily = m_device->GetGraphicsQueueFamily();
-        init_info.Queue = m_device->GetGraphicsQueue().handle;
-        init_info.PipelineCache = VK_NULL_HANDLE;
-        init_info.DescriptorPool = m_imGuiPool; // The pool you created above
-        init_info.RenderPass = m_renderPass->GetRenderPass();    // Your main render pass
-        init_info.Subpass = 0;
-        init_info.MinImageCount = 2;          // >= 2
-        init_info.ImageCount = m_swapChain->GetImageCount();
-        init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-
-        ImGui_ImplVulkan_Init(&init_info);
-        */
-
-        PrintLog("Vulkan renderer initialized successfully");
+        PrintLog("Vulkan renderer initialized successfully with dynamic rendering");
         return true;
     }
     catch (const std::exception& e)
@@ -204,10 +135,6 @@ void VulkanRenderer::WaitForGPU()
 
 void VulkanRenderer::Cleanup()
 {
-    // ImGui_ImplVulkan_Shutdown();
-    // ImGui_ImplGlfw_Shutdown();
-    // ImGui::DestroyContext();
-
     if (m_imGuiPool != VK_NULL_HANDLE && m_device)
     {
         vkDestroyDescriptorPool(m_device->GetDevice(), m_imGuiPool, nullptr);
@@ -216,7 +143,6 @@ void VulkanRenderer::Cleanup()
 
     m_syncObjects.reset();
     m_commandPool.reset();
-    m_framebuffer.reset();
     m_depthBuffer.reset();
     m_renderPass.reset();
     m_swapChain.reset();
@@ -263,10 +189,6 @@ bool VulkanRenderer::BeginFrame()
     std::mutex& mutex = m_commandPool->GetMutex();
     mutex.lock();
 
-    // Start a new ImGui frame
-    // ImGui_ImplVulkan_NewFrame();
-    // ImGui_ImplGlfw_NewFrame();
-    // ImGui::NewFrame();
     return true;
 }
 
@@ -286,7 +208,33 @@ bool VulkanRenderer::MultiThreadSendToGPU()
 void VulkanRenderer::EndFrame()
 {
     auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
+    
     m_renderPass->End(commandBuffer);
+    
+    VkImageMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = m_swapChain->GetImages()[m_imageIndex];
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+    barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    barrier.dstAccessMask = 0;
+
+    vkCmdPipelineBarrier(
+        commandBuffer,
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+        0,
+        0, nullptr,
+        0, nullptr,
+        1, &barrier
+    );
 
     auto& mutex = m_commandPool->GetMutex();
     mutex.unlock();
@@ -321,7 +269,6 @@ void VulkanRenderer::EndFrame()
         throw std::runtime_error("Failed to submit draw command buffer!");
     }
 
-    // Present
     result = m_swapChain->PresentImage(m_device->GetPresentQueue(), m_imageIndex,
                                        m_syncObjects->GetRenderFinishedSemaphore(m_imageIndex));
 
@@ -519,25 +466,10 @@ PushConstants VulkanRenderer::GetPushConstants(Shader* shader)
 
 void VulkanRenderer::SendTexture(UBOBinding binding, Texture* texture, Shader* shader)
 {
-    // VulkanPipeline* pipeline = dynamic_cast<VulkanPipeline*>(shader->GetPipeline());
-    // auto descriptors = pipeline->GetDescriptorSets();
-    // auto uniformBuffers = pipeline->GetUniformBuffers();
-    // for (uint32_t j = 0; j < descriptors.size(); j++)
-    // {
-    //     for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-    //     {
-    //         descriptors[j]->UpdateDescriptorSets(i, j, shader->GetUniforms(), uniformBuffers, texture);
-    //     }
-    // }
 }
 
 void VulkanRenderer::SendValue(UBOBinding binding, void* value, uint32_t size, Shader* shader)
 {
-    // VulkanPipeline* pipeline = dynamic_cast<VulkanPipeline*>(shader->GetPipeline());
-    //
-    // VulkanUniformBuffer* uniformBuffer = pipeline->GetUniformBuffer(binding.set, binding.binding);
-    //
-    // uniformBuffer->WriteToMapped(value, size, m_currentFrame);
 }
 
 bool VulkanRenderer::BindShader(Shader* shader)
@@ -547,7 +479,7 @@ bool VulkanRenderer::BindShader(Shader* shader)
 
     VulkanPipeline* pipeline = dynamic_cast<VulkanPipeline*>(shader->GetPipeline());
     auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
-    pipeline->Bind(commandBuffer);
+    pipeline->Bind(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS);
 
     return true;
 }
@@ -617,8 +549,8 @@ std::unique_ptr<RHIShaderBuffer> VulkanRenderer::CreateShaderBuffer(const std::s
 std::unique_ptr<RHIPipeline> VulkanRenderer::CreatePipeline(const Shader* shader)
 {
     std::unique_ptr<VulkanPipeline> pipeline = std::make_unique<VulkanPipeline>();
-    pipeline->Initialize(m_device.get(), m_renderPass->GetRenderPass(), m_swapChain->GetExtent(), MAX_FRAMES_IN_FLIGHT,
-                         shader);
+    pipeline->Initialize(m_device.get(), m_swapChain->GetExtent(), MAX_FRAMES_IN_FLIGHT, shader, 
+                        m_renderPass->GetColorFormat(), m_renderPass->GetDepthFormat());
     return std::move(pipeline);
 }
 
@@ -664,12 +596,41 @@ void VulkanRenderer::ClearColor() const
 {
     VkCommandBuffer commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
     uint32_t imageIndex = m_imageIndex;
+    
+    VkImageMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = m_swapChain->GetImages()[imageIndex];
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+    barrier.srcAccessMask = 0;
+    barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    vkCmdPipelineBarrier(
+        commandBuffer,
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        0,
+        0, nullptr,
+        0, nullptr,
+        1, &barrier
+    );
+
     std::vector<VkClearValue> clearValues(2);
     clearValues[0].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
     clearValues[1].depthStencil = {.depth = 1.0f, .stencil = 0};
 
-    m_renderPass->Begin(commandBuffer, m_framebuffer->GetFramebuffer(imageIndex),
-                        m_swapChain->GetExtent(), clearValues);
+    m_renderPass->Begin(commandBuffer, 
+                       m_swapChain->GetImageViews()[imageIndex], 
+                       m_depthBuffer->GetImageView(), 
+                       m_swapChain->GetExtent(), 
+                       clearValues);
 }
 
 void VulkanRenderer::RecreateSwapChain()
@@ -686,9 +647,7 @@ void VulkanRenderer::RecreateSwapChain()
     vkDeviceWaitIdle(m_device->GetDevice());
 
     // Cleanup old swap chain resources
-    m_framebuffer->Cleanup();
     m_swapChain->Cleanup();
-
     m_depthBuffer->Cleanup();
 
     // Recreate swap chain
@@ -700,14 +659,6 @@ void VulkanRenderer::RecreateSwapChain()
     if (!m_depthBuffer->Initialize(m_device.get(), m_swapChain->GetExtent()))
     {
         throw std::runtime_error("Failed to recreate depth buffer!");
-    }
-
-    // Recreate framebuffers
-    if (!m_framebuffer->Initialize(m_device.get(), m_renderPass->GetRenderPass(),
-                                   m_swapChain->GetImageViews(),
-                                   m_swapChain->GetExtent(), m_depthBuffer.get()))
-    {
-        throw std::runtime_error("Failed to recreate framebuffers!");
     }
 }
 

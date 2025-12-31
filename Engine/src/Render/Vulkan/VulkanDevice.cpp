@@ -168,8 +168,7 @@ int VulkanDevice::RateDeviceSuitability(VkPhysicalDevice device) const
     vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
     int score = 0;
-
-    // Discrete GPUs have significant performance advantage
+    
     if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
     {
         score += 1000;
@@ -179,7 +178,6 @@ int VulkanDevice::RateDeviceSuitability(VkPhysicalDevice device) const
         score += 100;
     }
 
-    // Maximum possible size of textures affects graphics quality
     score += deviceProperties.limits.maxImageDimension2D;
 
     return score;
@@ -203,13 +201,37 @@ bool VulkanDevice::IsDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surfac
         swapChainAdequate = formatCount > 0 && presentModeCount > 0;
     }
 
-    return indices.isComplete() && extensionsSupported && swapChainAdequate;
+    // Check if dynamic rendering is supported
+    bool dynamicRenderingSupported = CheckDynamicRenderingSupport(device);
+
+    return indices.isComplete() && extensionsSupported && swapChainAdequate && dynamicRenderingSupported;
+}
+
+bool VulkanDevice::CheckDynamicRenderingSupport(VkPhysicalDevice device) const
+{
+    VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures{};
+    dynamicRenderingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+
+    VkPhysicalDeviceFeatures2 deviceFeatures2{};
+    deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    deviceFeatures2.pNext = &dynamicRenderingFeatures;
+
+    vkGetPhysicalDeviceFeatures2(device, &deviceFeatures2);
+
+    if (!dynamicRenderingFeatures.dynamicRendering)
+    {
+        PrintLog("Warning: Dynamic rendering is not supported on this device");
+        return false;
+    }
+
+    return true;
 }
 
 bool VulkanDevice::CheckDeviceExtensionSupport(VkPhysicalDevice device) const
 {
     const std::vector<const char*> requiredExtensions = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME  // Add dynamic rendering extension
     };
 
     uint32_t extensionCount;
@@ -231,6 +253,7 @@ bool VulkanDevice::CheckDeviceExtensionSupport(VkPhysicalDevice device) const
         }
         if (!found)
         {
+            PrintLog("Required extension not found: %s", required);
             return false;
         }
     }
@@ -295,18 +318,30 @@ void VulkanDevice::CreateLogicalDevice(VkSurfaceKHR surface)
         queueCreateInfos.push_back(queueCreateInfo);
     }
 
-    VkPhysicalDeviceFeatures deviceFeatures{};
-    deviceFeatures.samplerAnisotropy = VK_TRUE;
+    // Enable dynamic rendering feature
+    VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures{};
+    dynamicRenderingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+    dynamicRenderingFeatures.dynamicRendering = VK_TRUE;
+    dynamicRenderingFeatures.pNext = nullptr;
 
+    // Device features
+    VkPhysicalDeviceFeatures2 deviceFeatures2{};
+    deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    deviceFeatures2.pNext = &dynamicRenderingFeatures;  // Chain dynamic rendering features
+    deviceFeatures2.features.samplerAnisotropy = VK_TRUE;
+
+    // Required extensions
     const std::vector<const char*> deviceExtensions = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME
     };
 
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    createInfo.pNext = &deviceFeatures2;
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
     createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
-    createInfo.pEnabledFeatures = &deviceFeatures;
+    createInfo.pEnabledFeatures = nullptr;
     createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
     createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 

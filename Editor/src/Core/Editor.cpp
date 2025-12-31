@@ -51,9 +51,10 @@ void Editor::Initialize()
     auto model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Cube.obj");
     resourceManager->Load<Model>(RESOURCE_PATH"/models/Suzanne.obj");
     resourceManager->Load<Model>(RESOURCE_PATH"/models/Plane.obj");
+    model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Sponza/sponza.obj");
     model->EOnLoaded.Bind([model, this, currentScene]()
     {
-        // auto go = Model::CreateGameObject(model.getPtr(), currentScene);
+        auto go = Model::CreateGameObject(model.getPtr(), currentScene);
     });
     
     auto go = currentScene->CreateGameObject();

@@ -82,8 +82,9 @@ VulkanPipeline::~VulkanPipeline()
     Cleanup();
 }
 
-bool VulkanPipeline::Initialize(VulkanDevice* device, VkRenderPass renderPass, VkExtent2D extent,
-                                uint32_t maxFramesInFlight, const Shader* shader)
+bool VulkanPipeline::Initialize(VulkanDevice* device, VkExtent2D extent,
+                                uint32_t maxFramesInFlight, const Shader* shader,
+                                VkFormat colorFormat, VkFormat depthFormat)
 {
     auto uniforms = shader->GetUniforms();
     auto pushConstants = shader->GetPushConstants();
@@ -159,7 +160,7 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkRenderPass renderPass, V
         }
         else 
         {
-            return InitializeGraphicsPipeline(vertexShader, fragmentShader, renderPass);
+            return InitializeGraphicsPipeline(vertexShader, fragmentShader, colorFormat, depthFormat);
         }
     }
     catch (const std::exception& e) {
@@ -170,8 +171,9 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkRenderPass renderPass, V
 }
 
 bool VulkanPipeline::InitializeGraphicsPipeline(const VertexShader* vertexShader, 
-                                               const FragmentShader* fragmentShader, 
-                                               VkRenderPass renderPass)
+                                               const FragmentShader* fragmentShader,
+                                               VkFormat colorFormat,
+                                               VkFormat depthFormat)
 {
     VkPipelineShaderStageCreateInfo vertStage{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
     vertStage.stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -232,7 +234,15 @@ bool VulkanPipeline::InitializeGraphicsPipeline(const VertexShader* vertexShader
     colorBlending.attachmentCount = 1;
     colorBlending.pAttachments = &colorBlendAttachment;
 
+    VkPipelineRenderingCreateInfo pipelineRenderingInfo{};
+    pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    pipelineRenderingInfo.colorAttachmentCount = 1;
+    pipelineRenderingInfo.pColorAttachmentFormats = &colorFormat;
+    pipelineRenderingInfo.depthAttachmentFormat = depthFormat;
+    pipelineRenderingInfo.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+
     VkGraphicsPipelineCreateInfo pipelineInfo{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
+    pipelineInfo.pNext = &pipelineRenderingInfo;
     pipelineInfo.stageCount = 2;
     pipelineInfo.pStages = shaderStages;
     pipelineInfo.pVertexInputState = &vertexInputInfo;
@@ -244,12 +254,13 @@ bool VulkanPipeline::InitializeGraphicsPipeline(const VertexShader* vertexShader
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = m_pipelineLayout;
-    pipelineInfo.renderPass = renderPass;
+    pipelineInfo.renderPass = VK_NULL_HANDLE;
     pipelineInfo.subpass = 0;
 
     VkResult result = vkCreateGraphicsPipelines(m_device->GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
     return result == VK_SUCCESS;
 }
+
 
 bool VulkanPipeline::InitializeComputePipeline(const ComputeShader* computeShader)
 {
