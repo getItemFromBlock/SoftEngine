@@ -43,6 +43,7 @@ int main(int argc, char** argv, char** envp)
     // _CrtSetBreakAlloc(3248);
 #endif
 
+    //TODO: ClassDescriptor added to class or at least to a manager, that do for all loaded resources (for memory management), 
     return Run(argc, argv, envp);
 }
 #endif

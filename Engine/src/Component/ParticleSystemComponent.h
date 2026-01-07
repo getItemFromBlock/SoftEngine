@@ -143,6 +143,8 @@ public:
     void SetPlaybackTime(float time) { m_currentTime = time; }
 
     void SetBillboard(bool enable);
+    
+    SafePtr<Material> GetMaterial() const { return m_material; }
 private:
     void RecreateParticleBuffers();
     void InitializeParticleData(ParticleData& p, uint32_t index) const;
@@ -162,7 +164,7 @@ private:
     bool m_needsRecreation = false;
     bool m_needsShaderChange = false;
 
-    bool m_debugReadbackEnabled = true;
+    bool m_debugReadbackEnabled = false;
     std::unique_ptr<VulkanBuffer> m_debugReadbackBuffer;
     std::vector<ParticleData> m_debugCPUBuffer;
 

@@ -26,6 +26,7 @@ bool VulkanRenderPass::Initialize(VulkanDevice* device, VkFormat swapChainImageF
     }
 
     m_device = device;
+    return true;
 }
 
 void VulkanRenderPass::Cleanup()

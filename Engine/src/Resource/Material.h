@@ -78,10 +78,11 @@ public:
 
     void SendAllValues(RHIRenderer* renderer) const;
 
-    bool Bind(RHIRenderer* renderer) const;
+    bool Bind(RHIRenderer* renderer);
 
     MaterialAttributes GetAttributes() const { return m_attributes; }
     RHIMaterial* GetHandle() const { return m_handle.get(); }
+    bool IsDirty() const { return m_dirty; }
 private:
     void OnShaderChanged();
     
@@ -94,4 +95,7 @@ private:
     MaterialAttributes m_temporaryAttributes;
 
     EventHandle m_shaderChangeEvent;
+    
+    uint32_t m_frameProcessed = 0;
+    bool m_dirty = false;
 };

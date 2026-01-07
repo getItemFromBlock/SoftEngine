@@ -35,8 +35,10 @@ void Inspector::OnRender()
             ImGui::Text("Name: %s", object->GetName().c_str());
 
             auto components = object->GetComponents();
+            size_t i = 0;
             for (SafePtr<IComponent>& component : components)
             {
+                const ClassDescriptor& descriptor = GetDescriptor(component->GetUUID(), component);
                 ImGui::PushID(component->GetUUID());
 
                 bool enable = component->IsEnable();
@@ -53,23 +55,106 @@ void Inspector::OnRender()
 
                 if (open)
                 {
-                    ClassDescriptor descriptor;
-                    component->Describe(descriptor);
                     ShowProperty(descriptor);
                 }
                 ImGui::PopID();
+                i++;
             }
         }
     }
     ImGui::End();
 }
 
-void Inspector::SetSelectedObject(Core::UUID uuid)
+void Inspector::SetSelectedObject(const Core::UUID& uuid)
 {
     m_selectedObject = uuid;
+
+    if (SafePtr<GameObject> object = m_sceneHolder->GetCurrentScene()->GetGameObject(uuid))
+    {
+        std::vector<SafePtr<IComponent>> components = object->GetComponents();
+        
+        for (SafePtr<IComponent>& component : components)
+        {
+            ClassDescriptor descriptor;
+            component->Describe(descriptor);
+            m_descriptors[component->GetUUID()] = descriptor;
+        }
+    }
 }
 
-void Inspector::ShowMaterials(const Property& property) const
+template<>
+void Inspector::DisplayResourcePopup<Material>(const Property& property) const
+{
+    SafePtr<Material>* materialPtr = static_cast<SafePtr<Material>*>(property.data);
+    if (ImGui::BeginPopup("Resource Popup"))
+    {
+        auto resourceManager = p_engine->GetResourceManager();
+        auto materials = resourceManager->GetAll<Material>();
+        for (auto& material : materials)
+        {
+            ImGui::PushID(material->GetUUID());
+            if (ImGui::MenuItem(material->GetName().c_str()))
+            {
+                if (property.setter)
+                    property.setter(&material);
+                else
+                    *materialPtr = material;
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndPopup();
+    }
+}
+
+template<>
+void Inspector::DisplayResourcePopup<Mesh>(const Property& property) const
+{
+    SafePtr<Mesh>* meshPtr = static_cast<SafePtr<Mesh>*>(property.data);
+    if (ImGui::BeginPopup("Resource Popup"))
+    {
+        auto resourceManager = p_engine->GetResourceManager();
+        auto meshes = resourceManager->GetAll<Mesh>();
+        for (auto& mesh : meshes)
+        {
+            ImGui::PushID(mesh->GetUUID());
+            if (ImGui::MenuItem(mesh->GetName().c_str()))
+            {
+                if (property.setter)
+                    property.setter(&mesh);
+                else
+                    *meshPtr = mesh;
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndPopup();
+    }
+}
+
+template<>
+void Inspector::DisplayResourcePopup<Texture>(const Property& property) const
+{
+    SafePtr<Texture>* texturePtr = static_cast<SafePtr<Texture>*>(property.data);
+    if (ImGui::BeginPopup("Resource Popup"))
+    {
+        auto resourceManager = p_engine->GetResourceManager();
+        auto textures = resourceManager->GetAll<Texture>();
+        for (auto& texture : textures)
+        {
+            ImGui::PushID(texture->GetUUID());
+            if (ImGui::MenuItem(texture->GetName().c_str()))
+            {
+                if (property.setter)
+                    property.setter(&texture);
+                else
+                    *texturePtr = texture;
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndPopup();
+    }
+}
+
+void Inspector::ShowMaterials(const Property& property)
 {
     auto materials = static_cast<std::vector<SafePtr<Material>>*>(property.data);
     auto materialList = *materials;
@@ -99,8 +184,7 @@ void Inspector::ShowMaterials(const Property& property) const
         }
         if (ImGui::TreeNode("Details"))
         {
-            ClassDescriptor descriptor;
-            material->Describe(descriptor);
+            const ClassDescriptor& descriptor = GetDescriptor(material->GetUUID(), material);
             ShowProperty(descriptor);
             ImGui::TreePop();
         }
@@ -109,7 +193,7 @@ void Inspector::ShowMaterials(const Property& property) const
     *materials = materialList;
 }
 
-void Inspector::ShowMesh(const Property& property) const
+void Inspector::ShowMesh(const Property& property)
 {
     SafePtr<Mesh>* meshPtr = static_cast<SafePtr<Mesh>*>(property.data);
     SafePtr<Mesh> mesh = *meshPtr;
@@ -140,7 +224,7 @@ void Inspector::ShowMesh(const Property& property) const
     }
 }
 
-void Inspector::ShowTransform(const Property& property) const
+void Inspector::ShowTransform(const Property& property)
 {
     auto transform = static_cast<TransformComponent*>(property.data);
     Vec3f position = transform->GetLocalPosition();
@@ -217,7 +301,7 @@ bool DisplayParticleValue(const std::string& name, ParticleProperty<T>& property
     return result;
 }
 
-void Inspector::ShowParticleSystem(const Property& property) const
+void Inspector::ShowParticleSystem(const Property& property)
 {
     auto ps = static_cast<ParticleSystemComponent*>(property.data);
     
@@ -298,6 +382,9 @@ void Inspector::ShowParticleSystem(const Property& property) const
         {
             ps->SetBillboard(rendering.billboard);
         }
+        auto mat = ps->GetMaterial();
+        const ClassDescriptor& descriptor = GetDescriptor(mat->GetUUID(), mat);
+        ShowProperty(descriptor);
     }
     
     if (changed)
@@ -306,7 +393,20 @@ void Inspector::ShowParticleSystem(const Property& property) const
     }
 }
 
-void Inspector::ShowProperty(const ClassDescriptor& descriptor) const
+void Inspector::ShowTexture(const Property& property)
+{
+    auto texturePtr = static_cast<SafePtr<Texture>*>(property.data);
+    if (!texturePtr->getPtr())
+        return;
+    auto textureID = m_imguiHandler->GetTextureID(texturePtr->getPtr());
+    if (ImGui::ImageButton(property.name.c_str(), textureID, ImVec2(64, 64)))
+    {
+        ImGui::OpenPopup("Resource Popup");
+    }
+    DisplayResourcePopup<Texture>(property);
+}
+
+void Inspector::ShowProperty(const ClassDescriptor& descriptor)
 {
     for (auto& property : descriptor.properties)
     {
@@ -428,9 +528,7 @@ void Inspector::ShowProperty(const ClassDescriptor& descriptor) const
         }
         case PropertyType::Texture:
         {
-            auto texturePtr = static_cast<SafePtr<Texture>*>(property.data);
-            auto textureID = m_imguiHandler->GetTextureID(texturePtr->getPtr());
-            ImGui::Image(textureID, ImVec2(64, 64));
+            ShowTexture(property);
             break;
         }
         case PropertyType::Mesh:

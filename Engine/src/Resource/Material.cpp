@@ -55,7 +55,12 @@ void Material::Describe(ClassDescriptor& descriptor)
     }
     for (auto& [name, attrib] : m_attributes.samplerAttributes)
     {
-        descriptor.AddTexture(name.c_str(), attrib.value);
+        auto& prop = descriptor.AddTexture(name.c_str(), attrib.value);
+        prop.setter = [this, prop](void* value)
+        {
+            SafePtr<Texture>* texture = static_cast<SafePtr<Texture>*>(value);
+            SetAttribute(prop.name, *texture);
+        };
     }
 }
 
@@ -138,13 +143,7 @@ void Material::SetAttribute(const std::string& name, const SafePtr<Texture>& tex
     if (m_attributes.samplerAttributes.contains(name))
     {
         m_attributes.samplerAttributes[name] = texture;
-
-        texture->EOnSentToGPU.Bind([this, texture, name]()
-        {
-            auto uniform = m_shader->GetUniform(name);
-
-            SendTexture(texture.getPtr(), uniform);
-        });
+        m_dirty = true;
     }
     else if (m_shader && !m_shader->SentToGPU())
     {
@@ -249,10 +248,35 @@ void Material::SendAllValues(RHIRenderer* renderer) const
     }
 }
 
-bool Material::Bind(RHIRenderer* renderer) const
+bool Material::Bind(RHIRenderer* renderer)
 {
     if (!m_handle)
         return false;
+    
+    if (m_dirty)
+    {
+        for (auto& [name, buffer] : m_attributes.samplerAttributes)
+        {
+            auto texture = buffer.value;
+            if (!texture)
+                continue;
+            texture->EOnSentToGPU.Bind([this, texture, name]()
+            {
+                auto uniform = m_shader->GetUniform(name);
+
+                SendTexture(texture.getPtr(), uniform);
+            });
+        }
+        auto frameCount = Cast<VulkanRenderer>(renderer)->GetMaxFramesInFlight();
+        m_frameProcessed++;
+        
+        if (m_frameProcessed >= frameCount)
+        {
+            m_dirty = false;
+            m_frameProcessed = 0;
+        }
+    }
+    
     m_handle->Bind(renderer);
     return true;
 }
@@ -356,18 +380,13 @@ void Material::OnShaderChanged()
             break;
         case UniformType::Sampler2D:
             {
+                auto blankTexture = Engine::Get()->GetResourceManager()->GetBlankTexture();
                 m_attributes.samplerAttributes[uniform.name] =
                     m_temporaryAttributes.samplerAttributes.contains(uniform.name)
                         ? m_temporaryAttributes.samplerAttributes[uniform.name].value
-                        : SafePtr<Texture>{};
+                        : blankTexture;
 
-                Texture* texture = m_attributes.samplerAttributes[uniform.name].value.getPtr();
-                if (!texture)
-                    break;
-                texture->EOnSentToGPU.Bind([this, uniform, texture]()
-                {
-                    SendTexture(texture, uniform);
-                });
+                m_dirty = true;
             }
             break;
         case UniformType::SamplerCube:
@@ -383,5 +402,6 @@ void Material::SendTexture(Texture* texture, const Uniform& uniform) const
 {
     RHIRenderer* renderer = Engine::Get()->GetRenderer();
     VulkanMaterial* rhiMat = dynamic_cast<VulkanMaterial*>(m_handle.get());
-    rhiMat->SetTexture(uniform.set, uniform.binding, texture, renderer);
+    auto currentFrame = Cast<VulkanRenderer>(renderer)->GetFrameIndex();
+    rhiMat->SetTextureForFrame(currentFrame, uniform.set, uniform.binding, texture);
 }

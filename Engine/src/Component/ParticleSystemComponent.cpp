@@ -57,6 +57,8 @@ void ParticleSystemComponent::OnCreate()
 
     m_material = resourceManager->CreateMaterial("ParticleInstancing");
     m_material->SetShader(instancingShader);
+    
+    m_material->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
 
     m_mesh = resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cube.obj/Cube");
     SetParticleCount(m_particleSettings.general.particleCount);
@@ -141,6 +143,12 @@ void ParticleSystemComponent::OnCreate()
         m_particleBuffer = std::move(particleBuffer);
         m_instanceBuffer = std::move(instanceBuffer);
     });
+    
+    auto transform = p_gameObject->GetTransform();
+    transform->EOnUpdateModelMatrix += [this]()
+    {
+        ApplySettings();  
+    };
 }
 
 void ParticleSystemComponent::OnUpdate(float deltaTime)
@@ -460,6 +468,7 @@ void ParticleSystemComponent::InitializeParticleData(ParticleData& p, uint32_t i
     case ShapeType::None:
         point = worldPosition;
         direction = forward;
+        break;
     case ShapeType::Sphere:
         point = worldPosition + Random::PointInSphere(m_particleSettings.shape.radius, seed);
         direction = (point - worldPosition).GetNormalize();

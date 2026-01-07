@@ -19,6 +19,7 @@ layout(std140, set = 0, binding = 0) uniform CameraUBO {
 } cameraUBO;
 
 layout(location = 0) out vec4 fragColor;
+layout(location = 1) out vec2 vTexCoord;
 
 void main()
 {
@@ -27,10 +28,11 @@ void main()
     vec3 billboardOffset =
         cameraUBO.cameraRight * inPosition.x +
         cameraUBO.cameraUp    * inPosition.y +
-        cameraUBO.cameraFront * inPosition.z;
+        -cameraUBO.cameraFront * inPosition.z;
 
     vec3 worldPos = instancePosition.xyz + billboardOffset * scale;
 
     gl_Position = cameraUBO.viewProj * vec4(worldPos, 1.0);
+    vTexCoord = inTexCoord;
     fragColor = instanceColor;
 }
