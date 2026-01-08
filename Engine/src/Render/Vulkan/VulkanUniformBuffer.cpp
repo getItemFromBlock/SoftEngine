@@ -49,7 +49,6 @@ bool VulkanUniformBuffer::Initialize(VulkanDevice* device, VkDeviceSize size,
 
 void VulkanUniformBuffer::Cleanup()
 {
-    // Unmap any mapped memories
     UnmapAll();
 
     for (auto b : m_buffer)

@@ -28,7 +28,7 @@ Editor* Editor::Create()
 void Editor::Initialize()
 {
     WindowConfig config;
-    config.title = "Window Test";
+    config.title = "Editor";
     config.size = Vec2i(1280, 720);
     config.attributes = static_cast<WindowAttributes>(VSync);
     m_window = Window::Create(WindowAPI::GLFW, RenderAPI::Vulkan, config);

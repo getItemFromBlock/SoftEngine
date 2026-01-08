@@ -324,7 +324,7 @@ void Material::OnShaderChanged()
                     {
                         int value = m_temporaryAttributes.intAttributes.contains(member.name)
                                         ? m_temporaryAttributes.intAttributes[member.name].value
-                                        : 0.f;
+                                        : 0;
                         m_attributes.intAttributes[member.name] = Attribute<int>(
                             uniform.name,
                             value

@@ -27,7 +27,7 @@ struct Attribute
     Attribute() = default;
     Attribute(const std::string& uniformName, T value) : uniformName(uniformName), value(value) {}
     
-    void operator=(const T& value) { this->value = value; }
+    void operator=(const T& _value) { this->value = _value; }
     void operator=(const Attribute& attribute) { this->uniformName = attribute.uniformName, this->value = attribute.value; }
 };
 

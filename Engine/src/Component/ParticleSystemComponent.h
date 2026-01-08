@@ -67,6 +67,7 @@ struct ParticleSettings
         ParticleProperty<float> startLifeTime = 5.f;
         ParticleProperty<float> startSpeed = 5.f;
         ParticleProperty<float> startSize = 1.f;
+        ParticleProperty<float> gravityScale = 1.f;
 
         int particleCount = 1000;
 
@@ -108,7 +109,7 @@ struct ParticleData
     Vec4f positionSize;
     Vec4f velocityLifeTime;
     Vec4f color;
-    Vec4f padding;
+    Vec4f startTimeGravity;
 };
 
 struct InstanceData

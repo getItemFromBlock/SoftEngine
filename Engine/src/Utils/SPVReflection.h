@@ -16,8 +16,8 @@ namespace SPV
 
     void ReflectVertexInputs(const std::string& spirv, std::vector<VkVertexInputAttributeDescription>& outAttributes, std::vector<VkVertexInputBindingDescription>& outBindings);
     void ReflectDescriptorBindings(const std::string& spirv, std::vector<VkDescriptorSetLayoutBinding>& outBindings, VkShaderStageFlags& outStageFlags);
-    
-    size_t CalculateStorageBufferSize(const SpvReflectDescriptorBinding* binding);
+
+    uint32_t CalculateStorageBufferSize(const SpvReflectDescriptorBinding* binding);
     size_t CalculateStorageBufferSizeWithCount(const SpvReflectDescriptorBinding* binding,
                                                uint32_t runtimeArrayElementCount = 0);
     void ParseBlockVariable(const SpvReflectBlockVariable* var, UniformMember& out);

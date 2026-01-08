@@ -315,7 +315,6 @@ void VulkanTexture::CopyBufferToImage(VulkanCommandPool* _commandBuffer, VulkanQ
     m_device->EndSingleTimeCommands(_commandBuffer, graphicsQueue, commandBuffer);
 }
 
-// Private helper methods
 bool VulkanTexture::CopyDataToBuffer(VulkanBuffer& buffer, const void* data, VkDeviceSize size)
 {
     void* mappedData;

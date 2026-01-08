@@ -1,5 +1,6 @@
 ﻿#include "SPVReflection.h"
 
+#include <algorithm>
 #include <map>
 #include <set>
 
@@ -36,8 +37,8 @@ uint32_t SPV::VkFormatSize(VkFormat fmt)
 }
 
 void SPV::ReflectVertexInputs(const std::string& spirv,
-                             std::vector<VkVertexInputAttributeDescription>& outAttributes,
-                             std::vector<VkVertexInputBindingDescription>& outBindings)
+                              std::vector<VkVertexInputAttributeDescription>& outAttributes,
+                              std::vector<VkVertexInputBindingDescription>& outBindings)
 {
     const uint32_t* spirv_words = reinterpret_cast<const uint32_t*>(spirv.data());
     size_t word_count = spirv.size() / sizeof(uint32_t);
@@ -54,7 +55,8 @@ void SPV::ReflectVertexInputs(const std::string& spirv,
     if (spvReflectEnumerateInputVariables(&module, &var_count, vars.data()) != SPV_REFLECT_RESULT_SUCCESS)
         throw std::runtime_error("spvReflectEnumerateInputVariables failed (2)");
 
-    auto toLower = [](const char* s) {
+    auto toLower = [](const char* s)
+    {
         std::string r;
         if (!s) return r;
         for (; *s; ++s) r.push_back(static_cast<char>(std::tolower(*s)));
@@ -78,9 +80,10 @@ void SPV::ReflectVertexInputs(const std::string& spirv,
 
         uint32_t columns = 1;
         uint32_t rows = 1;
-        if (isMatrix) {
+        if (isMatrix)
+        {
             columns = var->type_description->traits.numeric.matrix.column_count;
-            rows    = var->type_description->traits.numeric.matrix.row_count;
+            rows = var->type_description->traits.numeric.matrix.row_count;
         }
 
         std::string nameLower = toLower(var->name);
@@ -94,8 +97,9 @@ void SPV::ReflectVertexInputs(const std::string& spirv,
         usedBindings.insert(binding);
 
         VkFormat columnFormat = baseFormat;
-        if (columns > 1) {
-            if (rows == 4)      columnFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
+        if (columns > 1)
+        {
+            if (rows == 4) columnFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
             else if (rows == 3) columnFormat = VK_FORMAT_R32G32B32_SFLOAT;
         }
 
@@ -103,9 +107,9 @@ void SPV::ReflectVertexInputs(const std::string& spirv,
         {
             VkVertexInputAttributeDescription attr{};
             attr.location = var->location + c;
-            attr.binding  = binding;
-            attr.format   = columnFormat;
-            attr.offset   = 0;
+            attr.binding = binding;
+            attr.format = columnFormat;
+            attr.offset = 0;
             perBindingAttrs[binding].push_back(attr);
         }
     }
@@ -119,7 +123,8 @@ void SPV::ReflectVertexInputs(const std::string& spirv,
 
         std::sort(attrs.begin(), attrs.end(),
                   [](const VkVertexInputAttributeDescription& a,
-                     const VkVertexInputAttributeDescription& b) {
+                     const VkVertexInputAttributeDescription& b)
+                  {
                       return a.location < b.location;
                   });
 
@@ -134,27 +139,26 @@ void SPV::ReflectVertexInputs(const std::string& spirv,
         bindingStrides[binding] = offset;
 
         VkVertexInputBindingDescription bindingDesc{};
-        bindingDesc.binding   = binding;
-        bindingDesc.stride    = offset;
+        bindingDesc.binding = binding;
+        bindingDesc.stride = offset;
         bindingDesc.inputRate = (binding == 1)
-                              ? VK_VERTEX_INPUT_RATE_INSTANCE
-                              : VK_VERTEX_INPUT_RATE_VERTEX;
+                                    ? VK_VERTEX_INPUT_RATE_INSTANCE
+                                    : VK_VERTEX_INPUT_RATE_VERTEX;
         outBindings.push_back(bindingDesc);
     }
 
-    std::sort(outAttributes.begin(), outAttributes.end(),
-              [](const VkVertexInputAttributeDescription& a,
-                 const VkVertexInputAttributeDescription& b) {
-                  if (a.binding != b.binding) return a.binding < b.binding;
-                  return a.location < b.location;
-              });
+    std::ranges::sort(outAttributes, [](const VkVertexInputAttributeDescription& a, const VkVertexInputAttributeDescription& b)
+    {
+      if (a.binding != b.binding) return a.binding < b.binding;
+      return a.location < b.location;
+    });
 
     spvReflectDestroyShaderModule(&module);
 }
 
 
 void SPV::ReflectDescriptorBindings(const std::string& spirv, std::vector<VkDescriptorSetLayoutBinding>& outBindings,
-    VkShaderStageFlags& outStageFlags)
+                                    VkShaderStageFlags& outStageFlags)
 {
     const uint32_t* spirv_words = reinterpret_cast<const uint32_t*>(spirv.data());
     size_t word_count = spirv.size() / sizeof(uint32_t);
@@ -253,16 +257,14 @@ void SPV::ReflectDescriptorBindings(const std::string& spirv, std::vector<VkDesc
     spvReflectDestroyShaderModule(&module);
 }
 
-size_t SPV::CalculateStorageBufferSize(const SpvReflectDescriptorBinding* binding)
+uint32_t SPV::CalculateStorageBufferSize(const SpvReflectDescriptorBinding* binding)
 {
-    // If the block has a known size, use it
     if (binding->block.size > 0)
     {
         return binding->block.size;
     }
 
-    // For runtime-sized arrays (common in SSBOs), calculate size from members
-    size_t calculatedSize = 0;
+    uint32_t calculatedSize = 0;
     bool hasRuntimeArray = false;
 
     if (binding->block.member_count > 0 && binding->block.members)
@@ -271,38 +273,28 @@ size_t SPV::CalculateStorageBufferSize(const SpvReflectDescriptorBinding* bindin
         {
             const SpvReflectBlockVariable* member = &binding->block.members[m];
 
-            // Check if this is a runtime array (array with no explicit size)
             if (member->array.dims_count > 0 && member->array.dims[member->array.dims_count - 1] == 0)
             {
                 hasRuntimeArray = true;
-                // For runtime arrays, we need to handle this differently
-                // The size should be set dynamically when creating the buffer
-                // Use VK_WHOLE_SIZE or a reasonable default
-                calculatedSize = member->offset; // Size up to the runtime array
+                calculatedSize = member->offset;
                 break;
             }
 
-            // Calculate the end offset of this member
-            size_t memberEnd = member->offset + member->size;
-            if (memberEnd > calculatedSize)
-            {
-                calculatedSize = memberEnd;
-            }
+            uint32_t memberEnd = member->offset + member->size;
+            calculatedSize = std::max(memberEnd, calculatedSize);
         }
     }
 
-    // If we have a runtime array, return 0 to indicate dynamic sizing needed
     if (hasRuntimeArray)
     {
-        return 0; // Caller must set size manually
+        return 0;
     }
 
-    // Otherwise return the calculated size, or a default minimum
-    return calculatedSize > 0 ? calculatedSize : 256; // 256 bytes minimum default
+    return calculatedSize > 0 ? calculatedSize : 256;
 }
 
 size_t SPV::CalculateStorageBufferSizeWithCount(const SpvReflectDescriptorBinding* binding,
-    uint32_t runtimeArrayElementCount)
+                                                uint32_t runtimeArrayElementCount)
 {
     if (binding->block.size > 0 && runtimeArrayElementCount == 0)
     {
@@ -317,19 +309,15 @@ size_t SPV::CalculateStorageBufferSizeWithCount(const SpvReflectDescriptorBindin
         {
             const SpvReflectBlockVariable* member = &binding->block.members[m];
 
-            // Check for runtime array
             if (member->array.dims_count > 0 &&
                 member->array.dims[member->array.dims_count - 1] == 0)
             {
-                // Calculate size of elements before runtime array
                 totalSize = member->offset;
 
                 if (runtimeArrayElementCount > 0)
                 {
-                    // Add size for runtime array elements
                     size_t elementSize = member->size;
 
-                    // Account for array stride if available
                     if (member->array.stride > 0)
                     {
                         elementSize = member->array.stride;
@@ -341,12 +329,8 @@ size_t SPV::CalculateStorageBufferSizeWithCount(const SpvReflectDescriptorBindin
                 break;
             }
 
-            // For fixed-size members
             size_t memberEnd = member->offset + member->size;
-            if (memberEnd > totalSize)
-            {
-                totalSize = memberEnd;
-            }
+            totalSize = std::max(memberEnd, totalSize);
         }
     }
 
@@ -572,7 +556,7 @@ Uniforms SPV::SpirvReflectUniforms(const std::string& spirv)
         case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER:
             u.type = UniformType::Sampler2D;
             u.offset = 0;
-            u.size = 0; // Samplers don't have a size
+            u.size = 0;
             break;
 
         case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER:

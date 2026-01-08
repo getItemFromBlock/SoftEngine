@@ -22,7 +22,7 @@ bool OBJLoader::Parse(Model& model)
 	auto endSubMesh = [&](Mesh& mesh) {
 		std::vector<SubMesh>& subMeshes = mesh.subMeshes;
 			if (!subMeshes.empty()) {
-				subMeshes.back().count = mesh.indices.size() - subMeshes.back().startIndex;
+				subMeshes.back().count = static_cast<uint32_t>(mesh.indices.size()) - subMeshes.back().startIndex;
 			}
 		};
 
@@ -56,7 +56,7 @@ bool OBJLoader::Parse(Model& model)
 			std::string materialName;
 			iss >> materialName;
 			SubMesh subMesh = SubMesh();
-			subMesh.startIndex = currentMesh.indices.size();
+			subMesh.startIndex = static_cast<uint32_t>(currentMesh.indices.size());
 			subMesh.materialName = materialName;
 
 			currentMesh.subMeshes.push_back(subMesh);
@@ -86,7 +86,7 @@ bool OBJLoader::Parse(Model& model)
 			if (currentMesh.subMeshes.empty())
 			{
 				SubMesh subMesh = SubMesh();
-				subMesh.startIndex = currentMesh.indices.size();
+				subMesh.startIndex = static_cast<uint32_t>(currentMesh.indices.size());
 				currentMesh.subMeshes.push_back(subMesh);
 			}
 

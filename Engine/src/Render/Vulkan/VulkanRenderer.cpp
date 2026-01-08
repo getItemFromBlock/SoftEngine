@@ -285,7 +285,7 @@ void VulkanRenderer::EndFrame()
     m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void VulkanRenderer::SendPushConstants(void* data, size_t size, Shader* shader, PushConstant pushConstant) const
+void VulkanRenderer::SendPushConstants(void* data, uint32_t size, Shader* shader, PushConstant pushConstant) const
 {
     auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
     VulkanPipeline* pipeline = dynamic_cast<VulkanPipeline*>(shader->GetPipeline());

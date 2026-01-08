@@ -86,7 +86,6 @@ void TransformComponent::SetWorldRotation(const Quat& rotation)
     auto parent = p_gameObject->GetParent();
     if (parent)
     {
-        // WorldRot = ParentRot * LocalRot  ->  LocalRot = ParentRot_Inverse * WorldRot
         Quat parentRotation = parent->GetTransform()->GetWorldRotation();
         SetLocalRotation(parentRotation.GetInverse() * rotation);
     }
@@ -128,7 +127,6 @@ void TransformComponent::SetWorldScale(const Vec3f& scale)
     {
         Vec3f parentScale = parent->GetTransform()->GetWorldScale();
 
-        // Guard against division by zero
         Vec3f newLocalScale;
         newLocalScale.x = (parentScale.x != 0.0f) ? scale.x / parentScale.x : 0.0f;
         newLocalScale.y = (parentScale.y != 0.0f) ? scale.y / parentScale.y : 0.0f;

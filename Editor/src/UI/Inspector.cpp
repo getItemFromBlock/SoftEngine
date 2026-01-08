@@ -343,8 +343,14 @@ void Inspector::ShowParticleSystem(const Property& property)
         changed |= DisplayParticleValue("Start Life Time", general.startLifeTime);
         changed |= DisplayParticleValue("Start Speed", general.startSpeed);
         changed |= DisplayParticleValue("Start Size", general.startSize);
-        changed |= ImGui::InputInt("Particle count", &general.particleCount);
+        int particleCount = general.particleCount;
+        if (ImGui::InputInt("Particle count", &particleCount) && particleCount > 0)
+        {
+            changed |= true;
+            general.particleCount = particleCount;
+        }
         changed |= DisplayParticleValue("Start Color", general.startColor);
+        changed |= DisplayParticleValue("Gravity Scale", general.gravityScale);
     }
     
     if (ImGui::CollapsingHeader("Emission"))

@@ -61,7 +61,7 @@ public:
     virtual void ClearColor() const = 0;
     
     virtual void BindVertexBuffers(RHIVertexBuffer* _vertexBuffer, RHIIndexBuffer* _indexBuffer) const = 0;
-    virtual void SendPushConstants(void* data, size_t size, Shader* shader, PushConstant pushConstant) const = 0;
+    virtual void SendPushConstants(void* data, uint32_t size, Shader* shader, PushConstant pushConstant) const = 0;
     virtual void DrawVertex(RHIVertexBuffer* _vertexBuffer, RHIIndexBuffer* indexBuffer) = 0;
     virtual void DrawVertexSubMesh(RHIIndexBuffer* _indexBuffer, uint32_t startIndex, uint32_t indexCount) {}
     virtual void DrawInstanced(RHIIndexBuffer* indexBuffer, RHIVertexBuffer* vertexShader, RHIBuffer* instanceBuffer, uint32_t instanceCount) {}

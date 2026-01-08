@@ -55,6 +55,7 @@ bool Mesh::Load(ResourceManager* resourceManager)
 
 bool Mesh::SendToGPU(RHIRenderer* renderer)
 {    
+    ASSERT(!m_vertices.empty());
     uint32_t floatsPerVertex = 11;
     m_vertexBuffer = renderer->CreateVertexBuffer(
         m_vertices.data(), 

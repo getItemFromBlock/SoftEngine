@@ -26,7 +26,6 @@ bool VulkanIndexBuffer::Initialize(VulkanDevice* device, VkDeviceSize size, VkIn
     m_size = size;
     m_indexType = indexType;
     
-    // Create index buffer with HOST_VISIBLE memory for dynamic updates
     m_buffer = new VulkanBuffer();
     if (!m_buffer->Initialize(device, size,
                               VK_BUFFER_USAGE_INDEX_BUFFER_BIT,

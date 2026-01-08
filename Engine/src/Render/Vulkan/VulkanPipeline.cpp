@@ -98,7 +98,6 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkExtent2D extent,
 
     try
     {
-        // --- 1. Descriptor Set Layouts (Shared by both) ---
         std::unordered_map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> layoutBindings;
         for (const auto& uniform : uniforms | std::views::values)
         {
@@ -128,7 +127,6 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkExtent2D extent,
             m_descriptorSetLayouts.push_back(std::move(layout));
         }
 
-        // --- 2. Push Constants (Shared) ---
         std::vector<VkPushConstantRange> ranges;
         for (auto& [shaderType, pc] : pushConstants)
         {
@@ -140,7 +138,6 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkExtent2D extent,
             ranges.push_back({ .stageFlags = stageFlags, .offset = pc.offset, .size = pc.size });
         }
 
-        // --- 3. Pipeline Layout (Shared) ---
         std::vector<VkDescriptorSetLayout> layouts;
         for (const auto& layout : m_descriptorSetLayouts) layouts.push_back(layout->GetLayout());
 
@@ -153,7 +150,6 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkExtent2D extent,
         if (vkCreatePipelineLayout(m_device->GetDevice(), &layoutInfo, nullptr, &m_pipelineLayout) != VK_SUCCESS)
             throw std::runtime_error("Failed to create pipeline layout");
 
-        // --- 4. Branching: Compute vs Graphics ---
         if (computeShader) 
         {
             return InitializeComputePipeline(computeShader);

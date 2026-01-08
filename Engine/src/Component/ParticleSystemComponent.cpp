@@ -317,8 +317,10 @@ void ParticleSystemComponent::OnDestroy()
 
 void ParticleSystemComponent::SetParticleCount(int count)
 {
-    if (count <= 0) return;
-    if (count == m_particleSettings.general.particleCount) return;
+    if (count <= 0) 
+        return;
+    if (count == m_particleSettings.general.particleCount) 
+        return;
 
     m_particleSettings.general.particleCount = count;
 
@@ -485,14 +487,16 @@ void ParticleSystemComponent::InitializeParticleData(ParticleData& p, uint32_t i
     bool prewarm = m_particleSettings.general.preWarm;
     float preWarmTime = m_particleSettings.general.duration;
     float startTime = index / rate;
+    float startSpeed = m_particleSettings.general.startSpeed.GetValue(seed);
     
     if (prewarm)
         startTime -= preWarmTime;
 
     p.positionSize = Vec4f(point, size);
-    p.velocityLifeTime = Vec4f(direction, lifeTime);
+    p.velocityLifeTime = Vec4f(direction * startSpeed, lifeTime);
     p.color = m_particleSettings.general.startColor.GetValue(seed);
-    p.padding = Vec4f(startTime, 0.f, 0.f, 0.f);
+    float gravity = m_particleSettings.general.gravityScale.GetValue(seed);
+    p.startTimeGravity = Vec4f(startTime, gravity, 0.f, 0.f);
 }
 
 void ParticleSystemComponent::ReadbackDebugData()

@@ -12,8 +12,8 @@ class OBJLoader
 public:
     struct SubMesh
     {
-        size_t startIndex;
-        size_t count;
+        uint32_t startIndex;
+        uint32_t count;
         std::optional<std::string> materialName;
     };
 

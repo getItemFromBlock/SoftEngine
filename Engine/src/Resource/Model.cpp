@@ -77,6 +77,7 @@ bool Model::Load(ResourceManager* resourceManager)
                 meshResource->m_indices.push_back(idx.z);
             }
             meshResource->SetLoaded();
+            ASSERT(!meshResource->m_vertices.empty())
             resourceManager->AddResourceToSend(meshResource.getPtr());
         }
         
