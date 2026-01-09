@@ -212,7 +212,7 @@ void WindowGLFW::SetTransparent(bool enabled)
 {
     if (GetHandle())
     {
-        glfwSetWindowAttrib(GetHandle(), GLFW_TRANSPARENT_FRAMEBUFFER, enabled ? GLFW_TRUE : GLFW_FALSE);
+        PrintWarning("SetTransparent is not supported at runtime with GLFW");
     }
     else
     {

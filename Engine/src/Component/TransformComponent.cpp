@@ -144,8 +144,7 @@ Vec3f TransformComponent::GetWorldScale() const
 {
     if (!p_gameObject)
         return m_localScale;
-    auto parent = p_gameObject->GetParent();
-    if (parent)
+    if (auto parent = p_gameObject->GetParent())
     {
         Vec3f parentScale = parent->GetTransform()->GetWorldScale();
         return parentScale * m_localScale;

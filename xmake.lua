@@ -12,7 +12,6 @@ end
 
 add_repositories("galaxy-repo https://github.com/GalaxyEngine/xmake-repo")
 
--- Add required packages based on options
 add_requires("vulkansdk")
 add_requires("shaderc")
 add_requires("spirv-reflect")
@@ -88,3 +87,5 @@ target("Editor")
     
     add_packages("imgui", "galaxymath", "stb", "thread-pool")
 target_end()
+
+includes("Tests/*.lua")
