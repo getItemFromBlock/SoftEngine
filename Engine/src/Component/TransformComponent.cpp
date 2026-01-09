@@ -193,15 +193,17 @@ Vec3f TransformComponent::TransformDirection(Vec3f dir) const
     return GetWorldRotation() * dir;
 }
 
-void TransformComponent::UpdateMatrix()
+void TransformComponent::UpdateMatrix(bool force)
 {
-    if (!m_dirty) 
+    if (!m_dirty && !force) 
         return;
+    
     if (!p_gameObject)
     {
         ComputeModelMatrix();
         return;
     }
+    
     if (SafePtr<GameObject> parent = p_gameObject->GetParent())
     {
         ComputeModelMatrix(parent->GetTransform()->GetWorldMatrix());
@@ -213,7 +215,7 @@ void TransformComponent::UpdateMatrix()
     
     for (auto& child : p_gameObject->GetChildren())
     {
-        child->GetTransform()->UpdateMatrix();
+        child->GetTransform()->UpdateMatrix(true);
     }
 }
 

@@ -55,7 +55,7 @@ public:
 private:
     void SetDirty() { m_dirty = true; }
     
-    void UpdateMatrix();
+    void UpdateMatrix(bool force = false);
     void ComputeModelMatrix(const Mat4& parentMatrix);
     void ComputeModelMatrix();
     void UpdateModelMatrix(const Mat4& matrix);
