@@ -59,8 +59,6 @@ public:
     bool SendToGPU(VulkanRenderer* renderer) override;
     void Unload() override;
     
-    std::string GetName(bool extension = true) const override;
-    
     void Describe(ClassDescriptor& descriptor) override;
     
     void SetShader(const SafePtr<Shader>& shader);

@@ -149,6 +149,7 @@ public:
     void SetBillboard(bool enable);
     
     SafePtr<Material> GetMaterial() const { return m_material; }
+    SafePtr<Mesh> GetMesh() const { return m_mesh; }
 private:
     void RecreateParticleBuffers();
     void InitializeParticleData(ParticleData& p, uint32_t index) const;

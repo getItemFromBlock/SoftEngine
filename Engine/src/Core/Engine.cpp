@@ -52,7 +52,7 @@ bool Engine::Initialize(EngineDesc desc)
     m_resourceManager->LoadDefaultTexture(RESOURCE_PATH"/textures/debug.jpeg");
     m_resourceManager->LoadBlankTexture(RESOURCE_PATH"/textures/blank.png");
     m_resourceManager->LoadDefaultShader(RESOURCE_PATH"/shaders/Unlit/unlit.shader");
-    m_resourceManager->LoadDefaultMaterial(RESOURCE_PATH"/shaders/unlit.material");
+    m_resourceManager->LoadDefaultMaterial(RESOURCE_PATH"/shaders/unlit.mat");
     
     m_componentRegister = std::make_unique<ComponentRegister>();
     m_componentRegister->RegisterComponent<TransformComponent>();

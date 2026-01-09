@@ -7,6 +7,7 @@ void ThreadPool::Initialize()
 {
     s_instance = std::make_unique<ThreadPool>();
     s_instance->m_threadPool = std::make_unique<BS::thread_pool<>>(std::thread::hardware_concurrency());
+    s_instance->m_mainThreadID = std::this_thread::get_id();
 
     auto ids = s_instance->m_threadPool->get_thread_ids();
     for (size_t i = 0; i < std::thread::hardware_concurrency(); i++)

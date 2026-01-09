@@ -3,6 +3,7 @@
 #include <ranges>
 #include <iomanip>
 
+#include "ComputeShader.h"
 #include "FragmentShader.h"
 #include "Material.h"
 #include "Texture.h"
@@ -63,6 +64,8 @@ std::filesystem::path ResourceManager::SanitizePath(const std::filesystem::path&
 std::shared_ptr<IResource> ResourceManager::CreateResourceFromPath(const std::filesystem::path& path)
 {
     std::string extension = path.extension().generic_string();
+    if (extension.empty())
+        return nullptr;
     extension = extension.substr(1); // Remove the . for optimization
 
     std::ranges::transform(extension, extension.begin(), ::tolower);
@@ -83,6 +86,8 @@ std::shared_ptr<IResource> ResourceManager::CreateResourceFromPath(const std::fi
             return std::make_shared<FragmentShader>(path);
         case ResourceType::VertexShader:
             return std::make_shared<VertexShader>(path);
+        case ResourceType::ComputeShader:
+            return std::make_shared<ComputeShader>(path);
         case ResourceType::Shader:
             return std::make_shared<Shader>(path);
         case ResourceType::Material:
@@ -116,7 +121,6 @@ void ResourceManager::UpdateResourceToSend()
             }
         }
     }
-    PrintLog("List size %d", m_resourceToSend.size());
 }
 void ResourceManager::AddResourceToSend(Core::UUID uuid)
 {
@@ -125,11 +129,11 @@ void ResourceManager::AddResourceToSend(Core::UUID uuid)
         ThreadPool::Enqueue([uuid, this]()
         {
             std::shared_ptr<IResource> resource = GetResource<IResource>(uuid);
-            if (resource && resource->SendToGPU(m_renderer))
+            if (resource && !resource->SentToGPU() && resource->SendToGPU(m_renderer))
             {
                 resource->SetSentToGPU();
             }
-            else
+            else if (!resource || !resource->IsLoaded())
             {
                 AddResourceToSend(uuid);
             }
@@ -190,8 +194,12 @@ void ResourceManager::LoadDefaultMaterial(const std::filesystem::path& materialP
     material->SetAttribute("albedoSampler", GetBlankTexture());
 }
 
-SafePtr<Material> ResourceManager::CreateMaterial(const std::filesystem::path& path)
+SafePtr<Material> ResourceManager::CreateMaterial(std::filesystem::path path)
 {
+    if (path.extension() != ".mat")
+    {
+        path = std::filesystem::path(path.generic_string() + ".mat");
+    }
     std::shared_ptr<Material> material = std::make_shared<Material>(path);
     std::shared_ptr<Shader> shader = GetDefaultShader();
     
@@ -251,7 +259,10 @@ void ResourceManager::ReadCache()
 
     while (stream >> uuid >> std::quoted(pathString))
     {
-        AddResource(uuid, nullptr, GetHash(pathString));
+        std::shared_ptr<IResource> resource = CreateResourceFromPath(pathString);
+        if (resource)
+            resource->p_uuid = uuid;
+        AddResource(uuid, resource, GetHash(pathString));
     }
 }
 

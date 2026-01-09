@@ -1,5 +1,6 @@
 ﻿#include "Mesh.h"
 
+#include "ResourceManager.h"
 #include "Debug/Log.h"
 #include "Render/Vulkan/VulkanRenderer.h"
 
@@ -46,9 +47,9 @@ std::array<VkVertexInputAttributeDescription, 4> Vertex::GetAttributeDescription
 }
 
 bool Mesh::Load(ResourceManager* resourceManager)
-{
-    UNUSED(resourceManager);
-    return true;
+{   
+    SafePtr<Model> model = resourceManager->Load<Model>(p_path.parent_path());
+    return false; // To not send twice
 }
 
 bool Mesh::SendToGPU(VulkanRenderer* renderer)
@@ -89,11 +90,6 @@ bool Mesh::SendToGPU(VulkanRenderer* renderer)
 
 void Mesh::Unload()
 {
-}
-
-std::string Mesh::GetName(bool extension) const
-{
-    return IResource::GetName(extension);
 }
 
 void Mesh::ComputeBoundingBox(const std::vector<Vec3f>& positionVertices)

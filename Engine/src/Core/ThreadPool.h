@@ -18,6 +18,8 @@ public:
     static void Initialize();
     static void WaitUntilAllTasksFinished();
     static void Terminate();
+    
+    static bool IsMainThread() { return std::this_thread::get_id() == s_instance->m_mainThreadID; }
 
     template <typename F, typename R = std::invoke_result_t<std::decay_t<F>>>
     static std::future<R> Enqueue(F&& task)
@@ -25,9 +27,7 @@ public:
 #ifdef MULTI_THREAD
         try
         {
-            auto value =  s_instance->m_threadPool->submit_task(std::forward<F>(task));
-            value.get();
-            return value;
+            return s_instance->m_threadPool->submit_task(std::forward<F>(task));;
         }
         catch (const std::exception& e)
         {
@@ -43,4 +43,5 @@ public:
 private:
     static std::unique_ptr<ThreadPool> s_instance;
     std::unique_ptr<BS::thread_pool<>> m_threadPool;
+    std::thread::id m_mainThreadID;
 };

@@ -29,7 +29,7 @@ public:
     IComponent& operator=(const IComponent& other) = default;
     IComponent(const IComponent&) = default;
     IComponent(IComponent&&) noexcept = default;
-    virtual ~IComponent() = default;
+    virtual ~IComponent();
     
     virtual const char* GetTypeName() const { return "IComponent"; }
     virtual void Describe(ClassDescriptor& d) {}

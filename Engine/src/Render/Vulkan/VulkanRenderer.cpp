@@ -198,7 +198,7 @@ void VulkanRenderer::DrawFrame()
 bool VulkanRenderer::MultiThreadSendToGPU()
 {
 #ifdef MULTI_THREAD
-    return true;
+    return false;
 #else
     return false;
 #endif

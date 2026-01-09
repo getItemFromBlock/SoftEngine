@@ -51,9 +51,12 @@ inline static std::unordered_map<std::string, ResourceType> extensionToResourceT
     { "psd", ResourceType::Texture },
     { "gif", ResourceType::Texture },
     { "obj", ResourceType::Model },
+    { "mesh", ResourceType::Mesh },
     { "vert", ResourceType::VertexShader },
     { "frag", ResourceType::FragmentShader },
-    { "shader", ResourceType::Shader }
+    { "comp", ResourceType::ComputeShader },
+    { "shader", ResourceType::Shader },
+    { "mat", ResourceType::Material }
 };
 
 #define DECLARE_RESOURCE_TYPE_PARENT(T, U) \

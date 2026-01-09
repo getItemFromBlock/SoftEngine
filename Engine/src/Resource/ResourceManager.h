@@ -67,7 +67,7 @@ public:
     void LoadBlankTexture(const std::filesystem::path& texturePath);
     void LoadDefaultMaterial(const std::filesystem::path& materialPath);
 
-    SafePtr<Material> CreateMaterial(const std::filesystem::path& path);
+    SafePtr<Material> CreateMaterial(std::filesystem::path path);
 
     std::shared_ptr<Shader> GetDefaultShader() const;
     std::shared_ptr<Texture> GetDefaultTexture() const;
@@ -160,6 +160,11 @@ template<typename T>
 SafePtr<T> ResourceManager::Load(const std::filesystem::path& resourcePath, bool multiThread)
 {
     static_assert(std::is_base_of_v<IResource, T>, "T must inherit...");
+    if (resourcePath.extension().empty())
+    {
+        PrintError("Invalid extension for resource: %s", resourcePath.generic_string().c_str());
+        return {};
+    }
 
     std::filesystem::path path = SanitizePath(resourcePath);
 

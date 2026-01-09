@@ -26,11 +26,6 @@ void Material::Unload()
         m_handle->Cleanup();
 }
 
-std::string Material::GetName(bool extension) const
-{
-    return IResource::GetName(extension);
-}
-
 void Material::Describe(ClassDescriptor& descriptor)
 {
     for (auto& [name, attrib] : m_attributes.floatAttributes)

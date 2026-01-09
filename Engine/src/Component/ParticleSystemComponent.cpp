@@ -43,9 +43,6 @@ Vec4f MinMax<Vec4f>::RandomValue(Seed seed) const
 
 void ParticleSystemComponent::Describe(ClassDescriptor& d)
 {
-    auto& meshProp = d.AddProperty("Mesh", PropertyType::Mesh, &m_mesh);
-    meshProp.setter = [this](void* data) { SetMesh(*static_cast<SafePtr<Mesh>*>(data)); };
-
     d.AddProperty("ParticleSystemComponent", PropertyType::ParticleSystem, this);
 }
 
@@ -63,7 +60,7 @@ void ParticleSystemComponent::OnCreate()
     
     m_material->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
 
-    m_mesh = resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cube.obj/Cube");
+    m_mesh = resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cube.obj/Cube.mesh");
     SetParticleCount(m_particleSettings.general.particleCount);
 
     computeShader->EOnSentToGPU.Bind([this, computeShader, renderer]()
@@ -291,7 +288,10 @@ void ParticleSystemComponent::OnUpdate(float deltaTime)
 
 void ParticleSystemComponent::OnRender(VulkanRenderer* renderer)
 {
-    if (!m_mesh || !m_instanceBuffer || !m_material || !m_initialUploadComplete)
+    if (!m_mesh || !m_mesh->IsLoaded() || !m_mesh->SentToGPU())
+        return;
+    
+    if (!m_instanceBuffer || !m_material || !m_initialUploadComplete)
         return;
 
     if (!renderer->BindShader(m_material->GetShader().getPtr()))

@@ -57,7 +57,14 @@ bool Model::Load(ResourceManager* resourceManager)
         for (auto& mesh : model.meshes)
         {
             positions.push_back(mesh.positions);
-            SafePtr<Mesh> meshResource = resourceManager->AddResource(std::make_shared<Mesh>(p_path / mesh.name));
+            std::filesystem::path meshPath = p_path / (mesh.name.generic_string() + ".mesh");
+            SafePtr<Mesh> meshResource = resourceManager->GetResource<Mesh>(meshPath);
+            if (!meshResource)
+            {
+                meshResource = resourceManager->AddResource(
+                    std::make_shared<Mesh>(meshPath)
+                );
+            }
             
             meshResource->m_subMeshes.reserve(mesh.subMeshes.size());
             for (const auto& subMesh : mesh.subMeshes)

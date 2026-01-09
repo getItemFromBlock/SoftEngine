@@ -388,9 +388,21 @@ void Inspector::ShowParticleSystem(const Property& property)
         {
             ps->SetBillboard(rendering.billboard);
         }
-        auto mat = ps->GetMaterial();
-        const ClassDescriptor& descriptor = GetDescriptor(mat->GetUUID(), mat);
-        ShowProperty(descriptor);
+        {
+            auto mat = ps->GetMaterial();
+            const ClassDescriptor& descriptor = GetDescriptor(mat->GetUUID(), mat);
+            ShowProperty(descriptor);
+        }
+        {
+            Property meshProp;
+            meshProp.name = "Mesh";
+            meshProp.type = PropertyType::Mesh;
+            meshProp.setter = [ps](void* data) { ps->SetMesh(*static_cast<SafePtr<Mesh>*>(data)); };
+            SafePtr<Mesh> mesh = ps->GetMesh();
+            meshProp.data = &mesh;
+            ShowMesh(meshProp);
+        }
+        
     }
     
     if (changed)

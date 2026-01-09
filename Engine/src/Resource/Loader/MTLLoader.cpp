@@ -67,6 +67,7 @@ std::vector<MTLLoader::Material> MTLLoader::Load(const std::filesystem::path& pa
             currentMaterial.albedo = albedo;
         }
     }
-    materials.push_back(currentMaterial);
+    if (!currentMaterial.name.empty())
+        materials.push_back(currentMaterial);
     return materials;
 }

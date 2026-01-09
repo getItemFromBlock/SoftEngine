@@ -92,6 +92,7 @@ std::filesystem::path BaseShader::GetCompiledPath() const
 
 bool Shader::Load(ResourceManager* resourceManager)
 {
+    bool multithread = !ThreadPool::IsMainThread();
     File file(p_path);
     std::vector<std::string> stagePaths;
 
@@ -113,7 +114,7 @@ bool Shader::Load(ResourceManager* resourceManager)
     if (stagePaths.size() > 0 && !stagePaths[0].empty())
     {
         std::string path = ResolvePath(stagePaths[0]);
-        m_vertexShader = resourceManager->Load<VertexShader>(path);
+        m_vertexShader = resourceManager->Load<VertexShader>(path, multithread);
         if (!m_vertexShader) {
             PrintError("Failed to load Vertex Shader: %s", path.c_str());
             return false;
@@ -124,7 +125,7 @@ bool Shader::Load(ResourceManager* resourceManager)
     if (stagePaths.size() > 1 && !stagePaths[1].empty())
     {
         std::string path = ResolvePath(stagePaths[1]);
-        m_fragmentShader = resourceManager->Load<FragmentShader>(path);
+        m_fragmentShader = resourceManager->Load<FragmentShader>(path, multithread);
         if (!m_fragmentShader) {
             PrintError("Failed to load Fragment Shader: %s", path.c_str());
             return false;
@@ -135,7 +136,7 @@ bool Shader::Load(ResourceManager* resourceManager)
     if (stagePaths.size() > 2 && !stagePaths[2].empty())
     {
         std::string path = ResolvePath(stagePaths[2]);
-        m_computeShader = resourceManager->Load<ComputeShader>(path);
+        m_computeShader = resourceManager->Load<ComputeShader>(path, multithread);
         if (!m_computeShader) {
             PrintError("Failed to load Compute Shader: %s", path.c_str());
             return false;
