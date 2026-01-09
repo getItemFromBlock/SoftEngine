@@ -1,6 +1,4 @@
 ﻿#include "VulkanCommandPool.h"
-#ifdef RENDER_API_VULKAN
-
 #include "VulkanDevice.h"
 #include <iostream>
 #include <stdexcept>
@@ -124,5 +122,3 @@ void VulkanCommandPool::Reset(size_t index)
 {
     vkResetCommandBuffer(m_commandBuffers[index], 0);
 }
-
-#endif

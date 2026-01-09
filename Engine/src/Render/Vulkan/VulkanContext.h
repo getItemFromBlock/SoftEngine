@@ -1,23 +1,23 @@
 ﻿#pragma once
-#ifdef RENDER_API_VULKAN
+#include "EngineAPI.h"
+
 #include <vector>
-#include <string>
 
 #include <vulkan/vulkan_core.h>
 
-#include "Render/RHI/RHIContext.h"
+class Window;
 
-class ENGINE_API VulkanContext : public RHIContext
+class ENGINE_API VulkanContext
 {
 public:
     VulkanContext() = default;
     VulkanContext& operator=(const VulkanContext& other) = default;
     VulkanContext(const VulkanContext&) = default;
     VulkanContext(VulkanContext&&) noexcept = default;
-    ~VulkanContext() override;
+    ~VulkanContext();
 
-    bool Initialize(Window* window) override;
-    void Cleanup() override;
+    bool Initialize(Window* window);
+    void Cleanup();
     std::vector<const char*> GetRequiredExtensions(Window* window) const;
     bool CheckExtensionSupport(const std::vector<const char*>& requiredExtensions) const;
 
@@ -58,4 +58,3 @@ private:
     VkDebugUtilsMessengerEXT m_debugMessenger;
     VkSurfaceKHR m_surface = VK_NULL_HANDLE;
 };
-#endif

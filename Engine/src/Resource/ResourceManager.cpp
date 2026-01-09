@@ -10,11 +10,14 @@
 #include "Model.h"
 #include "Mesh.h"
 #include "VertexShader.h"
+
+#include "Render/Vulkan/VulkanRenderer.h"
+
 #include "Utils/File.h"
 
 class Shader;
 
-void ResourceManager::Initialize(RHIRenderer* renderer)
+void ResourceManager::Initialize(VulkanRenderer* renderer)
 {
     m_renderer = renderer;
     CreateCacheDir();

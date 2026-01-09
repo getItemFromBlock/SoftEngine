@@ -1,10 +1,14 @@
 #include "Shader.h"
 
+#include "ResourceManager.h"
 #include "VertexShader.h"
 #include "FragmentShader.h"
 #include "ComputeShader.h"
-#include "ResourceManager.h"
+
 #include "Debug/Log.h"
+
+#include "Render/Vulkan/VulkanRenderer.h"
+
 #include "Utils/File.h"
 
 BaseShader::~BaseShader()
@@ -48,7 +52,7 @@ bool BaseShader::Load(ResourceManager* resourceManager)
     return true;
 }
 
-bool BaseShader::SendToGPU(RHIRenderer* renderer)
+bool BaseShader::SendToGPU(VulkanRenderer* renderer)
 {
     if (!p_buffer)
     {
@@ -152,7 +156,7 @@ bool Shader::Load(ResourceManager* resourceManager)
     return true;
 }
 
-bool Shader::SendToGPU(RHIRenderer* renderer)
+bool Shader::SendToGPU(VulkanRenderer* renderer)
 {
     if (m_graphic && (!m_vertexShader->SentToGPU() || !m_fragmentShader->SentToGPU()) 
         || !m_graphic && (!m_computeShader->SentToGPU()))
@@ -171,17 +175,17 @@ void Shader::Unload()
 {
 }
 
-void Shader::SendTexture(UBOBinding binding, Texture* texture, RHIRenderer* renderer)
+void Shader::SendTexture(UBOBinding binding, Texture* texture, VulkanRenderer* renderer)
 {
     renderer->SendTexture(binding, texture, this);
 }
 
-void Shader::SendValue(UBOBinding binding, void* value, uint32_t size, RHIRenderer* renderer)
+void Shader::SendValue(UBOBinding binding, void* value, uint32_t size, VulkanRenderer* renderer)
 {
     renderer->SendValue(binding, value, size, this);
 }
 
-std::unique_ptr<ComputeDispatch> Shader::CreateDispatch(RHIRenderer* renderer)
+std::unique_ptr<ComputeDispatch> Shader::CreateDispatch(VulkanRenderer* renderer)
 {
     return std::move(renderer->CreateDispatch(this));
 }

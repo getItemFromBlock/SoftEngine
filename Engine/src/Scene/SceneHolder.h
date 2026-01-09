@@ -13,7 +13,7 @@ public:
     Scene* GetCurrentScene() const { return m_currentScene.get(); }
     
     void Update(float deltaTime);
-    void Render(RHIRenderer* renderer);
+    void Render(VulkanRenderer* renderer);
     
 private:
     std::unique_ptr<Scene> m_currentScene;

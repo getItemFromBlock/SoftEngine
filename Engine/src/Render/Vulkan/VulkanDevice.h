@@ -1,5 +1,4 @@
 ﻿#pragma once
-#ifdef RENDER_API_VULKAN
 #include "EngineAPI.h"
 #include <mutex>
 #include <vulkan/vulkan_core.h>
@@ -72,4 +71,3 @@ private:
 
     std::vector<const char*> m_enabledDeviceExtensions;
 };
-#endif

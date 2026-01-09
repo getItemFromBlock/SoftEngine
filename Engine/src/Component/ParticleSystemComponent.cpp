@@ -1,8 +1,11 @@
 ﻿#include "ParticleSystemComponent.h"
 #include "Core/Engine.h"
+
 #include "Render/Vulkan/VulkanIndexBuffer.h"
 #include "Render/Vulkan/VulkanRenderer.h"
 #include "Render/Vulkan/VulkanVertexBuffer.h"
+
+#include "Resource/Mesh.h"
 #include "Scene/GameObject.h"
 #include "Utils/Color.h"
 #include "Utils/Random.h"
@@ -66,8 +69,7 @@ void ParticleSystemComponent::OnCreate()
     computeShader->EOnSentToGPU.Bind([this, computeShader, renderer]()
     {
         m_compute = computeShader->CreateDispatch(renderer);
-        auto vkRenderer = Cast<VulkanRenderer>(renderer);
-        auto device = vkRenderer->GetDevice();
+        auto device = renderer->GetDevice();
 
         uint32_t count = static_cast<uint32_t>(m_particleSettings.general.particleCount);
         VkDeviceSize particleBufferSize = sizeof(ParticleData) * count;
@@ -100,7 +102,7 @@ void ParticleSystemComponent::OnCreate()
         VkCommandBufferAllocateInfo alloc{};
         alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        alloc.commandPool = vkRenderer->GetCommandPool()->GetCommandPool();
+        alloc.commandPool = renderer->GetCommandPool()->GetCommandPool();
         alloc.commandBufferCount = 1;
 
         VkCommandBuffer cmd;
@@ -136,7 +138,7 @@ void ParticleSystemComponent::OnCreate()
         vkQueueWaitIdle(device->GetGraphicsQueue().handle);
 
         vkFreeCommandBuffers(device->GetDevice(),
-                             vkRenderer->GetCommandPool()->GetCommandPool(), 1, &cmd);
+                             renderer->GetCommandPool()->GetCommandPool(), 1, &cmd);
 
         m_initialUploadComplete = true;
         m_stagingBuffer = std::move(stagingBuffer);
@@ -191,18 +193,16 @@ void ParticleSystemComponent::OnUpdate(float deltaTime)
         m_currentTime += deltaTime;
     }
 
-    auto particleBuffer = Cast<VulkanBuffer>(m_particleBuffer.get());
-    auto instanceBuffer = Cast<VulkanBuffer>(m_instanceBuffer.get());
-    auto renderer = Cast<VulkanRenderer>(Engine::Get()->GetRenderer());
+    auto renderer = Engine::Get()->GetRenderer();
     VkCommandBuffer cmd = renderer->GetCommandBuffer();
 
-    VulkanMaterial* mat = Cast<VulkanMaterial>(m_compute->GetMaterial());
+    VulkanMaterial* mat = m_compute->GetMaterial();
 
     uint32_t count = static_cast<uint32_t>(m_particleSettings.general.particleCount);
 
-    mat->SetStorageBuffer(0, 0, particleBuffer->GetBuffer(), 0,
+    mat->SetStorageBuffer(0, 0, m_particleBuffer->GetBuffer(), 0,
                           sizeof(ParticleData) * count, renderer);
-    mat->SetStorageBuffer(0, 1, instanceBuffer->GetBuffer(), 0,
+    mat->SetStorageBuffer(0, 1, m_instanceBuffer->GetBuffer(), 0,
                           sizeof(InstanceData) * count, renderer);
 
     mat->BindForCompute(cmd, renderer->GetFrameIndex());
@@ -229,7 +229,7 @@ void ParticleSystemComponent::OnUpdate(float deltaTime)
         computeToTransfer.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
         computeToTransfer.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
         computeToTransfer.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-        computeToTransfer.buffer = particleBuffer->GetBuffer();
+        computeToTransfer.buffer = m_particleBuffer->GetBuffer();
         computeToTransfer.size = VK_WHOLE_SIZE;
 
         vkCmdPipelineBarrier(
@@ -243,7 +243,7 @@ void ParticleSystemComponent::OnUpdate(float deltaTime)
         copy.size = sizeof(ParticleData) * count;
         vkCmdCopyBuffer(
             cmd,
-            particleBuffer->GetBuffer(),
+            m_particleBuffer->GetBuffer(),
             m_debugReadbackBuffer->GetBuffer(),
             1, &copy
         );
@@ -269,7 +269,7 @@ void ParticleSystemComponent::OnUpdate(float deltaTime)
     barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.buffer = instanceBuffer->GetBuffer();
+    barrier.buffer = m_instanceBuffer->GetBuffer();
     barrier.size = VK_WHOLE_SIZE;
 
     vkCmdPipelineBarrier(cmd,
@@ -289,7 +289,7 @@ void ParticleSystemComponent::OnUpdate(float deltaTime)
     }
 }
 
-void ParticleSystemComponent::OnRender(RHIRenderer* renderer)
+void ParticleSystemComponent::OnRender(VulkanRenderer* renderer)
 {
     if (!m_mesh || !m_instanceBuffer || !m_material || !m_initialUploadComplete)
         return;
@@ -354,7 +354,7 @@ void ParticleSystemComponent::SetBillboard(bool enable)
 
 void ParticleSystemComponent::RecreateParticleBuffers()
 {
-    auto renderer = Cast<VulkanRenderer>(Engine::Get()->GetRenderer());
+    auto renderer = Engine::Get()->GetRenderer();
     auto device = renderer->GetDevice();
 
     renderer->WaitForGPU();
@@ -504,7 +504,7 @@ void ParticleSystemComponent::ReadbackDebugData()
     if (!m_debugReadbackEnabled || !m_debugReadbackBuffer)
         return;
 
-    auto renderer = Cast<VulkanRenderer>(Engine::Get()->GetRenderer());
+    auto renderer = Engine::Get()->GetRenderer();
 
     renderer->WaitForGPU();
 

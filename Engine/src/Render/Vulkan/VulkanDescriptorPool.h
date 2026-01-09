@@ -1,5 +1,4 @@
 #pragma once
-#ifdef RENDER_API_VULKAN
 #include "VulkanDevice.h"
 
 class VulkanDescriptorPool
@@ -17,4 +16,3 @@ private:
     VulkanDevice* m_device = nullptr;
     VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
 };
-#endif

@@ -1,5 +1,4 @@
 #include "VulkanIndexBuffer.h"
-#ifdef RENDER_API_VULKAN
 
 #include "VulkanDevice.h"
 #include <iostream>
@@ -122,5 +121,3 @@ bool VulkanIndexBuffer::CreateIndexBuffer(VulkanDevice* device, const void* indi
     
     return true;
 }
-
-#endif // RENDER_API_VULKAN

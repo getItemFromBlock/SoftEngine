@@ -26,7 +26,7 @@ void SceneHolder::Update(float deltaTime)
     m_currentScene->OnUpdate(deltaTime);
 }
 
-void SceneHolder::Render(RHIRenderer* renderer)
+void SceneHolder::Render(VulkanRenderer* renderer)
 {
     if (!m_currentScene)
         return;

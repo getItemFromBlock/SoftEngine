@@ -1,25 +1,22 @@
 #pragma once
 #include "VulkanBuffer.h"
 #include "VulkanDevice.h"
-#ifdef RENDER_API_VULKAN
 
-#include <vulkan/vulkan.h>
 #include <string>
 
-#include "Render/RHI/RHITexture.h"
 #include "Resource/Loader/ImageLoader.h"
 
 class VulkanCommandPool;
 class VulkanDevice;
 
-class VulkanTexture : public RHITexture
+class VulkanTexture
 {
 public:
     VulkanTexture() = default;
     VulkanTexture& operator=(const VulkanTexture& other) = default;
     VulkanTexture(const VulkanTexture&) = default;
     VulkanTexture(VulkanTexture&&) noexcept = default;
-    ~VulkanTexture() override;
+    virtual ~VulkanTexture();
  
     bool LoadFromFile(VulkanDevice* device, const std::string& filepath,
                       VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);
@@ -57,6 +54,7 @@ private:
     VkImageView m_imageView = VK_NULL_HANDLE;
     VkSampler m_sampler = VK_NULL_HANDLE;
     VkFormat m_format = VK_FORMAT_R8G8B8A8_SRGB;
+    
+    uint32_t p_width = 0;
+    uint32_t p_height = 0;
 };
-
-#endif

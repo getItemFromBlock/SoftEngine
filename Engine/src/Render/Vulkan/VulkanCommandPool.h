@@ -1,5 +1,4 @@
 ﻿#pragma once
-#ifdef RENDER_API_VULKAN
 #include "EngineAPI.h"
 
 #include <mutex>
@@ -35,5 +34,3 @@ private:
     
     std::mutex m_mutex;
 };
-
-#endif

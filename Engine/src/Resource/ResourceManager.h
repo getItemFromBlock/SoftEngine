@@ -7,8 +7,6 @@
 
 #include "Debug/Log.h"
 
-#include "Render/RHI/RHIRenderer.h"
-
 #include "Utils/Type.h"
 
 #include "Resource/IResource.h"
@@ -19,14 +17,14 @@
 class Material;
 class Shader;
 class Texture;
-class RHIRenderer;
+class VulkanRenderer;
 
 class ResourceManager
 {
 public:
     ResourceManager() = default;
 
-    void Initialize(RHIRenderer* renderer);
+    void Initialize(VulkanRenderer* renderer);
 
     Core::UUID GetUUID(const std::filesystem::path& resourcePath) const;
 
@@ -92,7 +90,7 @@ private:
     static void CreateCacheDir();
 
 private:
-    RHIRenderer* m_renderer;
+    VulkanRenderer* m_renderer;
     std::unordered_map<Core::UUID, std::shared_ptr<IResource>> m_resources;
     std::unordered_map<Hash, Core::UUID> m_hashToUUID;
     std::queue<Core::UUID> m_resourceToSend;

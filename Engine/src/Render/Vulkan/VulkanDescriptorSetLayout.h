@@ -1,5 +1,4 @@
 #pragma once
-#ifdef RENDER_API_VULKAN
 
 #include <vulkan/vulkan.h>
 #include <vector>
@@ -25,4 +24,3 @@ private:
     std::vector<VkDescriptorSetLayoutBinding> m_bindings;
 };
 
-#endif

@@ -85,7 +85,7 @@ void VulkanDescriptorSet::UpdateDescriptorSets(uint32_t frameIndex, uint32_t ind
                 continue; 
             }
             
-            VulkanUniformBuffer* ubo = dynamic_cast<VulkanUniformBuffer*>(uboIt->second);
+            VulkanUniformBuffer* ubo = uboIt->second;
             
             VkDescriptorBufferInfo descBufferInfo{};
             descBufferInfo.buffer = ubo->GetBuffer(frameIndex); 
@@ -95,7 +95,7 @@ void VulkanDescriptorSet::UpdateDescriptorSets(uint32_t frameIndex, uint32_t ind
         }
         else if (uniform.type == UniformType::Sampler2D)
         {
-            VulkanTexture* vulkanTexture = dynamic_cast<VulkanTexture*>(defaultTexture->GetBuffer());
+            VulkanTexture* vulkanTexture = defaultTexture->GetBuffer();
             if (!vulkanTexture) 
                 continue;
             VkDescriptorImageInfo imageInfo{};

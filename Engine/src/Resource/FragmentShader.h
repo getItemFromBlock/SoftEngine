@@ -11,7 +11,7 @@ public:
     virtual ~FragmentShader() override = default;
     
     bool Load(ResourceManager* resourceManager) override;
-    bool SendToGPU(RHIRenderer* renderer) override;
+    bool SendToGPU(VulkanRenderer* renderer) override;
     void Unload() override;
     
     ResourceType GetResourceType() const override { return ResourceType::VertexShader; }

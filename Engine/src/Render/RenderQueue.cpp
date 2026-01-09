@@ -4,8 +4,11 @@
 #include <algorithm>
 
 #include "Component/TransformComponent.h"
+
 #include "Resource/Mesh.h"
-#include "RHI/RHIRenderer.h"
+
+#include "Vulkan/VulkanRenderer.h"
+
 #include "Scene/GameObject.h"
 
 void RenderCommand::GenerateSortKey()
@@ -88,7 +91,7 @@ void RenderQueue::Sort()
     }
 }
 
-void RenderQueue::Execute(RHIRenderer* renderer)
+void RenderQueue::Execute(VulkanRenderer* renderer)
 {
     Material* lastMaterial = nullptr;
     Shader* lastShader = nullptr;
@@ -147,7 +150,7 @@ void RenderQueueManager::SortAll() const
     m_uiQueue->Sort();
 }
 
-void RenderQueueManager::ExecuteAll(RHIRenderer* renderer) const
+void RenderQueueManager::ExecuteAll(VulkanRenderer* renderer) const
 {
     m_opaqueQueue->Execute(renderer);
     m_transparentQueue->Execute(renderer);

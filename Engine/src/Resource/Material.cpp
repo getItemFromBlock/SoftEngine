@@ -15,7 +15,7 @@ bool Material::Load(ResourceManager* resourceManager)
     return true;
 }
 
-bool Material::SendToGPU(RHIRenderer* renderer)
+bool Material::SendToGPU(VulkanRenderer* renderer)
 {
     return true;
 }
@@ -163,7 +163,7 @@ void Material::SetAttribute(const std::string& name, const Mat4& attribute)
     }
 }
 
-void Material::SendAllValues(RHIRenderer* renderer) const
+void Material::SendAllValues(VulkanRenderer* renderer) const
 {
     if (!m_shader->IsLoaded() || !m_shader->SentToGPU())
         return;
@@ -248,7 +248,7 @@ void Material::SendAllValues(RHIRenderer* renderer) const
     }
 }
 
-bool Material::Bind(RHIRenderer* renderer)
+bool Material::Bind(VulkanRenderer* renderer)
 {
     if (!m_handle)
         return false;
@@ -267,7 +267,7 @@ bool Material::Bind(RHIRenderer* renderer)
                 SendTexture(texture.getPtr(), uniform);
             });
         }
-        auto frameCount = Cast<VulkanRenderer>(renderer)->GetMaxFramesInFlight();
+        auto frameCount = renderer->GetMaxFramesInFlight();
         m_frameProcessed++;
         
         if (m_frameProcessed >= frameCount)
@@ -400,8 +400,8 @@ void Material::OnShaderChanged()
 
 void Material::SendTexture(Texture* texture, const Uniform& uniform) const
 {
-    RHIRenderer* renderer = Engine::Get()->GetRenderer();
-    VulkanMaterial* rhiMat = dynamic_cast<VulkanMaterial*>(m_handle.get());
-    auto currentFrame = Cast<VulkanRenderer>(renderer)->GetFrameIndex();
+    VulkanRenderer* renderer = Engine::Get()->GetRenderer();
+    VulkanMaterial* rhiMat = m_handle.get();
+    uint32_t currentFrame = renderer->GetFrameIndex();
     rhiMat->SetTextureForFrame(currentFrame, uniform.set, uniform.binding, texture);
 }

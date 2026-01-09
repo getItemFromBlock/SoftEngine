@@ -39,7 +39,7 @@ Scene::~Scene()
     DestroyGameObject(root);
 }
 
-void Scene::OnRender(RHIRenderer* renderer)
+void Scene::OnRender(VulkanRenderer* renderer)
 {
     std::scoped_lock lock(m_componentsMutex);
     

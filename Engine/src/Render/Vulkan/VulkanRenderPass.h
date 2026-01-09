@@ -1,5 +1,4 @@
 ﻿#pragma once
-#ifdef RENDER_API_VULKAN
 
 #include <vulkan/vulkan.h>
 #include <vector>
@@ -30,5 +29,3 @@ private:
     VkFormat m_swapChainImageFormat = VK_FORMAT_UNDEFINED;
     VkFormat m_depthFormat = VK_FORMAT_UNDEFINED;
 };
-
-#endif

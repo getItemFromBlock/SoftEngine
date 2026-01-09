@@ -18,7 +18,7 @@
 #define DECLARE_COMPONENT_TYPE(T) DECLARE_COMPONENT_TYPE_PARENT(T, IComponent)
     
 
-class RHIRenderer;
+class VulkanRenderer;
 class GameObject;
 
 class IComponent
@@ -37,7 +37,7 @@ public:
     virtual void OnCreate() {}
     virtual void OnStart() {}
     virtual void OnUpdate(float deltaTime) {}
-    virtual void OnRender(RHIRenderer* renderer) {}
+    virtual void OnRender(VulkanRenderer* renderer) {}
     virtual void OnDestroy() {}
     
     bool IsEnable() const { return p_enable; }

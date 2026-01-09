@@ -1,10 +1,9 @@
 #pragma once
 #include "IResource.h"
+#include "Render/Vulkan/VulkanShaderBuffer.h"
+#include "Render/Vulkan/VulkanUniformBuffer.h"
+#include "Render/Vulkan/VulkanPipeline.h"
 #include "Utils/Type.h"
-
-#include "Render/RHI/RHIPipeline.h"
-#include "Render/RHI/RHIShaderBuffer.h"
-#include "Render/RHI/RHIUniformBuffer.h"
 
 class ComputeDispatch;
 class Texture;
@@ -30,20 +29,20 @@ public:
     virtual ~BaseShader() override;
     
     virtual bool Load(ResourceManager* resourceManager) override;
-    virtual bool SendToGPU(RHIRenderer* renderer) override;
+    virtual bool SendToGPU(VulkanRenderer* renderer) override;
     virtual void Unload() override {}
     
     virtual ResourceType GetResourceType() const override = 0;
     
     virtual ShaderType GetShaderType() const = 0;
     std::string GetContent() const { return p_content; }
-    RHIShaderBuffer* GetBuffer() const { return p_buffer.get(); }
+    VulkanShaderBuffer* GetBuffer() const { return p_buffer.get(); }
     
     std::filesystem::path GetCompiledPath() const;
 private:
     std::string p_content;
     bool p_compiled = false;
-    std::unique_ptr<RHIShaderBuffer> p_buffer;
+    std::unique_ptr<VulkanShaderBuffer> p_buffer;
 };
 
 enum class UniformType
@@ -108,7 +107,7 @@ public:
     DECLARE_RESOURCE_TYPE(Shader)
     
     bool Load(ResourceManager* resourceManager) override;
-    bool SendToGPU(RHIRenderer* renderer) override;
+    bool SendToGPU(VulkanRenderer* renderer) override;
     void Unload() override;
 
     PushConstants GetPushConstants() const {return m_pushConstants;}
@@ -119,14 +118,14 @@ public:
     FragmentShader* GetFragmentShader() const { return m_fragmentShader.getPtr(); }
     ComputeShader* GetComputeShader() const { return m_computeShader.getPtr(); }
     
-    void SendTexture(UBOBinding binding, Texture* texture, RHIRenderer* renderer);
-    void SendValue(UBOBinding binding, void* value, uint32_t size, RHIRenderer* renderer);
+    void SendTexture(UBOBinding binding, Texture* texture, VulkanRenderer* renderer);
+    void SendValue(UBOBinding binding, void* value, uint32_t size, VulkanRenderer* renderer);
     
-    RHIPipeline* GetPipeline() const { return m_pipeline.get(); }
+    VulkanPipeline* GetPipeline() const { return m_pipeline.get(); }
     
     bool IsGraphic() const { return m_graphic; }
     
-    std::unique_ptr<ComputeDispatch> CreateDispatch(RHIRenderer* renderer);
+    std::unique_ptr<ComputeDispatch> CreateDispatch(VulkanRenderer* renderer);
 private:
 private:
     SafePtr<VertexShader> m_vertexShader;
@@ -135,7 +134,7 @@ private:
 
     PushConstants m_pushConstants;
     Uniforms m_uniforms;
-    std::unique_ptr<RHIPipeline> m_pipeline;
+    std::unique_ptr<VulkanPipeline> m_pipeline;
     
     bool m_graphic;
 };

@@ -1,5 +1,4 @@
 ﻿#pragma once
-#ifdef RENDER_API_VULKAN
 
 #include <vector>
 #include <memory>
@@ -8,14 +7,17 @@
 
 #include "VulkanDevice.h"
 #include "VulkanDescriptorSetLayout.h"
-#include "VulkanDescriptorPool.h"
-#include "Resource/Shader.h"
+#include "VulkanUniformBuffer.h"
 
+struct Uniform;
 class Shader;
 class Texture;
+class VertexShader;
+class FragmentShader;
+class ComputeShader;
 class VulkanMaterial;
 
-class VulkanPipeline : public RHIPipeline
+class VulkanPipeline
 {
 public:
     VulkanPipeline() = default;
@@ -77,5 +79,3 @@ private:
     std::unordered_map<UBOBinding, uint32_t> m_uniformBufferSizes;
     std::unordered_map<VkDescriptorType, uint32_t> m_descriptorTypeCounts;
 };
-
-#endif

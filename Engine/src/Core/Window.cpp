@@ -2,38 +2,23 @@
 
 #include "Debug/Log.h"
 #include "Window/WindowGLFW.h"
-#include "Window/WindowSDL.h"
 
-std::unique_ptr<Window> Window::Create(WindowAPI windowAPI, RenderAPI renderAPI, const WindowConfig& config)
+std::unique_ptr<Window> Window::Create(WindowAPI windowAPI, const WindowConfig& config)
 {
     std::unique_ptr<Window> window;
     
     switch (windowAPI)
     {
     case WindowAPI::GLFW:
-#ifdef WINDOW_API_GLFW
         window = std::make_unique<WindowGLFW>();
-#else
-        PrintError("Failed to create window with GLFW, not compiled with WINDOW_API_GLFW");
-        return nullptr;
-#endif
-        break;
-    case WindowAPI::SDL:
-#ifdef WINDOW_API_SDL
-        window = std::make_unique<WindowSDL>();
-#else
-        PrintError("Failed to create window with SDL, not compiled with WINDOW_API_SDL");
-        return nullptr;
-#endif
         break;
     default:
         return nullptr;
     }
 
     window->p_windowAPI = windowAPI;
-    window->p_renderAPI = renderAPI;
     
-    if (window && window->Initialize(renderAPI, config))
+    if (window && window->Initialize(config))
     {
         window->InitializeInputs();
         
@@ -46,19 +31,9 @@ std::unique_ptr<Window> Window::Create(WindowAPI windowAPI, RenderAPI renderAPI,
 
 std::unique_ptr<Window> Window::Create(const WindowConfig& config)
 {
-#ifndef RENDER_API_VULKAN
-    RenderAPI renderAPI = RenderAPI::OpenGL;
-#else
-    RenderAPI renderAPI = RenderAPI::Vulkan;
-#endif
-    
-#ifdef WINDOW_API_GLFW
     WindowAPI windowAPI = WindowAPI::GLFW;
-#else
-    WindowAPI windowAPI = WindowAPI::SDL;
-#endif
     
-    return Create(windowAPI, renderAPI, config);
+    return Create(windowAPI, config);
 }
 
 void Window::InitializeInputs()

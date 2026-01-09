@@ -91,7 +91,7 @@ bool Model::Load(ResourceManager* resourceManager)
     }
 }
 
-bool Model::SendToGPU(RHIRenderer* renderer)
+bool Model::SendToGPU(VulkanRenderer* renderer)
 {
     UNUSED(renderer);
     return true;

@@ -16,7 +16,7 @@ public:
     DECLARE_RESOURCE_TYPE(Model)
 
     bool Load(ResourceManager* resourceManager) override;
-    bool SendToGPU(RHIRenderer* renderer) override;
+    bool SendToGPU(VulkanRenderer* renderer) override;
     void Unload() override;
     
     const std::vector<SafePtr<Mesh>>& GetMeshes() const { return m_meshes; }

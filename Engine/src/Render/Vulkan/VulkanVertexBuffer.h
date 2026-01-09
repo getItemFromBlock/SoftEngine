@@ -1,7 +1,4 @@
 #pragma once
-#include "Render/RHI/RHIVertexBuffer.h"
-
-#ifdef RENDER_API_VULKAN
 
 #include "VulkanBuffer.h"
 #include <vulkan/vulkan.h>
@@ -9,11 +6,11 @@
 class VulkanCommandPool;
 class VulkanDevice;
 
-class VulkanVertexBuffer : public RHIVertexBuffer
+class VulkanVertexBuffer
 {
 public:
     VulkanVertexBuffer() = default;
-    ~VulkanVertexBuffer() override;
+    ~VulkanVertexBuffer();
 
     bool Initialize(VulkanDevice* device, const void* vertices, VkDeviceSize size, VulkanCommandPool* commandBuffer);
     
@@ -40,5 +37,3 @@ private:
     VkDeviceSize m_size = 0;
     uint32_t m_vertexCount = 0;
 };
-
-#endif // RENDER_API_VULKAN

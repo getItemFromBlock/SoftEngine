@@ -1,5 +1,4 @@
 ﻿#include "VulkanRenderer.h"
-#ifdef RENDER_API_VULKAN
 
 #include "VulkanContext.h"
 #include "VulkanDevice.h"
@@ -20,7 +19,6 @@
 #include <spirv_reflect.h>
 #include <shaderc/shaderc.hpp>
 
-#include "VulkanComputeDispatch.h"
 #include "VulkanDepthBuffer.h"
 #include "VulkanDescriptorSetLayout.h"
 #include "VulkanIndexBuffer.h"
@@ -54,6 +52,7 @@ bool VulkanRenderer::Initialize(Window* window)
     }
 
     m_window = window;
+    m_renderQueueManager = std::make_unique<RenderQueueManager>();
 
     try
     {
@@ -107,7 +106,7 @@ bool VulkanRenderer::Initialize(Window* window)
         }
         m_syncObjects->ResizeRenderFinishedSemaphores(m_swapChain->GetImageCount());
 
-        p_initialized = true;
+        m_initialized = true;
 
         window->EResizeEvent.Bind([this](Vec2i)
         {
@@ -149,7 +148,7 @@ void VulkanRenderer::Cleanup()
     m_device.reset();
     m_context.reset();
 
-    p_initialized = false;
+    m_initialized = false;
     PrintLog("Vulkan renderer cleaned up");
 }
 
@@ -288,7 +287,7 @@ void VulkanRenderer::EndFrame()
 void VulkanRenderer::SendPushConstants(void* data, uint32_t size, Shader* shader, PushConstant pushConstant) const
 {
     auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
-    VulkanPipeline* pipeline = dynamic_cast<VulkanPipeline*>(shader->GetPipeline());
+    VulkanPipeline* pipeline = shader->GetPipeline();
     vkCmdPushConstants(commandBuffer, pipeline->GetPipelineLayout(),
                        pushConstant.shaderType == ShaderType::Vertex
                            ? VK_SHADER_STAGE_VERTEX_BIT
@@ -296,11 +295,9 @@ void VulkanRenderer::SendPushConstants(void* data, uint32_t size, Shader* shader
                        pushConstant.offset, size, data);
 }
 
-void VulkanRenderer::BindVertexBuffers(RHIVertexBuffer* _vertexBuffer, RHIIndexBuffer* _indexBuffer) const
+void VulkanRenderer::BindVertexBuffers(VulkanVertexBuffer* vertexBuffer, VulkanIndexBuffer* indexBuffer) const
 {
     VkCommandBuffer commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
-    VulkanVertexBuffer* vertexBuffer = static_cast<VulkanVertexBuffer*>(_vertexBuffer);
-    VulkanIndexBuffer* indexBuffer = static_cast<VulkanIndexBuffer*>(_indexBuffer);
 
     VkBuffer vkVertexBuffer = vertexBuffer->GetBuffer();
     VkDeviceSize offsets[] = {0};
@@ -309,15 +306,14 @@ void VulkanRenderer::BindVertexBuffers(RHIVertexBuffer* _vertexBuffer, RHIIndexB
     vkCmdBindIndexBuffer(commandBuffer, indexBuffer->GetBuffer(), 0, indexBuffer->GetIndexType());
 }
 
-void VulkanRenderer::DrawVertex(RHIVertexBuffer* _vertexBuffer, RHIIndexBuffer* _indexBuffer)
+void VulkanRenderer::DrawVertex(VulkanVertexBuffer* vertexBuffer, VulkanIndexBuffer* indexBuffer)
 {
     VkCommandBuffer commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
-    VulkanIndexBuffer* indexBuffer = static_cast<VulkanIndexBuffer*>(_indexBuffer);
 
     vkCmdDrawIndexed(commandBuffer, indexBuffer->GetIndexCount(), 1, 0, 0, 0);
 }
 
-void VulkanRenderer::DrawVertexSubMesh(RHIIndexBuffer* _indexBuffer, uint32_t startIndex, uint32_t indexCount)
+void VulkanRenderer::DrawVertexSubMesh(VulkanIndexBuffer* _indexBuffer, uint32_t startIndex, uint32_t indexCount)
 {
     VkCommandBuffer commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
 
@@ -325,19 +321,18 @@ void VulkanRenderer::DrawVertexSubMesh(RHIIndexBuffer* _indexBuffer, uint32_t st
     p_triangleCount += indexCount / 3;
 }
 
-void VulkanRenderer::DrawInstanced(RHIIndexBuffer* indexBuffer, RHIVertexBuffer* vertexShader, RHIBuffer* instanceBuffer, uint32_t instanceCount)
+void VulkanRenderer::DrawInstanced(VulkanIndexBuffer* indexBuffer, VulkanVertexBuffer* vertexShader, VulkanBuffer* instanceBuffer, uint32_t instanceCount)
 {
     VkCommandBuffer commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
-    VulkanIndexBuffer* index = static_cast<VulkanIndexBuffer*>(indexBuffer);
     
-    VkBuffer vertexBuffers[] = {Cast<VulkanVertexBuffer>(vertexShader)->GetBuffer(), Cast<VulkanBuffer>(instanceBuffer)->GetBuffer()};
+    VkBuffer vertexBuffers[] = {vertexShader->GetBuffer(), instanceBuffer->GetBuffer()};
     VkDeviceSize offsets[] = {0, 0};
     vkCmdBindVertexBuffers(commandBuffer, 0, 2, vertexBuffers, offsets);
 
-    vkCmdBindIndexBuffer(commandBuffer, index->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindIndexBuffer(commandBuffer, indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-    vkCmdDrawIndexed(commandBuffer, index->GetIndexCount(), static_cast<uint32_t>(instanceCount), 0, 0, 0);
-    p_triangleCount += (index->GetIndexCount() / 3) * instanceCount;
+    vkCmdDrawIndexed(commandBuffer, indexBuffer->GetIndexCount(), static_cast<uint32_t>(instanceCount), 0, 0, 0);
+    p_triangleCount += (indexBuffer->GetIndexCount() / 3) * instanceCount;
 }
 
 std::string VulkanRenderer::CompileShader(ShaderType type, const std::string& code)
@@ -477,7 +472,7 @@ bool VulkanRenderer::BindShader(Shader* shader)
     if (!shader || !shader->GetPipeline())
         return false;
 
-    VulkanPipeline* pipeline = dynamic_cast<VulkanPipeline*>(shader->GetPipeline());
+    VulkanPipeline* pipeline = shader->GetPipeline();
     auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
     pipeline->Bind(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS);
 
@@ -508,14 +503,14 @@ bool VulkanRenderer::BindMaterial(Material* material)
     return true;
 }
 
-std::unique_ptr<RHITexture> VulkanRenderer::CreateTexture(const ImageLoader::Image& image)
+std::unique_ptr<VulkanTexture> VulkanRenderer::CreateTexture(const ImageLoader::Image& image)
 {
     std::unique_ptr<VulkanTexture> texture = std::make_unique<VulkanTexture>();
     texture->CreateFromImage(image, m_device.get(), m_commandPool.get(), m_device->GetGraphicsQueue());
     return texture;
 }
 
-std::unique_ptr<RHIVertexBuffer> VulkanRenderer::CreateVertexBuffer(const float* data, uint32_t size,
+std::unique_ptr<VulkanVertexBuffer> VulkanRenderer::CreateVertexBuffer(const float* data, uint32_t size,
                                                                     uint32_t floatPerVertex)
 {
     std::unique_ptr<VulkanVertexBuffer> vertexBuffer = std::make_unique<VulkanVertexBuffer>();
@@ -527,7 +522,7 @@ std::unique_ptr<RHIVertexBuffer> VulkanRenderer::CreateVertexBuffer(const float*
     return std::move(vertexBuffer);
 }
 
-std::unique_ptr<RHIIndexBuffer> VulkanRenderer::CreateIndexBuffer(const uint32_t* data, uint32_t size)
+std::unique_ptr<VulkanIndexBuffer> VulkanRenderer::CreateIndexBuffer(const uint32_t* data, uint32_t size)
 {
     std::unique_ptr<VulkanIndexBuffer> indexBuffer = std::make_unique<VulkanIndexBuffer>();
 
@@ -538,7 +533,7 @@ std::unique_ptr<RHIIndexBuffer> VulkanRenderer::CreateIndexBuffer(const uint32_t
     return std::move(indexBuffer);
 }
 
-std::unique_ptr<RHIShaderBuffer> VulkanRenderer::CreateShaderBuffer(const std::string& code)
+std::unique_ptr<VulkanShaderBuffer> VulkanRenderer::CreateShaderBuffer(const std::string& code)
 {
     std::unique_ptr<VulkanShaderBuffer> shaderBuffer = std::make_unique<VulkanShaderBuffer>();
     if (!shaderBuffer->Initialize(m_device.get(), code))
@@ -546,7 +541,7 @@ std::unique_ptr<RHIShaderBuffer> VulkanRenderer::CreateShaderBuffer(const std::s
     return std::move(shaderBuffer);
 }
 
-std::unique_ptr<RHIPipeline> VulkanRenderer::CreatePipeline(const Shader* shader)
+std::unique_ptr<VulkanPipeline> VulkanRenderer::CreatePipeline(const Shader* shader)
 {
     std::unique_ptr<VulkanPipeline> pipeline = std::make_unique<VulkanPipeline>();
     pipeline->Initialize(m_device.get(), m_swapChain->GetExtent(), MAX_FRAMES_IN_FLIGHT, shader, 
@@ -554,9 +549,9 @@ std::unique_ptr<RHIPipeline> VulkanRenderer::CreatePipeline(const Shader* shader
     return std::move(pipeline);
 }
 
-std::unique_ptr<RHIMaterial> VulkanRenderer::CreateMaterial(Shader* shader)
+std::unique_ptr<VulkanMaterial> VulkanRenderer::CreateMaterial(Shader* shader)
 {
-    VulkanPipeline* pipeline = dynamic_cast<VulkanPipeline*>(shader->GetPipeline());
+    VulkanPipeline* pipeline = shader->GetPipeline();
     auto material = std::make_unique<VulkanMaterial>(pipeline);
     if (!material->Initialize(MAX_FRAMES_IN_FLIGHT, m_defaultTexture.getPtr(), pipeline))
     {
@@ -568,7 +563,7 @@ std::unique_ptr<RHIMaterial> VulkanRenderer::CreateMaterial(Shader* shader)
 
 std::unique_ptr<ComputeDispatch> VulkanRenderer::CreateDispatch(Shader* shader)
 {
-    auto vulkanPipeline = Cast<VulkanPipeline>(shader->GetPipeline());
+    auto vulkanPipeline = shader->GetPipeline();
     std::unique_ptr<VulkanMaterial> material = std::make_unique<VulkanMaterial>(vulkanPipeline);
     if (!material->Initialize(MAX_FRAMES_IN_FLIGHT, m_defaultTexture.getPtr(), vulkanPipeline))
     {
@@ -589,7 +584,7 @@ void VulkanRenderer::SetDefaultTexture(const SafePtr<Texture>& texture)
         PrintError("Failed to set default texture because device is not valid");
     }
     m_defaultTexture = texture.get();
-    m_device->SetDefaultTexture(dynamic_cast<VulkanTexture*>(texture->GetBuffer()));
+    m_device->SetDefaultTexture(texture->GetBuffer());
 }
 
 void VulkanRenderer::ClearColor() const
@@ -661,5 +656,3 @@ void VulkanRenderer::RecreateSwapChain()
         throw std::runtime_error("Failed to recreate depth buffer!");
     }
 }
-
-#endif

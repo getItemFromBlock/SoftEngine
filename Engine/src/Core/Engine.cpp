@@ -36,7 +36,9 @@ bool Engine::Initialize(EngineDesc desc)
         return false;
     }
 
-    m_renderer = RHIRenderer::Create(RenderAPI::Vulkan, m_window);
+    m_renderer = std::make_unique<VulkanRenderer>();
+    m_renderer->Initialize(m_window);
+    
     if (!m_renderer || !m_renderer->IsInitialized())
     {
         PrintError("Failed to create renderer");

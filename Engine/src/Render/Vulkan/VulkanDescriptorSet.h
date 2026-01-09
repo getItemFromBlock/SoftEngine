@@ -1,8 +1,6 @@
 #pragma once
-
 #include "Resource/Shader.h"
 
-#ifdef RENDER_API_VULKAN
 #include <vulkan/vulkan.h>
 #include <vector>
 
@@ -32,4 +30,3 @@ private:
     std::vector<VkDescriptorSet> m_descriptorSets;
     VkDescriptorPool m_pool;
 };
-#endif

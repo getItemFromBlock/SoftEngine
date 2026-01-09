@@ -8,11 +8,10 @@
 #include "IResource.h"
 #include "Physic/BoundingBox.h"
 
-#include "Render/RHI/RHIVertex.h"
-#include "Render/RHI/RHIVertexBuffer.h"
-#include "Render/RHI/RHIIndexBuffer.h"
+#include "Render/Vulkan/VulkanVertexBuffer.h"
+#include "Render/Vulkan/VulkanIndexBuffer.h"
 
-class RHIBuffer;
+class VulkanBuffer;
 
 struct Vertex
 {
@@ -21,9 +20,9 @@ struct Vertex
     Vec3f normal;
     Vec3f tangent;
 
-    static RHIBindingDescription GetBindingDescription();
+    static VkVertexInputBindingDescription GetBindingDescription();
 
-    static std::array<RHIVertexInputAttributeDescription, 4> GetAttributeDescriptions();
+    static std::array<VkVertexInputAttributeDescription, 4> GetAttributeDescriptions();
 };
 
 struct SubMesh
@@ -38,13 +37,13 @@ public:
     DECLARE_RESOURCE_TYPE(Mesh)
 
     bool Load(ResourceManager* resourceManager) override;
-    bool SendToGPU(RHIRenderer* renderer) override;
+    bool SendToGPU(VulkanRenderer* renderer) override;
     void Unload() override;
     
     std::string GetName(bool extension = true) const override;
 
-    RHIVertexBuffer* GetVertexBuffer() const { return m_vertexBuffer.get(); }
-    RHIIndexBuffer* GetIndexBuffer() const { return m_indexBuffer.get(); }
+    VulkanVertexBuffer* GetVertexBuffer() const { return m_vertexBuffer.get(); }
+    VulkanIndexBuffer* GetIndexBuffer() const { return m_indexBuffer.get(); }
     
     const std::vector<SubMesh>& GetSubMeshes() const { return m_subMeshes; }
     
@@ -59,8 +58,8 @@ private:
     std::vector<uint32_t> m_indices;
     std::vector<SubMesh> m_subMeshes;
 
-    std::unique_ptr<RHIVertexBuffer> m_vertexBuffer;
-    std::unique_ptr<RHIIndexBuffer> m_indexBuffer;
+    std::unique_ptr<VulkanVertexBuffer> m_vertexBuffer;
+    std::unique_ptr<VulkanIndexBuffer> m_indexBuffer;
     
     BoundingBox m_boundingBox;
 };

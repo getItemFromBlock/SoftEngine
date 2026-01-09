@@ -1,5 +1,4 @@
 ﻿#pragma once
-#ifdef RENDER_API_VULKAN
 
 #include "VulkanPipeline.h"
 #include "VulkanMaterial.h"
@@ -173,12 +172,12 @@ bool VulkanPipeline::InitializeGraphicsPipeline(const VertexShader* vertexShader
 {
     VkPipelineShaderStageCreateInfo vertStage{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
     vertStage.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    vertStage.module = dynamic_cast<VulkanShaderBuffer*>(vertexShader->GetBuffer())->GetModule();
+    vertStage.module = vertexShader->GetBuffer()->GetModule();
     vertStage.pName = "main";
 
     VkPipelineShaderStageCreateInfo fragStage{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
     fragStage.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    fragStage.module = dynamic_cast<VulkanShaderBuffer*>(fragmentShader->GetBuffer())->GetModule();
+    fragStage.module = fragmentShader->GetBuffer()->GetModule();
     fragStage.pName = "main";
 
     VkPipelineShaderStageCreateInfo shaderStages[] = { vertStage, fragStage };
@@ -265,7 +264,7 @@ bool VulkanPipeline::InitializeComputePipeline(const ComputeShader* computeShade
     // Shader Stage
     pipelineInfo.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     pipelineInfo.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    pipelineInfo.stage.module = dynamic_cast<VulkanShaderBuffer*>(computeShader->GetBuffer())->GetModule();
+    pipelineInfo.stage.module = computeShader->GetBuffer()->GetModule();
     pipelineInfo.stage.pName = "main";
     
     pipelineInfo.layout = m_pipelineLayout;
@@ -347,5 +346,3 @@ std::string VulkanPipeline::ReadFile(const std::string& filename)
     buffer << t.rdbuf();
     return buffer.str();
 }
-
-#endif

@@ -31,33 +31,14 @@ bool WindowGLFW::InitializeAPI()
     return true;
 }
 
-bool WindowGLFW::Initialize(RenderAPI renderAPI, const WindowConfig& config)
+bool WindowGLFW::Initialize(const WindowConfig& config)
 {
     if (s_windowCount == 0)
     {
         InitializeAPI();
     }
 
-    // Configure GLFW based on render API
-    switch (renderAPI)
-    {
-        case RenderAPI::OpenGL:
-            glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-            glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-            glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-            #ifdef __APPLE__
-                glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, true);
-            #endif
-            break;
-        case RenderAPI::Vulkan:
-            glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-            break;
-        case RenderAPI::DirectX:
-            glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-            break;
-        default:
-            break;
-    }
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     SetClickThrough(config.attributes & WindowAttributes::ClickThrough);
     SetDecorated(!(config.attributes & WindowAttributes::NoDecoration));
     SetTransparent(config.attributes & WindowAttributes::Transparent);
@@ -74,11 +55,6 @@ bool WindowGLFW::Initialize(RenderAPI renderAPI, const WindowConfig& config)
 
     s_windowCount++;
     
-    if (renderAPI == RenderAPI::OpenGL)
-    {
-        glfwMakeContextCurrent(GetHandle());
-    }
-
     glfwSetWindowUserPointer(GetHandle(), this);
     SetupCallbacks();
     CreateCursors();
@@ -247,12 +223,6 @@ void WindowGLFW::SetTransparent(bool enabled)
 void WindowGLFW::SetVSync(bool enabled)
 {
     m_vsync = enabled;
-    if (p_renderAPI == RenderAPI::Vulkan)
-    {
-        // PrintWarning("VSync is not supported for Vulkan");
-        return;
-    }
-    glfwSwapInterval(enabled ? 1 : 0);
 }
 
 void WindowGLFW::Close(bool shouldClose)

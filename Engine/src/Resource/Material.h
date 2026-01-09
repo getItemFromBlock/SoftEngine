@@ -7,8 +7,6 @@
 #include "Utils/Type.h"
 #include "Render/Vulkan/VulkanMaterial.h"
 
-#include "Render/RHI/RHIMaterial.h"
-
 class Shader;
 class Texture;
 
@@ -58,7 +56,7 @@ public:
     DECLARE_RESOURCE_TYPE(Material)
     
     bool Load(ResourceManager* resourceManager) override;
-    bool SendToGPU(RHIRenderer* renderer) override;
+    bool SendToGPU(VulkanRenderer* renderer) override;
     void Unload() override;
     
     std::string GetName(bool extension = true) const override;
@@ -76,19 +74,19 @@ public:
     void SetAttribute(const std::string& name, const SafePtr<Texture>& texture);
     void SetAttribute(const std::string& name, const Mat4& attribute);
 
-    void SendAllValues(RHIRenderer* renderer) const;
+    void SendAllValues(VulkanRenderer* renderer) const;
 
-    bool Bind(RHIRenderer* renderer);
+    bool Bind(VulkanRenderer* renderer);
 
     MaterialAttributes GetAttributes() const { return m_attributes; }
-    RHIMaterial* GetHandle() const { return m_handle.get(); }
+    VulkanMaterial* GetHandle() const { return m_handle.get(); }
     bool IsDirty() const { return m_dirty; }
 private:
     void OnShaderChanged();
     
     void SendTexture(Texture* texture, const Uniform& uniform) const;
 private:
-    std::unique_ptr<RHIMaterial> m_handle;
+    std::unique_ptr<VulkanMaterial> m_handle;
     SafePtr<Shader> m_shader;
     
     MaterialAttributes m_attributes;

@@ -2,31 +2,27 @@
 #include "EngineAPI.h"
 #include <memory>
 
-#include "VulkanDescriptorSetLayout.h"
-#include "Render/RHI/RHIRenderer.h"
 #include "Resource/Material.h"
 #include "Resource/Model.h"
 #include "Resource/Texture.h"
+#include "Resource/Shader.h"
+
 #include "Utils/Type.h"
 
-#ifdef RENDER_API_VULKAN
-
 #include <galaxymath/Maths.h>
-#include <vulkan/vulkan.h>
-#include <memory>
 
 #include "VulkanContext.h"
 #include "VulkanDevice.h"
-#include "VulkanSwapChain.h"
 #include "VulkanRenderPass.h"
 #include "VulkanPipeline.h"
 #include "VulkanFramebuffer.h"
 #include "VulkanCommandPool.h"
 #include "VulkanDepthBuffer.h"
-#include "VulkanDescriptorPool.h"
-#include "VulkanDescriptorSet.h"
+#include "VulkanIndexBuffer.h"
+#include "VulkanSwapChain.h"
 #include "VulkanSyncObjects.h"
-#include "VulkanUniformBuffer.h"
+#include "VulkanVertexBuffer.h"
+#include "Render/RenderQueue.h"
 
 enum class ShaderType;
 class Window;
@@ -38,71 +34,78 @@ struct UniformBufferObject
     Mat4 Projection;
 };
 
-class ENGINE_API VulkanRenderer : public RHIRenderer
+class ENGINE_API VulkanRenderer
 {
 public:
     VulkanRenderer() = default;
     VulkanRenderer(const VulkanRenderer&) = delete;
     VulkanRenderer& operator=(const VulkanRenderer&) = delete;
     VulkanRenderer(VulkanRenderer&&) = delete;
-    ~VulkanRenderer() override;
+    ~VulkanRenderer();
 
-    bool Initialize(Window* window) override;
-    void WaitForGPU() override;
-    void Cleanup() override;
+    bool Initialize(Window* window);
+    bool IsInitialized() const { return m_initialized; }
+    void WaitForGPU();
+    void Cleanup();
     
-    void WaitUntilFrameFinished() override;
-    bool BeginFrame() override;
-    void Update() override;
-    void EndFrame() override;
+    void WaitUntilFrameFinished();
+    bool BeginFrame();
+    void Update();
+    void EndFrame();
     
-    void SendPushConstants(void* data, uint32_t size, Shader* shader, PushConstant pushConstant) const override;
-    void BindVertexBuffers(RHIVertexBuffer* _vertexBuffer, RHIIndexBuffer* _indexBuffer) const override;
-    void DrawVertex(RHIVertexBuffer* _vertexBuffer, RHIIndexBuffer* _indexBuffer) override;
-    void DrawVertexSubMesh(RHIIndexBuffer* _indexBuffer, uint32_t startIndex, uint32_t indexCount) override;
-    void DrawInstanced(RHIIndexBuffer* indexBuffer, RHIVertexBuffer* vertexShader, RHIBuffer* instanceBuffer, uint32_t instanceCount) override;
+    void SendPushConstants(void* data, uint32_t size, Shader* shader, PushConstant pushConstant) const;
+    void BindVertexBuffers(VulkanVertexBuffer* vertexBuffer, VulkanIndexBuffer* indexBuffer) const;
+    void DrawVertex(VulkanVertexBuffer* vertexBuffer, VulkanIndexBuffer* indexBuffer);
+    void DrawVertexSubMesh(VulkanIndexBuffer* _indexBuffer, uint32_t startIndex, uint32_t indexCount);
+    void DrawInstanced(VulkanIndexBuffer* indexBuffer, VulkanVertexBuffer* vertexShader, VulkanBuffer* instanceBuffer, uint32_t instanceCount);
     
-    void DrawFrame() override;
+    void DrawFrame();
     
-    bool MultiThreadSendToGPU() override;
+    bool MultiThreadSendToGPU();
 
-    std::string CompileShader(ShaderType type, const std::string& code) override;
-    Uniforms GetUniforms(Shader* shader) override;
-    PushConstants GetPushConstants(Shader* shader) override;
+    std::string CompileShader(ShaderType type, const std::string& code);
+    Uniforms GetUniforms(Shader* shader);
+    PushConstants GetPushConstants(Shader* shader);
     
-    VulkanCommandPool* GetCommandPool() const { return m_commandPool.get(); }
+    void SendTexture(UBOBinding binding, Texture* texture, Shader* shader);
+    void SendValue(UBOBinding binding, void* value, uint32_t size, Shader* shader);
+    bool BindShader(Shader* shader);
+    bool BindMaterial(Material* material);
     
-    void SendTexture(UBOBinding binding, Texture* texture, Shader* shader) override;
-    void SendValue(UBOBinding binding, void* value, uint32_t size, Shader* shader) override;
-    bool BindShader(Shader* shader) override;
-    bool BindMaterial(Material* material) override;
+    std::unique_ptr<VulkanTexture> CreateTexture(const ImageLoader::Image& image);
+    std::unique_ptr<VulkanVertexBuffer> CreateVertexBuffer(const float* data, uint32_t size, uint32_t floatPerVertex);
+    std::unique_ptr<VulkanIndexBuffer> CreateIndexBuffer(const uint32_t* data, uint32_t size);
+    std::unique_ptr<VulkanShaderBuffer> CreateShaderBuffer(const std::string& code);
+    std::unique_ptr<VulkanPipeline> CreatePipeline(const Shader* shader);
+    std::unique_ptr<VulkanMaterial> CreateMaterial(Shader* shader);
+    std::unique_ptr<ComputeDispatch> CreateDispatch(Shader* shader);
     
-    std::unique_ptr<RHITexture> CreateTexture(const ImageLoader::Image& image) override;
-    std::unique_ptr<RHIVertexBuffer> CreateVertexBuffer(const float* data, uint32_t size, uint32_t floatPerVertex) override;
-    std::unique_ptr<RHIIndexBuffer> CreateIndexBuffer(const uint32_t* data, uint32_t size) override;
-    std::unique_ptr<RHIShaderBuffer> CreateShaderBuffer(const std::string& code) override;
-    std::unique_ptr<RHIPipeline> CreatePipeline(const Shader* shader) override;
-    std::unique_ptr<RHIMaterial> CreateMaterial(Shader* shader) override;
-    std::unique_ptr<ComputeDispatch> CreateDispatch(Shader* shader) override;
-    
-    void SetDefaultTexture(const SafePtr<Texture>& texture) override;
-    void ClearColor() const override;
+    void SetDefaultTexture(const SafePtr<Texture>& texture);
+    void ClearColor() const;
     
     uint32_t GetFrameIndex() const { return m_currentFrame; }
     VkCommandBuffer GetCommandBuffer() const { return m_commandPool->GetCommandBuffer(m_currentFrame); }
     
     VulkanContext* GetContext() const { return m_context.get(); }
     VulkanDevice* GetDevice() const { return m_device.get(); }
+    VulkanCommandPool* GetCommandPool() const { return m_commandPool.get(); }
     VulkanRenderPass* GetRenderPass() const { return m_renderPass.get(); }
     VulkanSwapChain* GetSwapChain() const { return m_swapChain.get(); }
     VulkanSyncObjects* GetSyncObjects() const { return m_syncObjects.get(); }
     
     uint32_t GetMaxFramesInFlight() const { return MAX_FRAMES_IN_FLIGHT; }
+    
+    RenderQueueManager* GetRenderQueueManager() const { return m_renderQueueManager.get(); }
+    uint64_t GetTriangleCount() const { return p_triangleCount; }
 private:
     void RecreateSwapChain();
     void TransitionImageForPresent() const;
 
 private:
+    bool m_initialized = false;
+    std::unique_ptr<RenderQueueManager> m_renderQueueManager;
+    uint64_t p_triangleCount = 0;
+    
     Window* m_window = nullptr;
     bool m_framebufferResized = false;
 
@@ -123,5 +126,3 @@ private:
     static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
     uint32_t m_currentFrame = 0;
 };
-
-#endif

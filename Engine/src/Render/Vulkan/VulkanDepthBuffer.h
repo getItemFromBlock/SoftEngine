@@ -1,5 +1,4 @@
 #pragma once
-#ifdef RENDER_API_VULKAN
 #include <vector>
 #include <vulkan/vulkan.h>
 
@@ -42,4 +41,3 @@ private:
     VkImageView m_depthImageView = VK_NULL_HANDLE;
     VkFormat m_depthFormat = VK_FORMAT_UNDEFINED;
 };
-#endif

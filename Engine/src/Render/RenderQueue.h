@@ -8,7 +8,7 @@
 #include "Resource/Shader.h"
 #include "Utils/Type.h"
 
-class RHIRenderer;
+class VulkanRenderer;
 class GameObject;
 class Mesh;
 class Material;
@@ -53,7 +53,7 @@ public:
 
     void Sort();
 
-    void Execute(RHIRenderer* renderer);
+    void Execute(VulkanRenderer* renderer);
 
     void Clear();
 
@@ -75,7 +75,7 @@ public:
     
     void SortAll() const;
 
-    void ExecuteAll(RHIRenderer* renderer) const;
+    void ExecuteAll(VulkanRenderer* renderer) const;
 
     void ClearAll() const;
 

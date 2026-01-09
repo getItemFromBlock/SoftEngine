@@ -4,7 +4,7 @@
 
 #include "Core/Window.h"
 #include "Resource/ResourceManager.h"
-#include "Render/RHI/RHIRenderer.h"
+#include "Render/Vulkan/VulkanRenderer.h"
 #include "Scene/ComponentHandler.h"
 #include "Scene/SceneHolder.h"
 
@@ -29,12 +29,12 @@ public:
     static Engine* Get();
 
     Window* GetWindow() const { return m_window; }
-    RHIRenderer* GetRenderer() const { return m_renderer.get(); }
+    VulkanRenderer* GetRenderer() const { return m_renderer.get(); }
     SceneHolder* GetSceneHolder() const { return m_sceneHolder.get(); }
     ResourceManager* GetResourceManager() const { return m_resourceManager.get(); }
 private:
     Window* m_window;
-    std::unique_ptr<RHIRenderer> m_renderer;
+    std::unique_ptr<VulkanRenderer> m_renderer;
     std::unique_ptr<ResourceManager> m_resourceManager;
     std::unique_ptr<ComponentRegister> m_componentRegister;
     std::unique_ptr<SceneHolder> m_sceneHolder;

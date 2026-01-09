@@ -5,16 +5,13 @@
 
 #include "Utils/Event.h"
 #include "Core/Input.h"
-#include "Render/RHI/RHIRenderer.h"
+#include "Render/Vulkan/VulkanRenderer.h"
 
-#ifdef RENDER_API_VULKAN
 #include <vulkan/vulkan.hpp>
-#endif
 
 enum class ENGINE_API WindowAPI
 {
     GLFW,
-    SDL,
 };
 
 enum class CoordinateSpace
@@ -48,18 +45,17 @@ public:
     Window(Window&&) noexcept = default;
     virtual ~Window() = default;
 
-    static std::unique_ptr<Window> Create(WindowAPI windowAPI, RenderAPI renderAPI, const WindowConfig& config);
+    static std::unique_ptr<Window> Create(WindowAPI windowAPI, const WindowConfig& config);
     static std::unique_ptr<Window> Create(const WindowConfig& config);
     
     virtual bool InitializeAPI() = 0;
     
     void InitializeInputs();
     
-    virtual bool Initialize(RenderAPI renderAPI, const WindowConfig& config) = 0;
+    virtual bool Initialize(const WindowConfig& config) = 0;
     virtual void PollEvents() = 0;
     virtual void Terminate() = 0;
 
-    RenderAPI GetRenderAPI() const { return p_renderAPI; }
     WindowAPI GetWindowAPI() const { return p_windowAPI; }
 
     // === Setters === //
@@ -109,9 +105,8 @@ public:
     virtual void* GetNativeHandle() const = 0;
 
     Input& GetInput() { return p_input; }
-#ifdef RENDER_API_VULKAN
+    
     virtual VkSurfaceKHR CreateSurface(VkInstance instance) = 0;
-#endif
 public:
     // === Events === //
     Event<Vec2i> EResizeEvent;
@@ -129,6 +124,5 @@ protected:
 protected:
     void* p_windowHandle = nullptr;
     WindowAPI p_windowAPI;
-    RenderAPI p_renderAPI;
     Input p_input;
 };

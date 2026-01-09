@@ -4,11 +4,13 @@
 #include <string>
 
 #include "Core/UUID.h"
+
 #include "Scene/ClassDescriptor.h"
+
 #include "Utils/Event.h"
 
 class ResourceManager;
-class RHIRenderer;
+class VulkanRenderer;
 
 enum class ResourceType
 {
@@ -75,7 +77,7 @@ public:
     virtual ~IResource() = default;
 
     virtual bool Load(ResourceManager* resourceManager) = 0;
-    virtual bool SendToGPU(RHIRenderer* renderer) = 0;
+    virtual bool SendToGPU(VulkanRenderer* renderer) = 0;
     virtual void Unload() = 0;
     
     virtual void Describe(ClassDescriptor& descriptor) {}

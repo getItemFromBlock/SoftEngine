@@ -1,8 +1,11 @@
 ﻿#pragma once
 #include "IComponent.h"
+
 #include "Render/Vulkan/VulkanBuffer.h"
 #include "Render/Vulkan/VulkanRenderer.h"
+
 #include "Resource/ComputeShader.h"
+
 #include "Utils/Random.h"
 
 class Material;
@@ -126,7 +129,7 @@ public:
     void Describe(ClassDescriptor& d) override;
     void OnCreate() override;
     void OnUpdate(float deltaTime) override;
-    void OnRender(RHIRenderer* renderer) override;
+    void OnRender(VulkanRenderer* renderer) override;
     void OnDestroy() override;
 
     void SetParticleCount(int count);
@@ -154,9 +157,9 @@ private:
 private:
     std::unique_ptr<ComputeDispatch> m_compute;
 
-    std::unique_ptr<RHIBuffer> m_particleBuffer;
-    std::unique_ptr<RHIBuffer> m_instanceBuffer;
-    std::unique_ptr<RHIBuffer> m_stagingBuffer;
+    std::unique_ptr<VulkanBuffer> m_particleBuffer;
+    std::unique_ptr<VulkanBuffer> m_instanceBuffer;
+    std::unique_ptr<VulkanBuffer> m_stagingBuffer;
 
     SafePtr<Mesh> m_mesh;
     SafePtr<Material> m_material;

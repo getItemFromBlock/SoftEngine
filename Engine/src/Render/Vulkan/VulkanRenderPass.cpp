@@ -1,5 +1,4 @@
 ﻿#include "VulkanRenderPass.h"
-#ifdef RENDER_API_VULKAN
 
 #include "VulkanDevice.h"
 #include <iostream>
@@ -81,5 +80,3 @@ VkFormat VulkanRenderPass::GetDepthFormat() const
 {
     return m_depthFormat;
 }
-
-#endif

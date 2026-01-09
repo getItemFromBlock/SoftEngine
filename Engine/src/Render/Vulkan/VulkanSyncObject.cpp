@@ -1,10 +1,8 @@
 ﻿#include "VulkanSyncObjects.h"
-#ifdef RENDER_API_VULKAN
 
 #include "VulkanDevice.h"
 #include <iostream>
 #include <stdexcept>
-#include <string>
 
 #include "Debug/Log.h"
 
@@ -98,5 +96,3 @@ bool VulkanSyncObjects::ResizeRenderFinishedSemaphores(uint32_t swapChainImageCo
     }
     return true;
 }
-
-#endif

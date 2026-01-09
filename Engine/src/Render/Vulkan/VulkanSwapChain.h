@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include "VulkanDevice.h"
-#ifdef RENDER_API_VULKAN
 #include "EngineAPI.h"
 
 #include <vulkan/vulkan.h>
@@ -56,5 +55,3 @@ private:
     VkFormat m_imageFormat;
     VkExtent2D m_extent;
 };
-
-#endif

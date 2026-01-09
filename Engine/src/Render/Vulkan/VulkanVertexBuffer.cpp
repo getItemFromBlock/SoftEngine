@@ -1,5 +1,4 @@
 #include "VulkanVertexBuffer.h"
-#ifdef RENDER_API_VULKAN
 
 #include "VulkanDevice.h"
 #include <iostream>
@@ -119,5 +118,3 @@ bool VulkanVertexBuffer::CreateVertexBuffer(VulkanDevice* device, const void* ve
     stagingBuffer.Cleanup();
     return true;
 }
-
-#endif // RENDER_API_VULKAN

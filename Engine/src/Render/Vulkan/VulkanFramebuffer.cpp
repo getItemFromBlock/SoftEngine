@@ -1,5 +1,4 @@
 ﻿#include "VulkanFramebuffer.h"
-#ifdef RENDER_API_VULKAN
 
 #include <array>
 
@@ -80,5 +79,3 @@ void VulkanFramebuffer::Cleanup()
     }
     m_framebuffers.clear();
 }
-
-#endif

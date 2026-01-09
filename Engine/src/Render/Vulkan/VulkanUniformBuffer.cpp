@@ -1,5 +1,4 @@
 #include "VulkanUniformBuffer.h"
-#ifdef RENDER_API_VULKAN
 
 #include "VulkanDevice.h"
 #include "VulkanBuffer.h"
@@ -303,4 +302,3 @@ VkDescriptorBufferInfo VulkanUniformBuffer::GetDescriptorInfo(size_t frame, VkDe
     return bufferInfo;
 }
 
-#endif // RENDER_API_VULKAN

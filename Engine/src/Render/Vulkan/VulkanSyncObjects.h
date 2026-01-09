@@ -1,5 +1,4 @@
 ﻿#pragma once
-#ifdef RENDER_API_VULKAN
 
 #include <vulkan/vulkan.h>
 #include <vector>
@@ -29,5 +28,3 @@ private:
     std::vector<VkSemaphore> m_renderFinishedSemaphores;
     std::vector<VkFence> m_inFlightFences;
 };
-
-#endif

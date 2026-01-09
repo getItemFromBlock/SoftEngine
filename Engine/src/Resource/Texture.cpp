@@ -2,7 +2,7 @@
 
 #include "Debug/Log.h"
 #include "Loader/ImageLoader.h"
-#include "Render/RHI/RHIRenderer.h"
+#include "Render/Vulkan/VulkanRenderer.h"
 
 bool Texture::Load(ResourceManager* resourceManager)
 {    
@@ -16,7 +16,7 @@ bool Texture::Load(ResourceManager* resourceManager)
     return true;
 }
 
-bool Texture::SendToGPU(RHIRenderer* renderer)
+bool Texture::SendToGPU(VulkanRenderer* renderer)
 {
     m_buffer = renderer->CreateTexture(m_image);
     ImageLoader::ImageFree(m_image);

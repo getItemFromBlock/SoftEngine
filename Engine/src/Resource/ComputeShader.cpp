@@ -9,7 +9,7 @@ ComputeDispatch::~ComputeDispatch()
     }
 }
 
-bool ComputeShader::SendToGPU(RHIRenderer* renderer)
+bool ComputeShader::SendToGPU(VulkanRenderer* renderer)
 {
     if (!BaseShader::SendToGPU(renderer))
         return false;

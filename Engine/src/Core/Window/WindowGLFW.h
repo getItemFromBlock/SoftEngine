@@ -2,15 +2,7 @@
 #include "Core/Window.h"
 #include <unordered_map>
 
-#ifdef RENDER_API_VULKAN
 #define GLFW_EXPOSE_NATIVE_VULKAN
-#endif
-#ifdef RENDER_API_OPENGL
-#define GLFW_EXPOSE_NATIVE_OPENGL
-#endif
-#ifdef RENDER_API_DIRECTX
-#define GLFW_EXPOSE_NATIVE_DIRECTX
-#endif
 #ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
 #elif defined(__APPLE__)
@@ -28,7 +20,7 @@ public:
     ~WindowGLFW() override;
 
     bool InitializeAPI() override;
-    bool Initialize(RenderAPI renderAPI, const WindowConfig& config) override;
+    bool Initialize(const WindowConfig& config) override;
     void PollEvents() override;
     void Terminate() override;
 
@@ -73,9 +65,7 @@ public:
     
     // KeyEvent GetKeyState(Key key) const override;
     
-#ifdef RENDER_API_VULKAN
     VkSurfaceKHR CreateSurface(VkInstance instance) override;
-#endif
 
 private:
     void SetupCallbacks() const override;

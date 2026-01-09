@@ -33,7 +33,7 @@ void MeshComponent::OnUpdate(float deltaTime)
     }
 }
 
-void MeshComponent::OnRender(RHIRenderer* renderer) 
+void MeshComponent::OnRender(VulkanRenderer* renderer) 
 {
     if (!m_visible)
         return;

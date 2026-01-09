@@ -1,5 +1,4 @@
 ﻿#pragma once
-#ifdef RENDER_API_VULKAN
 
 #include <memory>
 #include <unordered_map>
@@ -8,36 +7,35 @@
 #include "VulkanDescriptorPool.h"
 #include "VulkanDescriptorSet.h"
 #include "VulkanUniformBuffer.h"
-#include "Render/RHI/RHIMaterial.h"
 
 class VulkanPipeline;
 class VulkanDevice;
 class Texture;
 
-class VulkanMaterial : public RHIMaterial
+class VulkanMaterial
 {
 public:
     VulkanMaterial(VulkanPipeline* pipeline);
-    ~VulkanMaterial() override;
+    ~VulkanMaterial();
 
     bool Initialize(uint32_t maxFramesInFlight, Texture* defaultTexture, VulkanPipeline* pipeline);
-    void Cleanup() override;
+    void Cleanup();
 
-    void SetUniformData(uint32_t set, uint32_t binding, const void* data, size_t size, RHIRenderer* renderer) override;
-    void SetTexture(uint32_t set, uint32_t binding, Texture* texture, RHIRenderer* renderer);
+    void SetUniformData(uint32_t set, uint32_t binding, const void* data, size_t size, VulkanRenderer* renderer);
+    void SetTexture(uint32_t set, uint32_t binding, Texture* texture, VulkanRenderer* renderer);
     void SetTextureForFrame(uint32_t frameIndex, uint32_t set, uint32_t binding, Texture* texture);
     
-    void Bind(RHIRenderer* renderer) override;
+    void Bind(VulkanRenderer* renderer);
     void BindDescriptorSets(VkCommandBuffer commandBuffer, uint32_t frameIndex);
 
     VulkanUniformBuffer* GetUniformBuffer(uint32_t set, uint32_t binding) const;
     VulkanDescriptorSet* GetDescriptorSet(uint32_t set) const;
     void SetStorageBuffer(uint32_t set, uint32_t binding, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range,
-                          RHIRenderer* renderer);
+                          VulkanRenderer* renderer);
     void BindForCompute(VkCommandBuffer commandBuffer, uint32_t frameIndex);
-    void DispatchCompute(RHIRenderer* renderer, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
-    void SetPushConstants(RHIRenderer* renderer, const void* data, uint32_t size, uint32_t offset);
-    void SetStorageBufferData(uint32_t set, uint32_t binding, const void* data, size_t size, RHIRenderer* renderer);
+    void DispatchCompute(VulkanRenderer* renderer, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+    void SetPushConstants(VulkanRenderer* renderer, const void* data, uint32_t size, uint32_t offset);
+    void SetStorageBufferData(uint32_t set, uint32_t binding, const void* data, size_t size, VulkanRenderer* renderer);
     VulkanPipeline* GetPipeline() const { return m_pipeline; }
 
 private:
@@ -50,5 +48,3 @@ private:
     std::vector<std::unique_ptr<VulkanDescriptorSet>> m_descriptorSets;
     std::unordered_map<uint32_t, std::vector<Uniform>> m_uniformsBySet;
 };
-
-#endif

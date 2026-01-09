@@ -1,6 +1,6 @@
 ﻿#pragma once
 #include "Shader.h"
-#include "Render/RHI/RHIMaterial.h"
+#include "Render/Vulkan/VulkanMaterial.h"
 
 class ComputeDispatch
 {
@@ -11,11 +11,11 @@ public:
     ComputeDispatch& operator=(const ComputeDispatch&) = delete;
     virtual ~ComputeDispatch();
     
-    void SetMaterial(std::unique_ptr<RHIMaterial> mat) { m_buffer = std::move(mat); }
+    void SetMaterial(std::unique_ptr<VulkanMaterial> mat) { m_buffer = std::move(mat); }
 
-    RHIMaterial* GetMaterial() const { return m_buffer.get(); }
+    VulkanMaterial* GetMaterial() const { return m_buffer.get(); }
 private:
-    std::unique_ptr<RHIMaterial> m_buffer;
+    std::unique_ptr<VulkanMaterial> m_buffer;
 };
 
 class ComputeShader : public BaseShader
@@ -31,5 +31,5 @@ public:
     
     ShaderType GetShaderType() const override { return ShaderType::Compute; }
     
-    bool SendToGPU(RHIRenderer* renderer) override;
+    bool SendToGPU(VulkanRenderer* renderer) override;
 };

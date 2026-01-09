@@ -1,7 +1,7 @@
 #pragma once
 #include "IResource.h"
 #include "Loader/ImageLoader.h"
-#include "Render/RHI/RHITexture.h"
+#include "Render/Vulkan/VulkanTexture.h"
 
 class Texture : public IResource
 {
@@ -9,11 +9,11 @@ public:
     DECLARE_RESOURCE_TYPE(Texture)
 
     bool Load(ResourceManager* resourceManager) override;
-    bool SendToGPU(RHIRenderer* renderer) override;
+    bool SendToGPU(VulkanRenderer* renderer) override;
     void Unload() override;
     
-    RHITexture* GetBuffer() const { return m_buffer.get(); }
+    VulkanTexture* GetBuffer() const { return m_buffer.get(); }
 private:
     ImageLoader::Image m_image = {};
-    std::unique_ptr<RHITexture> m_buffer;
+    std::unique_ptr<VulkanTexture> m_buffer;
 };

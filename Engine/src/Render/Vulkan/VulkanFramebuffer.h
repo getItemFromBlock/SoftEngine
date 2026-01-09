@@ -1,5 +1,4 @@
 ﻿#pragma once
-#ifdef RENDER_API_VULKAN
 
 #include <vulkan/vulkan.h>
 #include <vector>
@@ -25,5 +24,3 @@ private:
     VulkanDevice* m_device = nullptr;
     std::vector<VkFramebuffer> m_framebuffers;
 };
-
-#endif

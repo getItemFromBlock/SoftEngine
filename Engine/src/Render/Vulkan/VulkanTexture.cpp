@@ -1,5 +1,3 @@
-#ifdef RENDER_API_VULKAN
-
 #include "VulkanTexture.h"
 #include "VulkanDevice.h"
 #include "VulkanBuffer.h"
@@ -358,5 +356,3 @@ bool VulkanTexture::CreateAndSetupImage(VkBuffer stagingBuffer, VulkanCommandPoo
     
     return true;
 }
-
-#endif

@@ -1,5 +1,4 @@
 ﻿#include "VulkanDevice.h"
-#ifdef RENDER_API_VULKAN
 
 #include <iostream>
 #include <set>
@@ -359,5 +358,3 @@ void VulkanDevice::CreateLogicalDevice(VkSurfaceKHR surface)
         m_presentQueue.mutex = m_graphicsQueue.mutex;
     }
 }
-
-#endif

@@ -1,5 +1,4 @@
 ﻿#include "VulkanBuffer.h"
-#ifdef RENDER_API_VULKAN
 
 #include <cassert>
 
@@ -106,5 +105,3 @@ uint32_t VulkanBuffer::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags
 
     throw std::runtime_error("Failed to find suitable memory type!");
 }
-
-#endif

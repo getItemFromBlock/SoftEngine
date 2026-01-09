@@ -1,5 +1,4 @@
 ﻿#include "VulkanSwapChain.h"
-#ifdef RENDER_API_VULKAN
 
 #include "VulkanDevice.h"
 #include "Core/Window.h"
@@ -352,5 +351,3 @@ void VulkanSwapChain::CleanupSwapChain()
 
     m_images.clear();
 }
-
-#endif

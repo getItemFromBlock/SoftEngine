@@ -35,7 +35,7 @@ public:
     Scene(Scene&&) noexcept = delete;
     virtual ~Scene();
 
-    void OnRender(RHIRenderer* renderer);
+    void OnRender(VulkanRenderer* renderer);
     void OnUpdate(float deltaTime);
 
     const GameObjectList& GetGameObjects() const { return m_gameObjects; }

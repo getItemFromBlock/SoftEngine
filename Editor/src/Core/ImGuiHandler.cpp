@@ -4,12 +4,9 @@
 
 #include "Core/Window.h"
 #include "Core/Window/WindowGLFW.h"
-#include "Render/RHI/RHIRenderer.h"
-#include "Render/Vulkan/VulkanTexture.h"
 
-#ifdef RENDER_API_VULKAN
+#include "Render/Vulkan/VulkanTexture.h"
 #include "Render/Vulkan/VulkanRenderer.h"
-#endif
 
 // Validation callback (like in the example)
 static void check_vk_result(VkResult err)
@@ -21,12 +18,10 @@ static void check_vk_result(VkResult err)
         abort();
 }
 
-void ImGuiHandler::Initialize(Window* window, RHIRenderer* renderer)
+void ImGuiHandler::Initialize(Window* window, VulkanRenderer* renderer)
 {
     m_renderer = renderer;
-#ifdef RENDER_API_VULKAN
-    auto vulkanRenderer = dynamic_cast<VulkanRenderer*>(renderer);
-    m_device = vulkanRenderer->GetDevice();
+    m_device = renderer->GetDevice();
     
     VkDescriptorPoolSize pool_sizes[] =
     {
@@ -67,12 +62,10 @@ void ImGuiHandler::Initialize(Window* window, RHIRenderer* renderer)
 
     ImGui::StyleColorsDark();
 
-#ifdef WINDOW_API_GLFW
     ImGui_ImplGlfw_InitForVulkan(glfwWindow, true);
-#endif
 
     ImGui_ImplVulkan_InitInfo init_info = {};
-    init_info.Instance = vulkanRenderer->GetContext()->GetInstance();
+    init_info.Instance = renderer->GetContext()->GetInstance();
     init_info.PhysicalDevice = m_device->GetPhysicalDevice();
     init_info.Device = m_device->GetDevice();
     init_info.QueueFamily = m_device->GetGraphicsQueueFamily();
@@ -80,7 +73,7 @@ void ImGuiHandler::Initialize(Window* window, RHIRenderer* renderer)
     init_info.PipelineCache = VK_NULL_HANDLE;
     init_info.DescriptorPool = m_descriptorPool;
     init_info.MinImageCount = 2;
-    init_info.ImageCount = vulkanRenderer->GetSwapChain()->GetImageCount();
+    init_info.ImageCount = renderer->GetSwapChain()->GetImageCount();
     init_info.Allocator = nullptr;
     init_info.CheckVkResultFn = check_vk_result;
     
@@ -89,9 +82,9 @@ void ImGuiHandler::Initialize(Window* window, RHIRenderer* renderer)
     VkPipelineRenderingCreateInfoKHR pipeline_rendering_create_info = {};
     pipeline_rendering_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
     pipeline_rendering_create_info.colorAttachmentCount = 1;
-    VkFormat colorFormat = vulkanRenderer->GetRenderPass()->GetColorFormat();
+    VkFormat colorFormat = renderer->GetRenderPass()->GetColorFormat();
     pipeline_rendering_create_info.pColorAttachmentFormats = &colorFormat;
-    pipeline_rendering_create_info.depthAttachmentFormat = vulkanRenderer->GetRenderPass()->GetDepthFormat();
+    pipeline_rendering_create_info.depthAttachmentFormat = renderer->GetRenderPass()->GetDepthFormat();
     
     init_info.PipelineInfoMain.PipelineRenderingCreateInfo = pipeline_rendering_create_info;
 
@@ -100,8 +93,6 @@ void ImGuiHandler::Initialize(Window* window, RHIRenderer* renderer)
     {
         std::cerr << "Failed to initialize ImGui Vulkan backend!" << std::endl;
     }
-
-#endif
     
     VkPhysicalDeviceProperties deviceProps;
     vkGetPhysicalDeviceProperties(m_device->GetPhysicalDevice(), &deviceProps);
@@ -128,9 +119,7 @@ void ImGuiHandler::Cleanup()
 
 void ImGuiHandler::BeginFrame()
 {
-#ifdef RENDER_API_VULKAN
     ImGui_ImplVulkan_NewFrame();
-#endif
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 }
@@ -140,19 +129,15 @@ void ImGuiHandler::EndFrame()
     ImGui::Render();
     ImDrawData* draw_data = ImGui::GetDrawData();
     
-#ifdef RENDER_API_VULKAN
-    VulkanRenderer* vulkanRenderer = dynamic_cast<VulkanRenderer*>(m_renderer);
-    
     const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
     if (!is_minimized && draw_data->CmdListsCount > 0)
     {
-        VulkanCommandPool* commandPool = vulkanRenderer->GetCommandPool();
-        uint32_t currentFrame = vulkanRenderer->GetFrameIndex();
+        VulkanCommandPool* commandPool = m_renderer->GetCommandPool();
+        uint32_t currentFrame = m_renderer->GetFrameIndex();
         VkCommandBuffer commandBuffer = commandPool->GetCommandBuffer(currentFrame);
         
         ImGui_ImplVulkan_RenderDrawData(draw_data, commandBuffer);
     }
-#endif
 }
 
 ImTextureRef ImGuiHandler::GetTextureID(Texture* texture)
@@ -161,7 +146,7 @@ ImTextureRef ImGuiHandler::GetTextureID(Texture* texture)
     auto it = m_textureIDs.find(texture->GetUUID());
     if (it == m_textureIDs.end())
     {
-        auto buffer = dynamic_cast<VulkanTexture*>(texture->GetBuffer());
+        auto buffer = texture->GetBuffer();
         ID = ImGui_ImplVulkan_AddTexture(
             buffer->GetSampler(),
             buffer->GetImageView(),

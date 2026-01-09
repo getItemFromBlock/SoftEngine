@@ -1,16 +1,14 @@
 #pragma once
 
-#ifdef RENDER_API_VULKAN
 
 #include "VulkanBuffer.h"
 #include <vulkan/vulkan.h>
 
-#include "Render/RHI/RHIIndexBuffer.h"
 
 class VulkanCommandPool;
 class VulkanDevice;
 
-class VulkanIndexBuffer : public RHIIndexBuffer
+class VulkanIndexBuffer
 {
 public:
     VulkanIndexBuffer() = default;
@@ -46,4 +44,3 @@ private:
     VkIndexType m_indexType = VK_INDEX_TYPE_UINT32;
 };
 
-#endif // RENDER_API_VULKAN
