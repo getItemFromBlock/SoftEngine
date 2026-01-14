@@ -92,10 +92,12 @@ public:
 
     virtual std::string GetName(bool extension = false) const;
     bool IsLoaded() const { return p_isLoaded; }
+    bool IsLoading() const { return p_isLoading; }
     bool SentToGPU() const { return p_sendToGPU; }
     
     void SetLoaded()
     {
+        p_isLoading = false;
         p_isLoaded = true;
         EOnLoaded.Invoke();
     }
@@ -114,6 +116,7 @@ protected:
     std::filesystem::path p_path;
     Core::UUID p_uuid;
 
+    std::atomic_bool p_isLoading;
     std::atomic_bool p_isLoaded;
     std::atomic_bool p_sendToGPU;
 };

@@ -186,7 +186,7 @@ SafePtr<T> ResourceManager::Load(const std::filesystem::path& resourcePath, bool
             resource->p_uuid = uuid;
             AddResource(resource);
         }
-        else if (resource->IsLoaded())
+        else if (resource->IsLoading() || resource->IsLoaded())
         {
             return resource;
         }
@@ -202,6 +202,11 @@ SafePtr<T> ResourceManager::Load(const std::filesystem::path& resourcePath, bool
                 PrintError("Resource is invalid");
                 return;
             }
+            if (resource->IsLoading() || resource->IsLoaded())
+            {
+                return;
+            }
+            resource->p_isLoading.store(true);
             if (resource->Load(this))
             {
                 PrintLog("Resource loaded %s", resource->GetPath().generic_string().c_str());
@@ -212,6 +217,7 @@ SafePtr<T> ResourceManager::Load(const std::filesystem::path& resourcePath, bool
     }
     else
     {
+        resource->p_isLoading.store(true);
         if (resource->Load(this))
         {
             PrintLog("Resource loaded %s", resource->GetPath().generic_string().c_str());

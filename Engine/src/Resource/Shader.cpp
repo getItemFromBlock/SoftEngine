@@ -107,39 +107,52 @@ bool Shader::Load(ResourceManager* resourceManager)
         if (File::Exist(subPath)) return subPath;
         return (p_path.parent_path() / subPath).generic_string();
     };
-
-    // Index mapping: 0 = Vert, 1 = Frag, 2 = Compute
     
-    // 1. Vertex Shader
-    if (stagePaths.size() > 0 && !stagePaths[0].empty())
+    for (const auto& path : stagePaths)
     {
-        std::string path = ResolvePath(stagePaths[0]);
-        m_vertexShader = resourceManager->Load<VertexShader>(path, multithread);
-        if (!m_vertexShader) {
-            PrintError("Failed to load Vertex Shader: %s", path.c_str());
-            return false;
-        }
-    }
-
-    // 2. Fragment Shader
-    if (stagePaths.size() > 1 && !stagePaths[1].empty())
-    {
-        std::string path = ResolvePath(stagePaths[1]);
-        m_fragmentShader = resourceManager->Load<FragmentShader>(path, multithread);
-        if (!m_fragmentShader) {
-            PrintError("Failed to load Fragment Shader: %s", path.c_str());
-            return false;
-        }
-    }
-
-    // 3. Compute Shader
-    if (stagePaths.size() > 2 && !stagePaths[2].empty())
-    {
-        std::string path = ResolvePath(stagePaths[2]);
-        m_computeShader = resourceManager->Load<ComputeShader>(path, multithread);
-        if (!m_computeShader) {
-            PrintError("Failed to load Compute Shader: %s", path.c_str());
-            return false;
+        std::filesystem::path resolvedPath = ResolvePath(path);
+        if (File::Exist(resolvedPath))
+        {
+            std::string extension = resolvedPath.extension().generic_string();
+            if (extension == ".vert")
+            {
+                if (m_vertexShader)
+                {
+                    PrintError("Vertex Shader already loaded: %s", resolvedPath.c_str());
+                    return false;
+                }
+                m_vertexShader = resourceManager->Load<VertexShader>(resolvedPath, multithread);
+                if (!m_vertexShader) {
+                    PrintError("Failed to load Vertex Shader: %s", resolvedPath.c_str());
+                    return false;
+                }
+            }
+            else if (extension == ".frag")
+            {
+                if (m_fragmentShader)
+                {
+                    PrintError("Fragment Shader already loaded: %s", resolvedPath.c_str());
+                    return false;
+                }
+                m_fragmentShader = resourceManager->Load<FragmentShader>(resolvedPath, multithread);
+                if (!m_fragmentShader) {
+                    PrintError("Failed to load Fragment Shader: %s", resolvedPath.c_str());
+                    return false;
+                }
+            }
+            else if (extension == ".comp")
+            {
+                if (m_computeShader)
+                {
+                    PrintError("Compute Shader already loaded: %s", resolvedPath.c_str());
+                    return false;
+                }
+                m_computeShader = resourceManager->Load<ComputeShader>(resolvedPath, multithread);
+                if (!m_computeShader) {
+                    PrintError("Failed to load Compute Shader: %s", resolvedPath.c_str());
+                    return false;
+                }
+            }
         }
     }
 

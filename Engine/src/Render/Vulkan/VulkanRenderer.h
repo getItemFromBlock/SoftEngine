@@ -22,6 +22,7 @@
 #include "VulkanSwapChain.h"
 #include "VulkanSyncObjects.h"
 #include "VulkanVertexBuffer.h"
+#include "Render/LineRenderer.h"
 #include "Render/RenderQueue.h"
 
 enum class ShaderType;
@@ -97,6 +98,9 @@ public:
     
     RenderQueueManager* GetRenderQueueManager() const { return m_renderQueueManager.get(); }
     uint64_t GetTriangleCount() const { return p_triangleCount; }
+    
+    LineRenderer& GetLineRenderer() { return m_lineRenderer; }
+    void AddLine(const Vec3f& start, const Vec3f& end, const Vec4f& color, float thickness = 1.f);
 private:
     void RecreateSwapChain();
     void TransitionImageForPresent() const;
@@ -121,8 +125,9 @@ private:
     uint32_t m_imageIndex = 0;
     
     SafePtr<Texture> m_defaultTexture;
-    VkDescriptorPool m_imGuiPool;
 
     static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
     uint32_t m_currentFrame = 0;
+    
+    LineRenderer m_lineRenderer;
 };

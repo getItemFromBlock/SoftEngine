@@ -54,11 +54,12 @@ bool Model::Load(ResourceManager* resourceManager)
         
         std::vector<std::vector<Vec3f>> positions;
         positions.reserve(model.meshes.size());
-        for (auto& mesh : model.meshes)
+        for (size_t i = 0; i < model.meshes.size(); i++)
         {
+            auto& mesh = model.meshes[i];
             positions.push_back(mesh.positions);
             std::filesystem::path meshPath = p_path / (mesh.name.generic_string() + ".mesh");
-            SafePtr<Mesh> meshResource = resourceManager->GetResource<Mesh>(meshPath);
+            SafePtr meshResource = resourceManager->GetResource<Mesh>(meshPath);
             if (!meshResource)
             {
                 meshResource = resourceManager->AddResource(
@@ -74,6 +75,16 @@ bool Model::Load(ResourceManager* resourceManager)
                     m_materials.push_back(materials[subMesh.materialName.value()]);
             }
             
+            meshResource->ComputeBoundingBox(mesh.positions);
+            
+            m_boundingBox.min.x = std::min(m_boundingBox.min.x, meshResource->GetBoundingBox().min.x);
+            m_boundingBox.min.y = std::min(m_boundingBox.min.y, meshResource->GetBoundingBox().min.y);
+            m_boundingBox.min.z = std::min(m_boundingBox.min.z, meshResource->GetBoundingBox().min.z);
+
+            m_boundingBox.max.x = std::max(m_boundingBox.max.x, meshResource->GetBoundingBox().max.x);
+            m_boundingBox.max.y = std::max(m_boundingBox.max.y, meshResource->GetBoundingBox().max.y);
+            m_boundingBox.max.z = std::max(m_boundingBox.max.z, meshResource->GetBoundingBox().max.z);
+            
             m_meshes.push_back(meshResource);
             
             meshResource->m_vertices = mesh.finalVertices;
@@ -87,8 +98,6 @@ bool Model::Load(ResourceManager* resourceManager)
             ASSERT(!meshResource->m_vertices.empty())
             resourceManager->AddResourceToSend(meshResource.getPtr());
         }
-        
-        ComputeBoundingBox(positions);
         return true;
     }
     else
@@ -138,8 +147,9 @@ void Model::ComputeBoundingBox(const std::vector<std::vector<Vec3f>>& positionVe
 {
     if (positionVertices.empty())
         return;
-    for (size_t i = 0; SafePtr<Mesh>& mesh : m_meshes)
+    for (size_t i = 0; i < m_meshes.size(); i++)
     {
+        SafePtr<Mesh>& mesh = m_meshes[i];
         if (!mesh)
             continue;
         mesh->ComputeBoundingBox(positionVertices[i]);
@@ -151,6 +161,5 @@ void Model::ComputeBoundingBox(const std::vector<std::vector<Vec3f>>& positionVe
         m_boundingBox.max.x = std::max(m_boundingBox.max.x, mesh->m_boundingBox.max.x);
         m_boundingBox.max.y = std::max(m_boundingBox.max.y, mesh->m_boundingBox.max.y);
         m_boundingBox.max.z = std::max(m_boundingBox.max.z, mesh->m_boundingBox.max.z);
-        i++;
     }
 }

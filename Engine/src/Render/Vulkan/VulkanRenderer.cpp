@@ -25,6 +25,7 @@
 #include "VulkanShaderBuffer.h"
 #include "VulkanTexture.h"
 #include "VulkanVertexBuffer.h"
+#include "Core/Engine.h"
 
 #include "Debug/Log.h"
 #include "Resource/FragmentShader.h"
@@ -134,12 +135,6 @@ void VulkanRenderer::WaitForGPU()
 
 void VulkanRenderer::Cleanup()
 {
-    if (m_imGuiPool != VK_NULL_HANDLE && m_device)
-    {
-        vkDestroyDescriptorPool(m_device->GetDevice(), m_imGuiPool, nullptr);
-        m_imGuiPool = VK_NULL_HANDLE;
-    }
-
     m_syncObjects.reset();
     m_commandPool.reset();
     m_depthBuffer.reset();
@@ -206,6 +201,9 @@ bool VulkanRenderer::MultiThreadSendToGPU()
 
 void VulkanRenderer::EndFrame()
 {
+    auto currentScene = Engine::Get()->GetSceneHolder()->GetCurrentScene();
+    auto cameraData = currentScene->GetCameraData();
+    m_lineRenderer.Render(this, cameraData.VP);
     auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
     
     m_renderPass->End(commandBuffer);
@@ -626,6 +624,11 @@ void VulkanRenderer::ClearColor() const
                        m_depthBuffer->GetImageView(), 
                        m_swapChain->GetExtent(), 
                        clearValues);
+}
+
+void VulkanRenderer::AddLine(const Vec3f& start, const Vec3f& end, const Vec4f& color, float thickness)
+{
+    m_lineRenderer.AddLine(start, end, color, thickness);
 }
 
 void VulkanRenderer::RecreateSwapChain()
