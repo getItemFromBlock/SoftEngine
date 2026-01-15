@@ -57,8 +57,8 @@ void Editor::Initialize()
         auto go = Model::CreateGameObject(model.getPtr(), currentScene);
     });
     
-    auto go = currentScene->CreateGameObject();
-    go->AddComponent<ParticleSystemComponent>();
+    // auto go = currentScene->CreateGameObject();
+    // go->AddComponent<ParticleSystemComponent>();
 }
 
 void Editor::Run()

@@ -24,7 +24,7 @@ imgui_configs.vulkan = true
 
 add_requires("imgui v1.92.5-docking", {configs = imgui_configs, debug = true})
 add_requires("stb")
-add_requires("galaxymath")
+add_requires("galaxymath", "cpp_serializer")
 add_requires("thread-pool")
 
 -- Define macros
@@ -68,7 +68,7 @@ target("Engine")
     add_includedirs("Engine/src")
 
     -- Always add base packages
-    add_packages("galaxymath", "stb", "thread-pool")
+    add_packages("galaxymath", "stb", "thread-pool", "cpp_serializer")
     
     add_cxxflags("-Wall", "-Wextra")
 target_end()

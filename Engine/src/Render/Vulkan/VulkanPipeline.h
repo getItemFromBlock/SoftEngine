@@ -27,10 +27,10 @@ public:
                     uint32_t maxFramesInFlight, const Shader* shader,
                     VkFormat colorFormat, VkFormat depthFormat);
 
-    bool InitializeGraphicsPipeline(const VertexShader* vertexShader,
+    bool InitializeGraphicsPipeline(const Shader* shader,
+                                    const VertexShader* vertexShader,
                                     const FragmentShader* fragmentShader,
-                                    VkFormat colorFormat,
-                                    VkFormat depthFormat);
+                                    VkFormat colorFormat, VkFormat depthFormat);
 
     bool InitializeComputePipeline(const ComputeShader* computeShader);
 

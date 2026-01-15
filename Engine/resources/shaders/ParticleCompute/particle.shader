@@ -1,3 +1,3 @@
-
-
-particle.comp
+ ------------- Shader ------------- 
+[comp] : particle.comp
+ ============= Shader ============= 

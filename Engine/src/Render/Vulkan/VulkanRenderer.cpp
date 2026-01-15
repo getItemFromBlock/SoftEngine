@@ -135,6 +135,8 @@ void VulkanRenderer::WaitForGPU()
 
 void VulkanRenderer::Cleanup()
 {
+    m_lineRenderer.Cleanup();
+    
     m_syncObjects.reset();
     m_commandPool.reset();
     m_depthBuffer.reset();
@@ -159,7 +161,9 @@ void VulkanRenderer::Update()
 bool VulkanRenderer::BeginFrame()
 {
     p_triangleCount = 0;
+    p_vertexCount = 0;
     m_imageIndex = 0;
+    
     VkResult result = m_swapChain->AcquireNextImage(
         m_syncObjects->GetImageAvailableSemaphore(m_currentFrame),
         &m_imageIndex
@@ -201,9 +205,6 @@ bool VulkanRenderer::MultiThreadSendToGPU()
 
 void VulkanRenderer::EndFrame()
 {
-    auto currentScene = Engine::Get()->GetSceneHolder()->GetCurrentScene();
-    auto cameraData = currentScene->GetCameraData();
-    m_lineRenderer.Render(this, cameraData.VP);
     auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
     
     m_renderPass->End(commandBuffer);
@@ -304,11 +305,15 @@ void VulkanRenderer::BindVertexBuffers(VulkanVertexBuffer* vertexBuffer, VulkanI
     vkCmdBindIndexBuffer(commandBuffer, indexBuffer->GetBuffer(), 0, indexBuffer->GetIndexType());
 }
 
-void VulkanRenderer::DrawVertex(VulkanVertexBuffer* vertexBuffer, VulkanIndexBuffer* indexBuffer)
+void VulkanRenderer::DrawVertex(VulkanVertexBuffer* vertexBuffer, const VulkanIndexBuffer* indexBuffer)
 {
     VkCommandBuffer commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
 
-    vkCmdDrawIndexed(commandBuffer, indexBuffer->GetIndexCount(), 1, 0, 0, 0);
+    uint32_t indexCount = indexBuffer->GetIndexCount();
+    
+    vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
+    
+    p_vertexCount += indexCount;
 }
 
 void VulkanRenderer::DrawVertexSubMesh(VulkanIndexBuffer* _indexBuffer, uint32_t startIndex, uint32_t indexCount)
@@ -316,6 +321,7 @@ void VulkanRenderer::DrawVertexSubMesh(VulkanIndexBuffer* _indexBuffer, uint32_t
     VkCommandBuffer commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
 
     vkCmdDrawIndexed(commandBuffer, indexCount, 1, startIndex, 0, 0);
+    p_vertexCount += indexCount;
     p_triangleCount += indexCount / 3;
 }
 

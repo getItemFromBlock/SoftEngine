@@ -155,7 +155,7 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkExtent2D extent,
         }
         else 
         {
-            return InitializeGraphicsPipeline(vertexShader, fragmentShader, colorFormat, depthFormat);
+            return InitializeGraphicsPipeline(shader, vertexShader, fragmentShader, colorFormat, depthFormat);
         }
     }
     catch (const std::exception& e) {
@@ -165,10 +165,10 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkExtent2D extent,
     }
 }
 
-bool VulkanPipeline::InitializeGraphicsPipeline(const VertexShader* vertexShader, 
-                                               const FragmentShader* fragmentShader,
-                                               VkFormat colorFormat,
-                                               VkFormat depthFormat)
+bool VulkanPipeline::InitializeGraphicsPipeline(const Shader* shader,
+                                                const VertexShader* vertexShader,
+                                                const FragmentShader* fragmentShader,
+                                                VkFormat colorFormat, VkFormat depthFormat)
 {
     VkPipelineShaderStageCreateInfo vertStage{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
     vertStage.stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -194,7 +194,7 @@ bool VulkanPipeline::InitializeGraphicsPipeline(const VertexShader* vertexShader
     vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.topology = shader->GetTopology() == Topology::Triangle ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST : VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
     VkPipelineViewportStateCreateInfo viewportState{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};

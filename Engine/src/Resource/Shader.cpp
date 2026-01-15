@@ -11,6 +11,8 @@
 
 #include "Utils/File.h"
 
+#include <cpp_serializer/CppSerializer.h>
+
 BaseShader::~BaseShader()
 {
     if (p_buffer)
@@ -93,69 +95,78 @@ std::filesystem::path BaseShader::GetCompiledPath() const
 bool Shader::Load(ResourceManager* resourceManager)
 {
     bool multithread = !ThreadPool::IsMainThread();
-    File file(p_path);
-    std::vector<std::string> stagePaths;
-
-    if (!file.ReadAllLines(stagePaths) || stagePaths.empty())
-    {
-        PrintError("Failed to read shader source or file is empty: %s", p_path.c_str());
-        return false;
-    }
-
+    
     auto ResolvePath = [&](const std::string& subPath) -> std::string {
         if (subPath.empty()) return "";
         if (File::Exist(subPath)) return subPath;
         return (p_path.parent_path() / subPath).generic_string();
     };
     
-    for (const auto& path : stagePaths)
+    CppSer::Parser parser(p_path);
+    if (auto vertPath = parser["vert"].As<std::string>(); !vertPath.empty())
     {
-        std::filesystem::path resolvedPath = ResolvePath(path);
+        std::filesystem::path resolvedPath = ResolvePath(vertPath);
+        
+        if (m_vertexShader)
+        {
+            PrintError("Vertex Shader already loaded: %s", resolvedPath.c_str());
+            return false;
+        }
+        
         if (File::Exist(resolvedPath))
         {
-            std::string extension = resolvedPath.extension().generic_string();
-            if (extension == ".vert")
-            {
-                if (m_vertexShader)
-                {
-                    PrintError("Vertex Shader already loaded: %s", resolvedPath.c_str());
-                    return false;
-                }
-                m_vertexShader = resourceManager->Load<VertexShader>(resolvedPath, multithread);
-                if (!m_vertexShader) {
-                    PrintError("Failed to load Vertex Shader: %s", resolvedPath.c_str());
-                    return false;
-                }
-            }
-            else if (extension == ".frag")
-            {
-                if (m_fragmentShader)
-                {
-                    PrintError("Fragment Shader already loaded: %s", resolvedPath.c_str());
-                    return false;
-                }
-                m_fragmentShader = resourceManager->Load<FragmentShader>(resolvedPath, multithread);
-                if (!m_fragmentShader) {
-                    PrintError("Failed to load Fragment Shader: %s", resolvedPath.c_str());
-                    return false;
-                }
-            }
-            else if (extension == ".comp")
-            {
-                if (m_computeShader)
-                {
-                    PrintError("Compute Shader already loaded: %s", resolvedPath.c_str());
-                    return false;
-                }
-                m_computeShader = resourceManager->Load<ComputeShader>(resolvedPath, multithread);
-                if (!m_computeShader) {
-                    PrintError("Failed to load Compute Shader: %s", resolvedPath.c_str());
-                    return false;
-                }
+            m_vertexShader = resourceManager->Load<VertexShader>(resolvedPath, multithread);
+            if (!m_vertexShader) {
+                PrintError("Failed to load Vertex Shader: %s", resolvedPath.c_str());
+                return false;
             }
         }
     }
-
+    if (auto fragPath = parser["frag"].As<std::string>(); !fragPath.empty())
+    {
+        std::filesystem::path resolvedPath = ResolvePath(fragPath);
+        
+        if (m_fragmentShader)
+        {
+            PrintError("Fragment shader already loaded: %s", resolvedPath.c_str());
+            return false;
+        }
+        
+        if (File::Exist(resolvedPath))
+        {
+            m_fragmentShader = resourceManager->Load<FragmentShader>(resolvedPath, multithread);
+            if (!m_fragmentShader) {
+                PrintError("Failed to load Fragment Shader: %s", resolvedPath.c_str());
+                return false;
+            }
+        }
+    }
+    if (auto compPath = parser["comp"].As<std::string>(); !compPath.empty())
+    {
+        std::filesystem::path resolvedPath = ResolvePath(compPath);
+        
+        if (m_computeShader)
+        {
+            PrintError("Compute shader already loaded: %s", resolvedPath.c_str());
+            return false;
+        }
+        
+        if (File::Exist(resolvedPath))
+        {
+            m_computeShader = resourceManager->Load<ComputeShader>(resolvedPath, multithread);
+            if (!m_computeShader) {
+                PrintError("Failed to load Compute Shader: %s", resolvedPath.c_str());
+                return false;
+            }
+        }
+    }
+    auto topology = topology_from_string(parser["topology"].As<std::string>());
+    if (topology != Topology::None)
+    {
+        m_topology = topology;
+    }
+    
+    
     bool hasGraphics = (m_vertexShader && m_fragmentShader);
     bool hasCompute = (m_computeShader.valid());
 
@@ -180,7 +191,6 @@ bool Shader::SendToGPU(VulkanRenderer* renderer)
     
     m_pushConstants = renderer->GetPushConstants(this);
     m_uniforms = renderer->GetUniforms(this);
-    
     m_pipeline = renderer->CreatePipeline(this);
     return true;
 }

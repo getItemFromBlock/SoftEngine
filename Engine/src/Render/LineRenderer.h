@@ -7,6 +7,7 @@
 #include "Utils/Type.h"
 #include <galaxymath/Maths.h>
 
+class Material;
 class VulkanRenderer;
 class VulkanVertexBuffer;
 class VulkanIndexBuffer;
@@ -54,7 +55,7 @@ private:
     
     std::unique_ptr<VulkanVertexBuffer> m_vertexBuffer;
     std::unique_ptr<VulkanIndexBuffer> m_indexBuffer;
-    std::unique_ptr<VulkanMaterial> m_material;
+    SafePtr<Material> m_material;
     
     SafePtr<Shader> m_shader;
     

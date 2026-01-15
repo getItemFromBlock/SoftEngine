@@ -8,6 +8,7 @@ void ResourcesWindow::OnRender()
     {
         ImGui::Text("FPS: %f", ImGui::GetIO().Framerate);
         ImGui::Text("Triangle Count: %llu", p_engine->GetRenderer()->GetTriangleCount());
+        ImGui::Text("Vertex Count: %llu", p_engine->GetRenderer()->GetVertexCount());
         
         if (ImGui::CollapsingHeader("Resources"))
         {

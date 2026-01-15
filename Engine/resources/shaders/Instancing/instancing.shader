@@ -1,2 +1,4 @@
-instancing.vert
-instancing.frag
+ ------------- Shader ------------- 
+[vert] : instancing.vert
+[frag] : instancing.frag
+ ============= Shader ============= 

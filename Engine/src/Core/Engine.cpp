@@ -54,7 +54,7 @@ bool Engine::Initialize(EngineDesc desc)
     m_resourceManager->LoadDefaultShader(RESOURCE_PATH"/shaders/Unlit/unlit.shader");
     m_resourceManager->LoadDefaultMaterial(RESOURCE_PATH"/shaders/unlit.mat");
     
-    // m_renderer->GetLineRenderer().Initialize(m_renderer.get());
+    m_renderer->GetLineRenderer()->Initialize(m_renderer.get());
     
     m_componentRegister = std::make_unique<ComponentRegister>();
     m_componentRegister->RegisterComponent<TransformComponent>();
@@ -90,9 +90,16 @@ void Engine::Render()
 {        
     m_renderer->ClearColor();
     
-    m_renderer->AddLine(Vec3f(0, 0, 0), Vec3f(1, 1, 1), Vec4f(1, 0, 0, 1));
+    m_renderer->AddLine(Vec3f(0, 0, 0), Vec3f::Right(), Vec4f(1, 0, 0, 1));
+    m_renderer->AddLine(Vec3f(0, 0, 0), Vec3f::Up(), Vec4f(0, 1, 0, 1));
+    m_renderer->AddLine(Vec3f(0, 0, 0), Vec3f::Forward(), Vec4f(0, 0, 1, 1));
 
     m_sceneHolder->Render(m_renderer.get());
+    
+    auto currentScene = m_sceneHolder->GetCurrentScene();
+    auto cameraData = currentScene->GetCameraData();
+    
+    m_renderer->GetLineRenderer()->Render(m_renderer.get(), cameraData.VP);
 }
 
 void Engine::EndFrame()

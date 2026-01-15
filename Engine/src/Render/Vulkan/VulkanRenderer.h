@@ -56,7 +56,7 @@ public:
     
     void SendPushConstants(void* data, uint32_t size, Shader* shader, PushConstant pushConstant) const;
     void BindVertexBuffers(VulkanVertexBuffer* vertexBuffer, VulkanIndexBuffer* indexBuffer) const;
-    void DrawVertex(VulkanVertexBuffer* vertexBuffer, VulkanIndexBuffer* indexBuffer);
+    void DrawVertex(VulkanVertexBuffer* vertexBuffer, const VulkanIndexBuffer* indexBuffer);
     void DrawVertexSubMesh(VulkanIndexBuffer* _indexBuffer, uint32_t startIndex, uint32_t indexCount);
     void DrawInstanced(VulkanIndexBuffer* indexBuffer, VulkanVertexBuffer* vertexShader, VulkanBuffer* instanceBuffer, uint32_t instanceCount);
     
@@ -98,8 +98,9 @@ public:
     
     RenderQueueManager* GetRenderQueueManager() const { return m_renderQueueManager.get(); }
     uint64_t GetTriangleCount() const { return p_triangleCount; }
-    
-    LineRenderer& GetLineRenderer() { return m_lineRenderer; }
+    uint64_t GetVertexCount() const { return p_vertexCount; }
+
+    LineRenderer* GetLineRenderer() { return &m_lineRenderer; }
     void AddLine(const Vec3f& start, const Vec3f& end, const Vec4f& color, float thickness = 1.f);
 private:
     void RecreateSwapChain();
@@ -109,6 +110,7 @@ private:
     bool m_initialized = false;
     std::unique_ptr<RenderQueueManager> m_renderQueueManager;
     uint64_t p_triangleCount = 0;
+    uint64_t p_vertexCount = 0;
     
     Window* m_window = nullptr;
     bool m_framebufferResized = false;

@@ -99,6 +99,34 @@ struct PushConstant
     std::vector<UniformMember> members;
 };
 
+enum class Topology
+{
+    None,
+    Triangle,
+    Line
+};
+
+inline const char* to_string(Topology e)
+{
+    switch (e)
+    {
+    case Topology::Triangle: return "Triangle";
+    case Topology::Line: return "Line";
+    default: return "unknown";
+    }
+}
+
+inline Topology topology_from_string(std::string topology)
+{
+    if (topology == "Triangle")
+        return Topology::Triangle;
+    if (topology == "Line")
+        return Topology::Line;
+    return Topology::None;
+}
+
+
+
 using Uniforms = std::unordered_map<std::string, Uniform>;
 using PushConstants = std::unordered_map<ShaderType, PushConstant>;
 class Shader : public IResource
@@ -125,8 +153,10 @@ public:
     
     bool IsGraphic() const { return m_graphic; }
     
+    Topology GetTopology() const { return m_topology; }
+    
     std::unique_ptr<ComputeDispatch> CreateDispatch(VulkanRenderer* renderer);
-private:
+    
 private:
     SafePtr<VertexShader> m_vertexShader;
     SafePtr<FragmentShader> m_fragmentShader;
@@ -136,5 +166,7 @@ private:
     Uniforms m_uniforms;
     std::unique_ptr<VulkanPipeline> m_pipeline;
     
-    bool m_graphic;
+    Topology m_topology = Topology::Triangle;
+    
+    bool m_graphic = true;
 };

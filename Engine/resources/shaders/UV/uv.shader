@@ -1,2 +1,4 @@
-../Unlit/unlit.vert
-uv.frag
+ ------------- Shader ------------- 
+[vert] : ../Unlit/unlit.vert
+[frag] : uv.frag
+ ============= Shader ============= 

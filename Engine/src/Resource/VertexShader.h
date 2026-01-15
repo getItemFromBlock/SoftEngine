@@ -19,6 +19,4 @@ public:
     ResourceType GetResourceType() const override { return ResourceType::VertexShader; }
     
     ShaderType GetShaderType() const override { return ShaderType::Vertex; }
-private:
-    std::string p_content;
 };
