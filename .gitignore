@@ -26,3 +26,4 @@ compile.*
 
 # Engine
 /Engine/cache
+/.vs
