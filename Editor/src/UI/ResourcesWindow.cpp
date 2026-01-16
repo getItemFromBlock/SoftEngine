@@ -12,6 +12,19 @@ void ResourcesWindow::OnRender()
         
         if (ImGui::CollapsingHeader("Resources"))
         {
+            if (ImGui::BeginCombo("Resource Type", to_string(m_resourceTypeFilter)))
+            {
+                for (size_t i = 0; i < static_cast<int>(ResourceType::Count); i++)
+                {
+                    ResourceType resource = static_cast<ResourceType>(i);
+                    bool is_selected = (m_resourceTypeFilter == resource);
+                    if (ImGui::Selectable(to_string(resource), is_selected))
+                        m_resourceTypeFilter = resource;
+                    if (is_selected)
+                        ImGui::SetItemDefaultFocus();  
+                }
+                ImGui::EndCombo();
+            }
             for (const auto& pair : p_engine->GetResourceManager()->GetResources())
             {
                 ImGui::PushID(pair.first);
@@ -19,6 +32,11 @@ void ResourcesWindow::OnRender()
                 if (!resource)
                 {
                     ImGui::Text("Invalid resource");
+                    ImGui::PopID();
+                    continue;
+                }
+                if (m_resourceTypeFilter != ResourceType::None && resource->GetResourceType() != m_resourceTypeFilter)
+                {
                     ImGui::PopID();
                     continue;
                 }

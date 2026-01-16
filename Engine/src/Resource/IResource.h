@@ -22,23 +22,24 @@ enum class ResourceType
     VertexShader,
     ComputeShader,
     Shader,
-    Material
+    Material,
+    Count
 };
 
 inline const char* to_string(ResourceType e)
 {
     switch (e)
     {
-        case ResourceType::None: return "None";
-        case ResourceType::Texture: return "Texture";
-        case ResourceType::Mesh: return "Mesh";
-        case ResourceType::Model: return "Model";
-        case ResourceType::FragmentShader: return "FragmentShader";
-        case ResourceType::VertexShader: return "VertexShader";
-        case ResourceType::ComputeShader: return "ComputeShader";
-        case ResourceType::Shader: return "Shader";
-        case ResourceType::Material: return "Material";
-        default: return "unknown";
+    case ResourceType::None: return "None";
+    case ResourceType::Texture: return "Texture";
+    case ResourceType::Mesh: return "Mesh";
+    case ResourceType::Model: return "Model";
+    case ResourceType::FragmentShader: return "FragmentShader";
+    case ResourceType::VertexShader: return "VertexShader";
+    case ResourceType::ComputeShader: return "ComputeShader";
+    case ResourceType::Shader: return "Shader";
+    case ResourceType::Material: return "Material";
+    default: return "unknown";
     }
 }
 

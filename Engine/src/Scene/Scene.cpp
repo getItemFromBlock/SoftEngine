@@ -277,11 +277,11 @@ void Scene::UpdateCamera(float deltaTime) const
     }
     if (input.IsKeyDown(Key::Q))
     {
-        position += transform->GetUp() * speed * deltaTime;
+        position -= transform->GetUp() * speed * deltaTime;
     }
     if (input.IsKeyDown(Key::E))
     {
-        position -= transform->GetUp() * speed * deltaTime;
+        position += transform->GetUp() * speed * deltaTime;
     }
 
     transform->SetLocalPosition(position);
