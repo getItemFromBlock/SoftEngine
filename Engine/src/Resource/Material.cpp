@@ -138,7 +138,16 @@ void Material::SetAttribute(const std::string& name, const SafePtr<Texture>& tex
     if (m_attributes.samplerAttributes.contains(name))
     {
         m_attributes.samplerAttributes[name] = texture;
-        m_dirty = true;
+        
+        if (!texture)
+            return;
+        texture->EOnSentToGPU.Bind([this, texture, name]()
+        {
+            if (!m_shader)
+                return;
+            auto uniform = m_shader->GetUniform(name);
+            SendTexture(texture.getPtr(), uniform);
+        });
     }
     else if (m_shader && !m_shader->SentToGPU())
     {
@@ -247,31 +256,6 @@ bool Material::Bind(VulkanRenderer* renderer)
 {
     if (!m_handle)
         return false;
-    
-    if (m_dirty)
-    {
-        for (auto& [name, buffer] : m_attributes.samplerAttributes)
-        {
-            auto texture = buffer.value;
-            if (!texture)
-                continue;
-            texture->EOnSentToGPU.Bind([this, texture, name]()
-            {
-                auto uniform = m_shader->GetUniform(name);
-
-                SendTexture(texture.getPtr(), uniform);
-            });
-        }
-        auto frameCount = renderer->GetMaxFramesInFlight();
-        m_frameProcessed++;
-        
-        if (m_frameProcessed >= frameCount)
-        {
-            m_dirty = false;
-            m_frameProcessed = 0;
-        }
-    }
-    
     m_handle->Bind(renderer);
     return true;
 }
@@ -380,8 +364,15 @@ void Material::OnShaderChanged()
                     m_temporaryAttributes.samplerAttributes.contains(uniform.name)
                         ? m_temporaryAttributes.samplerAttributes[uniform.name].value
                         : blankTexture;
-
-                m_dirty = true;
+                
+                
+                auto texture = m_attributes.samplerAttributes[uniform.name].value;
+                if (!texture)
+                    continue;
+                texture->EOnSentToGPU.Bind([this, texture, uniform]()
+                {
+                    SendTexture(texture.getPtr(), uniform);
+                });
             }
             break;
         case UniformType::SamplerCube:
@@ -397,6 +388,6 @@ void Material::SendTexture(Texture* texture, const Uniform& uniform) const
 {
     VulkanRenderer* renderer = Engine::Get()->GetRenderer();
     VulkanMaterial* rhiMat = m_handle.get();
-    uint32_t currentFrame = renderer->GetFrameIndex();
-    rhiMat->SetTextureForFrame(currentFrame, uniform.set, uniform.binding, texture);
+    rhiMat->SetTexture(uniform.set, uniform.binding, texture, renderer);
+    PrintLog("Send Texture %s to material %s", texture->GetPath().filename().generic_string().c_str(), GetPath().generic_string().c_str());
 }
