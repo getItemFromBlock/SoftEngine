@@ -13,5 +13,7 @@ layout(location = 1) in vec2 vTexCoord;
 layout(location = 0) out vec4 outColor;
 
 void main() {
-   outColor = texture(albedoSampler, vTexCoord) * material.color;
+    vec4 col = texture(albedoSampler, vTexCoord);
+	if (col.a < 0.5) discard;
+    outColor = col * material.color;
 }

@@ -1,0 +1,62 @@
+#version 450
+
+layout(local_size_x = 64) in;
+
+struct ParticleData {
+    vec4 position;
+    vec4 velocity;
+    vec4 color;
+    vec4 padding;
+};
+
+struct InstanceData {
+    vec4 position;
+    vec4 color;
+};
+
+layout(set = 0, binding = 0) buffer Particles {
+    ParticleData particles[];
+};
+
+layout(set = 0, binding = 1) buffer Instances {
+    InstanceData instances[];
+};
+
+layout(push_constant) uniform Push {
+    float deltaTime;
+    float currentTime;
+    uint  count;
+} pc;
+
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= pc.count)
+        return;
+
+    vec3 p0 = particles[id].position.xyz;
+    vec3 v0 = particles[id].velocity.xyz;
+
+    float scale0   = particles[id].position.w;
+    float lifeTime = particles[id].velocity.w;
+    float startTime = particles[id].padding.x;
+    float gravityScale = particles[id].padding.y;
+
+    float t = pc.currentTime - startTime;
+    bool alive = (t >= 0.0) && (t <= lifeTime);
+
+    vec3 g = vec3(0.0, -9.81 * gravityScale, 0.0);
+
+    vec3 p = p0;
+    float scale = 0.0;
+
+    if (alive)
+    {
+        p = p0 + v0 * t + 0.5 * g * t * t;
+        scale = scale0;
+    }
+
+    instances[id].position = vec4(p, scale);
+    instances[id].color    = particles[id].color;
+}
+
