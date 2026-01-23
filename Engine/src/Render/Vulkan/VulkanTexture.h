@@ -17,9 +17,6 @@ public:
     VulkanTexture(const VulkanTexture&) = default;
     VulkanTexture(VulkanTexture&&) noexcept = default;
     virtual ~VulkanTexture();
- 
-    bool LoadFromFile(VulkanDevice* device, const std::string& filepath,
-                      VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);
 
     bool CreateFromImage(const ImageLoader::Image& image, VulkanDevice* device,
                          VulkanCommandPool* commandBuffer, VulkanQueue& graphicsQueue);
@@ -27,6 +24,9 @@ public:
     bool Create(VulkanDevice* device, uint32_t width, uint32_t height,
                 VkFormat format, VkImageUsageFlags usage, VkCommandPool commandPool,
                 VkQueue graphicsQueue);
+    
+    void GenerateMipmaps(VulkanCommandPool* pool, VulkanQueue& queue) const;
+
 
     void Cleanup();
 
@@ -42,9 +42,9 @@ private:
     bool CreateImageView(VkImageAspectFlags aspectFlags);
     bool CreateSampler();
     void TransitionImageLayout(VulkanCommandPool* _commandBuffer, VulkanQueue& graphicsQueue,
-                               VkImageLayout oldLayout, VkImageLayout newLayout);
+                               VkImageLayout oldLayout, VkImageLayout newLayout) const;
     void CopyBufferToImage(VulkanCommandPool* _commandBuffer, VulkanQueue& graphicsQueue,
-                           VkBuffer buffer, uint32_t width, uint32_t height);
+                           VkBuffer buffer, uint32_t width, uint32_t height) const;
     bool CopyDataToBuffer(VulkanBuffer& buffer, const void* data, VkDeviceSize size);
     bool CreateAndSetupImage(VkBuffer stagingBuffer, VulkanCommandPool* commandBuffer, VulkanQueue& graphicsQueue);
 
@@ -55,6 +55,7 @@ private:
     VkSampler m_sampler = VK_NULL_HANDLE;
     VkFormat m_format = VK_FORMAT_R8G8B8A8_SRGB;
     
-    uint32_t p_width = 0;
-    uint32_t p_height = 0;
+    uint32_t m_width = 0;
+    uint32_t m_height = 0;
+    uint32_t m_mipLevels = 1;
 };
