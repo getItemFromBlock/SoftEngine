@@ -13,7 +13,7 @@ public:
                    VkBufferUsageFlags usage, VkMemoryPropertyFlags properties);
     void Cleanup();
 
-    void CopyData(const void* data, VkDeviceSize size);
+    void CopyData(const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
     void CopyFrom(VkCommandBuffer commandBuffer, VulkanBuffer* srcBuffer, VkDeviceSize size);
 
     VkDeviceMemory GetBufferMemory() const { return m_bufferMemory; }

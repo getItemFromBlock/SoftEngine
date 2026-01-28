@@ -10,6 +10,13 @@
 #include "Utils/Color.h"
 #include "Utils/Random.h"
 
+// Aligns an integer to the next nearest memory aligned value. Alignement MUST be a power of two!
+uint64_t align(uint64_t value, uint64_t alignement)
+{
+    assert((alignement-1) & alignement == 0);
+    return (value + alignement - 1) & ~(alignement - 1);
+}
+
 void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
 {
     d.AddProperty("GPUSoftBodyComponent", PropertyType::ParticleSystem, this);
@@ -33,86 +40,11 @@ void GPUSoftBodyComponent::OnCreate()
     m_mesh = resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cube.obj/Cube.mesh");
 
     computeShader0->EOnSentToGPU.Bind([this, computeShader0, renderer]()
-    {
-        m_simulationCompute0 = computeShader0->CreateDispatch(renderer);
-        auto device = renderer->GetDevice();
-
-        Vec3i count = m_particleSettings.general.particleAmount;
-        uint32_t countTotal = count.x * count.y * count.z;
-
-        VkDeviceSize particleBufferSize = sizeof(ParticleData) * countTotal;
-        VkDeviceSize instanceBufferSize = sizeof(InstanceData) * countTotal;
-
-        auto particleBuffer = std::make_unique<VulkanBuffer>();
-        particleBuffer->Initialize(device, particleBufferSize,
-                                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
-                                   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-        auto instanceBuffer = std::make_unique<VulkanBuffer>();
-        instanceBuffer->Initialize(device, instanceBufferSize,
-                                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-        auto stagingBuffer = std::make_unique<VulkanBuffer>();
-        stagingBuffer->Initialize(device, particleBufferSize,
-                                  VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-        std::vector<ParticleData> init(count);
-        for (uint32_t i = 0; i < count; ++i)
         {
-            InitializeParticleData(init[i], i);
-        }
-
-        stagingBuffer->CopyData(init.data(), particleBufferSize);
-
-        VkCommandBufferAllocateInfo alloc{};
-        alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        alloc.commandPool = renderer->GetCommandPool()->GetCommandPool();
-        alloc.commandBufferCount = 1;
-
-        VkCommandBuffer cmd;
-        vkAllocateCommandBuffers(device->GetDevice(), &alloc, &cmd);
-
-        VkCommandBufferBeginInfo begin{};
-        begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-        vkBeginCommandBuffer(cmd, &begin);
-
-        particleBuffer->CopyFrom(cmd, stagingBuffer.get(), particleBufferSize);
-
-        VkBufferMemoryBarrier barrier{};
-        barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-        barrier.buffer = particleBuffer->GetBuffer();
-        barrier.size = VK_WHOLE_SIZE;
-
-        vkCmdPipelineBarrier(cmd,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                             0, 0, nullptr, 1, &barrier, 0, nullptr);
-
-        vkEndCommandBuffer(cmd);
-
-        VkSubmitInfo submit{};
-        submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submit.commandBufferCount = 1;
-        submit.pCommandBuffers = &cmd;
-
-        vkQueueSubmit(device->GetGraphicsQueue().handle, 1, &submit, VK_NULL_HANDLE);
-        vkQueueWaitIdle(device->GetGraphicsQueue().handle);
-
-        vkFreeCommandBuffers(device->GetDevice(),
-                             renderer->GetCommandPool()->GetCommandPool(), 1, &cmd);
-
-        m_initialUploadComplete = true;
-        m_stagingBuffer = std::move(stagingBuffer);
-        m_particleBuffer = std::move(particleBuffer);
-        m_instanceBuffer = std::move(instanceBuffer);
-    });
+            m_simulationCompute0 = computeShader0->CreateDispatch(renderer);
+        });
+    
+    CreateParticleBuffers();
     
     auto transform = p_gameObject->GetTransform();
     transform->EOnUpdateModelMatrix += [this]()
@@ -123,138 +55,90 @@ void GPUSoftBodyComponent::OnCreate()
 
 void GPUSoftBodyComponent::OnUpdate(float deltaTime)
 {
-    if (!m_compute || !m_particleBuffer || !m_initialUploadComplete)
+    if (!m_simulationCompute0 || !m_simulationCompute1 || !m_particleBuffer || !m_initialUploadComplete)
         return;
-
-    if (m_needsShaderChange)
-    {
-        m_needsShaderChange = false;
-        
-        bool enable = m_particleSettings.rendering.billboard;
-        auto resourceManager = Engine::Get()->GetResourceManager();
-        auto renderer = Engine::Get()->GetRenderer();
-    
-        renderer->WaitForGPU();
-    
-        auto resourcePath = std::string(RESOURCE_PATH"/shaders/Instancing/") + 
-                            ((enable) ? "billboardInstancing.shader" : "instancing.shader");
-        auto instancingShader = resourceManager->Load<Shader>(resourcePath);
-        m_material->SetShader(instancingShader);
-        
-        m_needsRecreation = true;
-    }
     
     if (m_needsRecreation)
     {
-        RecreateParticleBuffers();
+        CreateParticleBuffers();
         m_needsRecreation = false;
         return;
-    }
-
-    if (m_currentTime > m_particleSettings.general.duration &&
-        m_particleSettings.general.looping)
-    {
-        Restart();
-    }
-    else if (m_currentTime < m_particleSettings.general.duration && m_isPlaying)
-    {
-        m_currentTime += deltaTime;
     }
 
     auto renderer = Engine::Get()->GetRenderer();
     VkCommandBuffer cmd = renderer->GetCommandBuffer();
 
-    VulkanMaterial* mat = m_compute->GetMaterial();
+    VulkanMaterial* mat0 = m_simulationCompute0->GetMaterial();
+    VulkanMaterial* mat1 = m_simulationCompute1->GetMaterial();
 
-    uint32_t count = static_cast<uint32_t>(m_particleSettings.general.particleCount);
+    // First compute pass needs both particle data and connections
+    mat0->SetStorageBuffer(0, 0, m_particleBuffer->GetBuffer(), 0,
+                          PBufSizeAligned, renderer);
+    mat0->SetStorageBuffer(0, 1, m_particleBuffer->GetBuffer(), PBufSizeAligned,
+        CBufSizeAligned, renderer);
 
-    mat->SetStorageBuffer(0, 0, m_particleBuffer->GetBuffer(), 0,
-                          sizeof(ParticleData) * count, renderer);
-    mat->SetStorageBuffer(0, 1, m_instanceBuffer->GetBuffer(), 0,
-                          sizeof(InstanceData) * count, renderer);
-
-    mat->BindForCompute(cmd, renderer->GetFrameIndex());
+    mat0->BindForCompute(cmd, renderer->GetFrameIndex());
 
     struct Push
     {
-        float dt;
-        float currentTime;
-        uint32_t c;
+        float deltaTime;
+        uint32_t particleCount;
     } push;
-    push.dt = deltaTime;
-    push.currentTime = m_currentTime;
-    push.c = count;
+    push.deltaTime = deltaTime;
+    push.particleCount = totalParticleCount;
+    
 
-    vkCmdPushConstants(cmd, mat->GetPipeline()->GetPipelineLayout(),
+    vkCmdPushConstants(cmd, mat0->GetPipeline()->GetPipelineLayout(),
                        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(Push), &push);
 
-    uint32_t groups = (count + 63) / 64;
-    mat->DispatchCompute(renderer, groups, 1, 1);
+    uint32_t groups = (totalParticleCount + 63) / 64;
+    mat0->DispatchCompute(renderer, groups, 1, 1);
 
-    if (m_debugReadbackEnabled && m_debugReadbackBuffer)
-    {
-        VkBufferMemoryBarrier computeToTransfer{};
-        computeToTransfer.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-        computeToTransfer.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-        computeToTransfer.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-        computeToTransfer.buffer = m_particleBuffer->GetBuffer();
-        computeToTransfer.size = VK_WHOLE_SIZE;
-
-        vkCmdPipelineBarrier(
-            cmd,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            0, 0, nullptr, 1, &computeToTransfer, 0, nullptr
-        );
-
-        VkBufferCopy copy{};
-        copy.size = sizeof(ParticleData) * count;
-        vkCmdCopyBuffer(
-            cmd,
-            m_particleBuffer->GetBuffer(),
-            m_debugReadbackBuffer->GetBuffer(),
-            1, &copy
-        );
-
-        VkBufferMemoryBarrier transferToHost{};
-        transferToHost.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-        transferToHost.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        transferToHost.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
-        transferToHost.buffer = m_debugReadbackBuffer->GetBuffer();
-        transferToHost.size = VK_WHOLE_SIZE;
-
-        vkCmdPipelineBarrier(
-            cmd,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_HOST_BIT,
-            0, 0, nullptr, 1, &transferToHost, 0, nullptr
-        );
-    }
-
-    VkBufferMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.buffer = m_instanceBuffer->GetBuffer();
-    barrier.size = VK_WHOLE_SIZE;
+    VkBufferMemoryBarrier barrier0{};
+    barrier0.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    barrier0.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    barrier0.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    barrier0.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier0.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier0.buffer = m_particleBuffer->GetBuffer();
+    barrier0.size = VK_WHOLE_SIZE;
 
     vkCmdPipelineBarrier(cmd,
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                          VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-                         0, 0, nullptr, 1, &barrier, 0, nullptr);
+                         0, 0, nullptr, 1, &barrier0, 0, nullptr);
+
+
+    // Second compute pass does not need connection data, as it just updates the velocity based on acceleration computed in the first pass
+    mat1->SetStorageBuffer(0, 0, m_particleBuffer->GetBuffer(), 0,
+        PBufSizeAligned, renderer);
+
+    mat1->BindForCompute(cmd, renderer->GetFrameIndex());
+
+    vkCmdPushConstants(cmd, mat1->GetPipeline()->GetPipelineLayout(),
+        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(Push), &push);
+
+    mat1->DispatchCompute(renderer, groups, 1, 1);
+
+    VkBufferMemoryBarrier barrier1{};
+    barrier1.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    barrier1.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    barrier1.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+    barrier1.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier1.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier1.buffer = m_particleBuffer->GetBuffer();
+    barrier1.size = VK_WHOLE_SIZE;
+
+    vkCmdPipelineBarrier(cmd,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+        0, 0, nullptr, 1, &barrier1, 0, nullptr);
 
     CameraData cam = p_gameObject->GetScene()->GetCameraData();
     m_material->SetAttribute("viewProj", cam.VP);
     m_material->SetAttribute("cameraRight", cam.right);
     m_material->SetAttribute("cameraUp", cam.up);
     m_material->SetAttribute("cameraFront", cam.forward);
-
-    if (m_debugReadbackEnabled)
-    {
-        ReadbackDebugData();
-    }
 }
 
 void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
@@ -262,18 +146,24 @@ void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
     if (!m_mesh || !m_mesh->IsLoaded() || !m_mesh->SentToGPU())
         return;
     
-    if (!m_instanceBuffer || !m_material || !m_initialUploadComplete)
+    if (!m_particleBuffer || !m_material || !m_initialUploadComplete)
         return;
 
     if (!renderer->BindShader(m_material->GetShader().getPtr()))
         return;
+
+    /*
+    // vertex shader needs particle data as source to "map" the mesh onto
+    m_material->GetHandle()->SetStorageBuffer(0, 0, m_particleBuffer->GetBuffer(), 0,
+        PBufSizeAligned, renderer);
+    */
 
     m_material->SendAllValues(renderer);
     if (!renderer->BindMaterial(m_material.getPtr()))
         return;
 
     renderer->DrawInstanced(m_mesh->GetIndexBuffer(), m_mesh->GetVertexBuffer(),
-                            m_instanceBuffer.get(), m_particleSettings.general.particleCount);
+                            m_particleBuffer.get(), totalParticleCount);
 }
 
 void GPUSoftBodyComponent::OnDestroy()
@@ -281,34 +171,18 @@ void GPUSoftBodyComponent::OnDestroy()
     Engine::Get()->GetRenderer()->WaitForGPU();
 
     if (m_particleBuffer) m_particleBuffer->Cleanup();
-    if (m_instanceBuffer) m_instanceBuffer->Cleanup();
-    if (m_stagingBuffer) m_stagingBuffer->Cleanup();
-    if (m_debugReadbackBuffer) m_debugReadbackBuffer->Cleanup();
-}
-
-void GPUSoftBodyComponent::Play()
-{
-    m_isPlaying = true;
-}
-
-void GPUSoftBodyComponent::Pause()
-{
-    m_isPlaying = false;
 }
 
 void GPUSoftBodyComponent::Restart()
 {
+    // TODO reset buffers ? hmleh
+    /*
     Play();
     m_currentTime = 0.f;
+    */
 }
 
-void GPUSoftBodyComponent::SetBillboard(bool enable)
-{
-    m_particleSettings.rendering.billboard = enable;
-    m_needsShaderChange = true;
-}
-
-void GPUSoftBodyComponent::RecreateParticleBuffers()
+void GPUSoftBodyComponent::CreateParticleBuffers()
 {
     auto renderer = Engine::Get()->GetRenderer();
     auto device = renderer->GetDevice();
@@ -317,54 +191,29 @@ void GPUSoftBodyComponent::RecreateParticleBuffers()
 
     if (m_particleBuffer)
         m_particleBuffer->Cleanup();
-    if (m_instanceBuffer)
-        m_instanceBuffer->Cleanup();
-    if (m_stagingBuffer)
-        m_stagingBuffer->Cleanup();
-    if (m_debugReadbackBuffer)
-        m_debugReadbackBuffer->Cleanup();
 
-    uint32_t count = static_cast<uint32_t>(m_particleSettings.general.particleCount);
-    VkDeviceSize particleBufferSize = sizeof(ParticleData) * count;
-    VkDeviceSize instanceBufferSize = sizeof(InstanceData) * count;
+    std::vector<ParticleData> particles;
+    std::vector<ConnectionData> connections;
+    InitializeParticleData(particles, connections);
+
+    VkDeviceSize PBufSize = sizeof(ParticleData) * particles.size();
+    VkDeviceSize CBufSize = sizeof(ConnectionData) * connections.size();
+    PBufSizeAligned = align(PBufSize, 0x40);
+    CBufSizeAligned = align(CBufSize, 0x40);
 
     auto particleBuffer = std::make_unique<VulkanBuffer>();
-    particleBuffer->Initialize(device, particleBufferSize,
-                               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
-                               VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-    auto instanceBuffer = std::make_unique<VulkanBuffer>();
-    instanceBuffer->Initialize(device, instanceBufferSize,
-                               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    particleBuffer->Initialize(device, PBufSizeAligned + CBufSizeAligned,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     auto stagingBuffer = std::make_unique<VulkanBuffer>();
-    stagingBuffer->Initialize(device, particleBufferSize,
-                              VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    stagingBuffer->Initialize(device, PBufSizeAligned + CBufSizeAligned,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-    if (m_debugReadbackEnabled)
-    {
-        m_debugReadbackBuffer = std::make_unique<VulkanBuffer>();
-        m_debugReadbackBuffer->Initialize(
-            device,
-            particleBufferSize,
-            VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-        );
-
-        m_debugCPUBuffer.resize(count);
-    }
-
-
-    std::vector<ParticleData> init(count);
-    for (uint32_t i = 0; i < count; ++i)
-    {
-        InitializeParticleData(init[i], i);
-    }
-
-    stagingBuffer->CopyData(init.data(), particleBufferSize);
+    stagingBuffer->CopyData(particles.data(), PBufSize);
+    stagingBuffer->CopyData(particles.data(), CBufSize, PBufSizeAligned);
 
     VkCommandBufferAllocateInfo alloc{};
     alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -380,7 +229,7 @@ void GPUSoftBodyComponent::RecreateParticleBuffers()
     begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vkBeginCommandBuffer(cmd, &begin);
 
-    particleBuffer->CopyFrom(cmd, stagingBuffer.get(), particleBufferSize);
+    particleBuffer->CopyFrom(cmd, stagingBuffer.get(), PBufSizeAligned + CBufSizeAligned);
 
     VkBufferMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
@@ -390,9 +239,9 @@ void GPUSoftBodyComponent::RecreateParticleBuffers()
     barrier.size = VK_WHOLE_SIZE;
 
     vkCmdPipelineBarrier(cmd,
-                         VK_PIPELINE_STAGE_TRANSFER_BIT,
-                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         0, 0, nullptr, 1, &barrier, 0, nullptr);
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        0, 0, nullptr, 1, &barrier, 0, nullptr);
 
     vkEndCommandBuffer(cmd);
 
@@ -405,90 +254,80 @@ void GPUSoftBodyComponent::RecreateParticleBuffers()
     vkQueueWaitIdle(device->GetGraphicsQueue().handle);
 
     vkFreeCommandBuffers(device->GetDevice(),
-                         renderer->GetCommandPool()->GetCommandPool(), 1, &cmd);
+        renderer->GetCommandPool()->GetCommandPool(), 1, &cmd);
+
+    m_initialUploadComplete = true;
+    m_particleBuffer = std::move(particleBuffer);
+    stagingBuffer->Cleanup();
 
     m_particleBuffer = std::move(particleBuffer);
-    m_instanceBuffer = std::move(instanceBuffer);
-    m_stagingBuffer = std::move(stagingBuffer);
 }
 
-void GPUSoftBodyComponent::InitializeParticleData(ParticleData& p, uint32_t index) const
+void GPUSoftBodyComponent::InitializeParticleData(std::vector<ParticleData> &particles, std::vector<ConnectionData> &connections)
 {
-    Vec3f worldPosition = p_gameObject->GetTransform()->GetWorldPosition();
-    Vec3f forward = p_gameObject->GetTransform()->GetForward();
-    
-    Seed seed = m_seed + index;
-    Vec3f point;
-    Vec3f direction;
+    const Vec3f worldPosition = p_gameObject->GetTransform()->GetWorldPosition();
+    const Quat rotation = p_gameObject->GetTransform()->GetWorldRotation();
+    const Vec3f scale = p_gameObject->GetTransform()->GetWorldScale();
 
-    using ShapeType = ParticleSettings::Shape::Type;
-    switch (m_particleSettings.shape.type) {
-    case ShapeType::None:
-        point = worldPosition;
-        direction = forward;
-        break;
-    case ShapeType::Sphere:
-        point = worldPosition + Random::PointInSphere(m_particleSettings.shape.radius, seed);
-        direction = (point - worldPosition).GetNormalize();
-        break;
-    case ShapeType::Cube:
-        break;
-    case ShapeType::Cone:
-        break;
+    const Vec3i amount = m_particleSettings.general.particleAmount;
+    const uint32_t maxL = m_particleSettings.general.connectionStrength;
+
+    totalParticleCount = amount.x * amount.y * amount.z;
+    particles.resize(totalParticleCount);
+
+    for (int32_t j = 0; j < amount.y; j++)
+    {
+        for (int32_t i = 0; i < amount.x; i++)
+        {
+            for (int32_t k = 0; k < amount.z; k++)
+            {
+                const Vec3f offset = Vec3f(i, j, k) / (amount - Vec3i(1,1,1)) - Vec3f(0.5f, 0.5f, 0.5f);
+                const Vec3f pos = worldPosition + offset * rotation * (scale * m_particleSettings.shape.radius * 2);
+                const uint32_t index = i + j * (amount.x * amount.z) + k * (amount.x);
+
+                particles[index].position = pos;
+            }
+        }
     }
-    
-    float size = m_particleSettings.general.startSize.GetValue(seed);
-    float lifeTime = m_particleSettings.general.startLifeTime.GetValue(seed);
-    float rate = m_particleSettings.emission.rateOverTime.GetValue(seed);
-    bool prewarm = m_particleSettings.general.preWarm;
-    float preWarmTime = m_particleSettings.general.duration;
-    float startTime = index / rate;
-    float startSpeed = m_particleSettings.general.startSpeed.GetValue(seed);
-    
-    if (prewarm)
-        startTime -= preWarmTime;
 
-    p.positionSize = Vec4f(point, size);
-    p.velocityLifeTime = Vec4f(direction * startSpeed, lifeTime);
-    p.color = m_particleSettings.general.startColor.GetValue(seed);
-    float gravity = m_particleSettings.general.gravityScale.GetValue(seed);
-    p.startTimeGravity = Vec4f(startTime, gravity, 0.f, 0.f);
-}
+    for (int32_t j = 0; j < amount.y; j++)
+    {
+        for (int32_t i = 0; i < amount.x; i++)
+        {
+            for (int32_t k = 0; k < amount.z; k++)
+            {
+                if (j < m_particleSettings.general.solidLayers)
+                    continue;
+                const uint32_t index0 = i + j * (amount.x * amount.z) + k * (amount.x);
+                particles[index0].connectionsOffset = connections.size();
 
-void GPUSoftBodyComponent::ReadbackDebugData()
-{
-    if (!m_debugReadbackEnabled || !m_debugReadbackBuffer)
-        return;
+                for (int32_t l = i - maxL; l <= i + maxL; l++)
+                {
+                    if (l < 0 || l >= amount.x)
+                        continue;
+                    for (int32_t m = j - maxL; m <= j + maxL; m++)
+                    {
+                        if (m < 0 || m >= amount.y)
+                            continue;
+                        for (int32_t n = k - maxL; n <= k + maxL; n++)
+                        {
+                            if (n < 0 || n >= amount.z)
+                                continue;
+                            const uint32_t index1 = l + m * (amount.x * amount.z) + n * (amount.x);
+                            if (index0 == index1)
+                                continue;
 
-    auto renderer = Engine::Get()->GetRenderer();
-
-    renderer->WaitForGPU();
-
-    void* mapped = nullptr;
-    vkMapMemory(
-        renderer->GetDevice()->GetDevice(),
-        m_debugReadbackBuffer->GetBufferMemory(),
-        0,
-        VK_WHOLE_SIZE,
-        0,
-        &mapped
-    );
-
-    memcpy(m_debugCPUBuffer.data(), mapped,
-           sizeof(ParticleData) * m_debugCPUBuffer.size());
-
-    vkUnmapMemory(
-        renderer->GetDevice()->GetDevice(),
-        m_debugReadbackBuffer->GetBufferMemory()
-    );
-
-    ParticleData first = m_debugCPUBuffer[0];
-    first;
-}
-
-void GPUSoftBodyComponent::SetMesh(SafePtr<Mesh> mesh)
-{
-    m_mesh = std::move(mesh);
+                            ConnectionData c;
+                            c.particleID = l + m * (amount.x * amount.z) + n * (amount.x);
+                            c.initialLength = (particles[index0].position - particles[index1].position).Length();
+                            connections.push_back(c);
+                        }
+                    }
+                }
+                particles[index0].connectionsCount = connections.size() - particles[index0].connectionsOffset;
+            }
+        }
+    }
 }
 
 void GPUSoftBodyComponent::ApplySettings()
