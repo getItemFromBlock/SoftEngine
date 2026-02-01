@@ -13,7 +13,7 @@
 // Aligns an integer to the next nearest memory aligned value. Alignement MUST be a power of two!
 uint64_t align(uint64_t value, uint64_t alignement)
 {
-    assert((alignement-1) & alignement == 0);
+    assert(((alignement-1) & alignement) == 0);
     return (value + alignement - 1) & ~(alignement - 1);
 }
 
@@ -28,8 +28,8 @@ void GPUSoftBodyComponent::OnCreate()
     auto resourceManager = Engine::Get()->GetResourceManager();
     auto renderer = Engine::Get()->GetRenderer();
 
-    auto computeShader0 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/softboy0.shader");
-    auto computeShader1 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/softboy1.shader");
+    auto computeShader0 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/softbody0.shader");
+    auto computeShader1 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/softbody1.shader");
     auto instancingShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/sf_instancing.shader");
 
     m_material = resourceManager->CreateMaterial("SoftbodyInstancing");
@@ -84,6 +84,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
         float deltaTime;
         uint32_t particleCount;
     } push;
+
     push.deltaTime = deltaTime;
     push.particleCount = totalParticleCount;
     
@@ -109,7 +110,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
                          0, 0, nullptr, 1, &barrier0, 0, nullptr);
 
 
-    // Second compute pass does not need connection data, as it just updates the velocity based on acceleration computed in the first pass
+    // Second compute pass does not need connection data, as it just updates the position based on the velocity computed in the first pass
     mat1->SetStorageBuffer(0, 0, m_particleBuffer->GetBuffer(), 0,
         PBufSizeAligned, renderer);
 
@@ -281,8 +282,8 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<ParticleData> &par
         {
             for (int32_t k = 0; k < amount.z; k++)
             {
-                const Vec3f offset = Vec3f(i, j, k) / (amount - Vec3i(1,1,1)) - Vec3f(0.5f, 0.5f, 0.5f);
-                const Vec3f pos = worldPosition + offset * rotation * (scale * m_particleSettings.shape.radius * 2);
+                const Vec3f offset = Vec3f(i / (amount.x-1), j / (amount.y-1), k / (amount.z-1)) - Vec3f(0.5f, 0.5f, 0.5f);
+                const Vec3f pos = worldPosition + rotation * offset * (scale * m_particleSettings.shape.radius * 2);
                 const uint32_t index = i + j * (amount.x * amount.z) + k * (amount.x);
 
                 particles[index].position = pos;

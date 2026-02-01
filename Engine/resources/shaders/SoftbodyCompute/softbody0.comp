@@ -3,60 +3,55 @@
 layout(local_size_x = 64) in;
 
 struct ParticleData {
-    vec4 position;
-    vec4 velocity;
-    vec4 color;
-    vec4 padding;
+    vec3 position;
+	uint connectionsOffset;
+    vec3 velocity;
+	uint connectionsCount;
 };
 
-struct InstanceData {
-    vec4 position;
-    vec4 color;
+struct ConnectionData
+{
+    uint particleID;
+    float initialLength;
 };
 
 layout(set = 0, binding = 0) buffer Particles {
     ParticleData particles[];
 };
 
-layout(set = 0, binding = 1) buffer Instances {
-    InstanceData instances[];
+layout(set = 0, binding = 1) buffer Connections {
+    ConnectionData connections[];
 };
 
 layout(push_constant) uniform Push {
     float deltaTime;
-    float currentTime;
-    uint  count;
+    uint  particleCount;
 } pc;
 
 void main()
 {
     uint id = gl_GlobalInvocationID.x;
-    if (id >= pc.count)
+    if (id >= pc.particleCount)
         return;
+	
+    vec3 vel = particles[id].velocity;
+	vec3 pos = particles[id].position;
+    
+	vel -= vec3(0, 9.81, 0) * pc.deltaTime;
+	
+	const uint cCount = particles[id].connectionsCount;
+	const uint cOff = particles[id].connectionsOffset;
+    for (uint i = 0; i < cCount; i++)
+	{
+		ConnectionData c = connections[cOff + i];
+		vec3 dif = particles[c.particleID].position - pos;
+		float f = length(dif) - c.initialLength;
+		vel += dif * (f * pc.deltaTime);
+	}
+	
+	float l = length(vel);
+	if (l > 10.)
+		vel = normalize(vel) * 10.;
 
-    vec3 p0 = particles[id].position.xyz;
-    vec3 v0 = particles[id].velocity.xyz;
-
-    float scale0   = particles[id].position.w;
-    float lifeTime = particles[id].velocity.w;
-    float startTime = particles[id].padding.x;
-    float gravityScale = particles[id].padding.y;
-
-    float t = pc.currentTime - startTime;
-    bool alive = (t >= 0.0) && (t <= lifeTime);
-
-    vec3 g = vec3(0.0, -9.81 * gravityScale, 0.0);
-
-    vec3 p = p0;
-    float scale = 0.0;
-
-    if (alive)
-    {
-        p = p0 + v0 * t + 0.5 * g * t * t;
-        scale = scale0;
-    }
-
-    instances[id].position = vec4(p, scale);
-    instances[id].color    = particles[id].color;
+    particles[id].velocity = vel;
 }
-

@@ -6,7 +6,7 @@ layout(location = 2) in vec3 inNormal;
 layout(location = 3) in vec3 inTangent;
 
 layout(location = 4) in vec4 instancePosition;
-layout(location = 5) in vec4 instanceColor;
+layout(location = 5) in vec4 instanceVelocity;
 
 layout(std140, set = 0, binding = 0) uniform CameraUBO {
     mat4 viewProj;
@@ -20,5 +20,5 @@ void main() {
     vec4 worldPos = vec4(scaledPosition + instancePosition.xyz, 1.0);
     gl_Position = cameraUBO.viewProj * worldPos;
     vTexCoord = inTexCoord;
-    fragColor = instanceColor;
+    fragColor = vec4(1);
 }
