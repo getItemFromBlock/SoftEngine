@@ -139,14 +139,17 @@ void Material::SetAttribute(const std::string& name, const SafePtr<Texture>& tex
     {
         m_attributes.samplerAttributes[name] = texture;
         
-        if (!texture)
+        if (!texture || !m_shader)
             return;
-        texture->EOnSentToGPU.Bind([this, texture, name]()
+        m_shader->EOnSentToGPU.Bind([this, texture, name]()
         {
-            if (!m_shader)
-                return;
-            auto uniform = m_shader->GetUniform(name);
-            SendTexture(texture.getPtr(), uniform);
+            texture->EOnSentToGPU.Bind([this, texture, name]()
+            {
+                if (!m_shader)
+                    return;
+                auto uniform = m_shader->GetUniform(name);
+                SendTexture(texture.getPtr(), uniform);
+            });
         });
     }
     else if (m_shader && !m_shader->SentToGPU())
