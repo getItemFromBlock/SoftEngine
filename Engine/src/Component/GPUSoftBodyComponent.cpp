@@ -30,7 +30,7 @@ void GPUSoftBodyComponent::OnCreate()
 
     auto computeShader0 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/softbody0.shader");
     auto computeShader1 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/softbody1.shader");
-    auto instancingShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/sf_instancing.shader");
+    auto instancingShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/sb_instancing.shader");
 
     m_material = resourceManager->CreateMaterial("SoftbodyInstancing");
     m_material->SetShader(instancingShader);
@@ -73,9 +73,9 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
 
     // First compute pass needs both particle data and connections
     mat0->SetStorageBuffer(0, 0, m_particleBuffer->GetBuffer(), 0,
-                          PBufSizeAligned, renderer);
+                            PBufSizeAligned, renderer);
     mat0->SetStorageBuffer(0, 1, m_particleBuffer->GetBuffer(), PBufSizeAligned,
-        CBufSizeAligned, renderer);
+                            CBufSizeAligned, renderer);
 
     mat0->BindForCompute(cmd, renderer->GetFrameIndex());
 
@@ -112,7 +112,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
 
     // Second compute pass does not need connection data, as it just updates the position based on the velocity computed in the first pass
     mat1->SetStorageBuffer(0, 0, m_particleBuffer->GetBuffer(), 0,
-        PBufSizeAligned, renderer);
+                            PBufSizeAligned, renderer);
 
     mat1->BindForCompute(cmd, renderer->GetFrameIndex());
 
