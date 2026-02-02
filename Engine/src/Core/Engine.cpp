@@ -54,7 +54,7 @@ bool Engine::Initialize(EngineDesc desc)
     m_resourceManager->LoadDefaultShader(RESOURCE_PATH"/shaders/Unlit/unlit.shader");
     m_resourceManager->LoadDefaultMaterial(RESOURCE_PATH"/shaders/unlit.mat");
     
-    // m_resourceManager->LoadDefaultShader(RESOURCE_PATH"/shaders/PBR/PBR.shader");
+    m_resourceManager->LoadDefaultShader(RESOURCE_PATH"/shaders/PBR/PBR.shader");
 
     m_renderer->GetLineRenderer()->Initialize(m_renderer.get());
     

@@ -16,10 +16,6 @@ layout(binding = 1) uniform Material
 
 layout(binding = 2) uniform sampler2D albedoSampler;
 
-layout(std140, set = 0, binding = 0) uniform CameraUBO {
-    mat4 viewProj;
-} cameraUBO;
-
 layout(binding = 8) uniform Light
 {
     vec3 position;
