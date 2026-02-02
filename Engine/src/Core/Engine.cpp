@@ -27,6 +27,15 @@ Engine* Engine::Create()
     return s_instance.get();
 }
 
+void Engine::MipMapInit()
+{
+    int size = 256;
+    int mipLevels = static_cast<int>(floor(log2(size))) + 1;
+    auto mipmapCompute = m_resourceManager->Load<ComputeShader>(RESOURCE_PATH"/shaders/PBR/mapPrefilter.compute");
+
+    // Dispatch for each faces
+}
+
 bool Engine::Initialize(EngineDesc desc)
 {
     m_window = desc.window;

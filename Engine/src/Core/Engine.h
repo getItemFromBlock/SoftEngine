@@ -42,4 +42,6 @@ private:
     inline static std::unique_ptr<Engine> s_instance = nullptr;
     
     float m_deltaTime = 0.0f;
+
+    void MipMapInit(); // Temp solution for IBL
 };

@@ -2,6 +2,7 @@
 
 layout(std140, set = 0, binding = 0) uniform CameraUBO {
     mat4 viewProj;
+    vec3 camPos;
 } cameraUBO;
 
 layout(push_constant) uniform PushConstants {
@@ -16,6 +17,7 @@ layout(location = 3) in vec3 inTangent;
 layout(location = 0) out vec3 vWorldPos;
 layout(location = 1) out vec3 vNormal;
 layout(location = 2) out vec2 vTexCoord;
+layout(location = 3) out vec3 vViewDir;
 
 void main()
 {
@@ -23,8 +25,10 @@ void main()
     gl_Position = cameraUBO.viewProj * worldPos;
 
     mat3 normalMatrix = transpose(inverse(mat3(pc.model)));
-    vNormal = normalize(normalMatrix * inNormal);
+    vec3 N = normalize(normalMatrix * inNormal);
 
     vWorldPos = worldPos.xyz;
+    vNormal   = N;
     vTexCoord = inTexCoord;
+    vViewDir  = cameraUBO.camPos - worldPos.xyz;
 }
