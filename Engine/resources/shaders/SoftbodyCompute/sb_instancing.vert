@@ -5,8 +5,16 @@ layout(location = 1) in vec2 inTexCoord;
 layout(location = 2) in vec3 inNormal;
 layout(location = 3) in vec3 inTangent;
 
-layout(location = 4) in vec4 instancePosition;
-layout(location = 5) in vec4 instanceVelocity;
+struct ParticleData {
+    vec3 position;
+	uint connectionsOffset;
+    vec3 velocity;
+	uint connectionsCount;
+};
+
+layout(set = 0, binding = 2) readonly buffer Particles {
+    ParticleData particles[];
+};
 
 layout(std140, set = 0, binding = 0) uniform CameraUBO {
     mat4 viewProj;
@@ -16,8 +24,7 @@ layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec2 vTexCoord;
 
 void main() {
-    vec3 scaledPosition = inPosition * instancePosition.w;
-    vec4 worldPos = vec4(scaledPosition + instancePosition.xyz, 1.0);
+    vec4 worldPos = vec4(inPosition * 0.1 + particles[gl_InstanceIndex].position, 1.0);
     gl_Position = cameraUBO.viewProj * worldPos;
     vTexCoord = inTexCoord;
     fragColor = vec4(1);

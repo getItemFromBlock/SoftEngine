@@ -286,6 +286,7 @@ void Material::OnShaderChanged()
     {
         switch (uniform.type)
         {
+        case UniformType::StorageBuffer:
         case UniformType::NestedStruct:
             for (UniformMember& member : uniform.members)
             {

@@ -339,6 +339,20 @@ void VulkanRenderer::DrawInstanced(VulkanIndexBuffer* indexBuffer, VulkanVertexB
     p_triangleCount += (indexBuffer->GetIndexCount() / 3) * instanceCount;
 }
 
+void VulkanRenderer::DrawInstanced(VulkanIndexBuffer *indexBuffer, VulkanVertexBuffer *vertexShader, uint32_t instanceCount)
+{
+    VkCommandBuffer commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
+
+    VkBuffer vertexBuffers[] = { vertexShader->GetBuffer() };
+    VkDeviceSize offsets[] = { 0 };
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+    vkCmdBindIndexBuffer(commandBuffer, indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+    vkCmdDrawIndexed(commandBuffer, indexBuffer->GetIndexCount(), static_cast<uint32_t>(instanceCount), 0, 0, 0);
+    p_triangleCount += (indexBuffer->GetIndexCount() / 3) * instanceCount;
+}
+
 std::string VulkanRenderer::CompileShader(ShaderType type, const std::string& code)
 {
     shaderc_shader_kind kind;

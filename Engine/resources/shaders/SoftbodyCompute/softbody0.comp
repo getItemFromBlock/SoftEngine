@@ -41,6 +41,13 @@ void main()
 	
 	const uint cCount = particles[id].connectionsCount;
 	const uint cOff = particles[id].connectionsOffset;
+	
+	if (cCount == 0)
+	{
+		particles[id].velocity = vec3(0);
+		return;
+	}
+	
     for (uint i = 0; i < cCount; i++)
 	{
 		ConnectionData c = connections[cOff + i];

@@ -43,6 +43,11 @@ void GPUSoftBodyComponent::OnCreate()
         {
             m_simulationCompute0 = computeShader0->CreateDispatch(renderer);
         });
+
+    computeShader1->EOnSentToGPU.Bind([this, computeShader1, renderer]()
+        {
+            m_simulationCompute1 = computeShader1->CreateDispatch(renderer);
+        });
     
     CreateParticleBuffers();
     
@@ -70,6 +75,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
 
     VulkanMaterial* mat0 = m_simulationCompute0->GetMaterial();
     VulkanMaterial* mat1 = m_simulationCompute1->GetMaterial();
+    VulkanMaterial* mat2 = m_material->GetHandle();
 
     // First compute pass needs both particle data and connections
     mat0->SetStorageBuffer(0, 0, m_particleBuffer->GetBuffer(), 0,
@@ -98,7 +104,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
     VkBufferMemoryBarrier barrier0{};
     barrier0.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
     barrier0.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    barrier0.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    barrier0.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     barrier0.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier0.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier0.buffer = m_particleBuffer->GetBuffer();
@@ -106,7 +112,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
 
     vkCmdPipelineBarrier(cmd,
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+                         VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
                          0, 0, nullptr, 1, &barrier0, 0, nullptr);
 
 
@@ -124,7 +130,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
     VkBufferMemoryBarrier barrier1{};
     barrier1.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
     barrier1.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    barrier1.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+    barrier1.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
     barrier1.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier1.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier1.buffer = m_particleBuffer->GetBuffer();
@@ -153,18 +159,17 @@ void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
     if (!renderer->BindShader(m_material->GetShader().getPtr()))
         return;
 
-    /*
+    
     // vertex shader needs particle data as source to "map" the mesh onto
-    m_material->GetHandle()->SetStorageBuffer(0, 0, m_particleBuffer->GetBuffer(), 0,
+    m_material->GetHandle()->SetStorageBuffer(0, 2, m_particleBuffer->GetBuffer(), 0,
         PBufSizeAligned, renderer);
-    */
+    
 
     m_material->SendAllValues(renderer);
     if (!renderer->BindMaterial(m_material.getPtr()))
         return;
 
-    renderer->DrawInstanced(m_mesh->GetIndexBuffer(), m_mesh->GetVertexBuffer(),
-                            m_particleBuffer.get(), totalParticleCount);
+    renderer->DrawInstanced(m_mesh->GetIndexBuffer(), m_mesh->GetVertexBuffer(), totalParticleCount);
 }
 
 void GPUSoftBodyComponent::OnDestroy()
@@ -214,7 +219,7 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     stagingBuffer->CopyData(particles.data(), PBufSize);
-    stagingBuffer->CopyData(particles.data(), CBufSize, PBufSizeAligned);
+    stagingBuffer->CopyData(connections.data(), CBufSize, PBufSizeAligned);
 
     VkCommandBufferAllocateInfo alloc{};
     alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -260,8 +265,6 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
     m_initialUploadComplete = true;
     m_particleBuffer = std::move(particleBuffer);
     stagingBuffer->Cleanup();
-
-    m_particleBuffer = std::move(particleBuffer);
 }
 
 void GPUSoftBodyComponent::InitializeParticleData(std::vector<ParticleData> &particles, std::vector<ConnectionData> &connections)
