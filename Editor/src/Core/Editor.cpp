@@ -51,8 +51,8 @@ void Editor::Initialize()
     auto model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Cube.obj");
     resourceManager->Load<Model>(RESOURCE_PATH"/models/Suzanne.obj");
     resourceManager->Load<Model>(RESOURCE_PATH"/models/Plane.obj");
-    model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Sponza/sponza.obj");
     resourceManager->Load<Model>(RESOURCE_PATH"/models/sphere.obj");
+    model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Sponza/sponza.obj");
     
     model->EOnLoaded.Bind([model, this, currentScene]()
     {

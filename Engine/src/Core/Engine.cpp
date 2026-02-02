@@ -31,7 +31,7 @@ void Engine::MipMapInit()
 {
     int size = 256;
     int mipLevels = static_cast<int>(floor(log2(size))) + 1;
-    auto mipmapCompute = m_resourceManager->Load<ComputeShader>(RESOURCE_PATH"/shaders/PBR/mapPrefilter.compute");
+    // auto mipmapCompute = m_resourceManager->Load<ComputeShader>(RESOURCE_PATH"/shaders/PBR/mapPrefilter.compute");
 
     // Dispatch for each faces
 }
