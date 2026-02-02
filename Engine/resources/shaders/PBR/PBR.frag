@@ -48,7 +48,7 @@ float G_Schlick(float NdotV, float r)
 float G_Smith(vec3 N, vec3 V, vec3 L, float r)
 {
     return G_Schlick(max(dot(N, V), 0.0), r) *
-           G_Schlick(max(dot(N, L), 0.0), r);
+    G_Schlick(max(dot(N, L), 0.0), r);
 }
 
 vec3 F_Schlick(float cosTheta, vec3 F0)
@@ -59,7 +59,7 @@ vec3 F_Schlick(float cosTheta, vec3 F0)
 vec3 F_SchlickRoughness(float cosTheta, vec3 F0, float r)
 {
     return F0 + (max(vec3(1.0 - r), F0) - F0) *
-           pow(1.0 - cosTheta, 5.0);
+    pow(1.0 - cosTheta, 5.0);
 }
 
 void main()

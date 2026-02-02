@@ -4,6 +4,7 @@
 #include <iomanip>
 
 #include "ComputeShader.h"
+#include "CubeMap.h"
 #include "FragmentShader.h"
 #include "Material.h"
 #include "Texture.h"
@@ -194,6 +195,13 @@ void ResourceManager::LoadDefaultMaterial(const std::filesystem::path& materialP
     material->SetAttribute("albedoSampler", GetBlankTexture());
 }
 
+void ResourceManager::LoadDefaultCubeMap(const std::filesystem::path& cubeMapPath)
+{
+    SafePtr<CubeMap> cubeMap = Load<CubeMap>(cubeMapPath, false);
+    
+    m_defaultCubeMap = cubeMap->GetUUID();
+}
+
 SafePtr<Material> ResourceManager::CreateMaterial(std::filesystem::path path)
 {
     if (path.extension() != ".mat")
@@ -231,6 +239,11 @@ std::shared_ptr<Texture> ResourceManager::GetBlankTexture() const
 std::shared_ptr<Material> ResourceManager::GetDefaultMaterial() const
 {
     return GetResource<Material>(m_defaultMaterial);
+}
+
+std::shared_ptr<CubeMap> ResourceManager::GetDefaultCubeMap() const
+{
+    return GetResource<CubeMap>(m_defaultCubeMap);
 }
 
 std::filesystem::path ResourceManager::GetCacheDir()

@@ -23,6 +23,7 @@ enum class ResourceType
     ComputeShader,
     Shader,
     Material,
+    CubeMap,
     Count
 };
 
@@ -39,6 +40,7 @@ inline const char* to_string(ResourceType e)
     case ResourceType::ComputeShader: return "ComputeShader";
     case ResourceType::Shader: return "Shader";
     case ResourceType::Material: return "Material";
+    case ResourceType::CubeMap: return "CubeMap";
     default: return "unknown";
     }
 }
@@ -57,7 +59,8 @@ inline static std::unordered_map<std::string, ResourceType> extensionToResourceT
     { "frag", ResourceType::FragmentShader },
     { "comp", ResourceType::ComputeShader },
     { "shader", ResourceType::Shader },
-    { "mat", ResourceType::Material }
+    { "mat", ResourceType::Material },
+    { "hdr", ResourceType::CubeMap }
 };
 
 #define DECLARE_RESOURCE_TYPE_PARENT(T, U) \

@@ -514,8 +514,15 @@ std::unique_ptr<VulkanTexture> VulkanRenderer::CreateTexture(const ImageLoader::
     return texture;
 }
 
+std::unique_ptr<VulkanTexture> VulkanRenderer::CreateCubeMap(const ImageLoader::HDRImage& image)
+{
+    std::unique_ptr<VulkanTexture> texture = std::make_unique<VulkanTexture>();
+    texture->CreateCubemapFromHDR(image, m_device.get(), m_commandPool.get(), m_device->GetGraphicsQueue());
+    return texture;
+}
+
 std::unique_ptr<VulkanVertexBuffer> VulkanRenderer::CreateVertexBuffer(const float* data, uint32_t size,
-                                                                    uint32_t floatPerVertex)
+                                                                       uint32_t floatPerVertex)
 {
     std::unique_ptr<VulkanVertexBuffer> vertexBuffer = std::make_unique<VulkanVertexBuffer>();
 

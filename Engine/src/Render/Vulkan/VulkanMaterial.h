@@ -7,6 +7,7 @@
 #include "VulkanDescriptorPool.h"
 #include "VulkanDescriptorSet.h"
 #include "VulkanUniformBuffer.h"
+#include "Resource/CubeMap.h"
 
 class VulkanPipeline;
 class VulkanDevice;
@@ -22,9 +23,16 @@ public:
     void Cleanup();
 
     void SetUniformData(uint32_t set, uint32_t binding, const void* data, size_t size, VulkanRenderer* renderer);
+    
     void SetTexture(uint32_t set, uint32_t binding, Texture* texture, VulkanRenderer* renderer);
     void SetTextureForFrame(uint32_t frameIndex, uint32_t set, uint32_t binding, Texture* texture);
     
+    void SetCubemap(uint32_t set, uint32_t binding, CubeMap* cubemapTexture, VulkanRenderer* renderer) const;
+    void SetCubemapForFrame(uint32_t frameIndex, uint32_t set, uint32_t binding, CubeMap* cubemapTexture) const;
+    void SetCombinedImageSampler(uint32_t set, uint32_t binding, VkImageView imageView, VkSampler sampler,
+                                 VulkanRenderer* renderer);
+    void SetStorageImage(uint32_t set, uint32_t binding, VkImageView imageView, VulkanRenderer* renderer);
+
     void Bind(VulkanRenderer* renderer);
     void BindDescriptorSets(VkCommandBuffer commandBuffer, uint32_t frameIndex);
 

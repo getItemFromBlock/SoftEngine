@@ -13,7 +13,8 @@ Scene::Scene()
     SafePtr<GameObject> root = CreateGameObject();
     root->SetName("Root");
     m_rootUUID = root->GetUUID();
-
+    
+    m_lightManager = std::make_unique<LightManager>(); 
     m_editorCamera = std::make_unique<Camera>();
     m_editorCamera->GetTransform()->SetLocalPosition(Vec3f::Zero());
 
@@ -30,6 +31,7 @@ Scene::Scene()
         m_editorCameraData.forward = m_editorCamera->GetTransform()->GetForward();
         m_editorCameraData.right = m_editorCamera->GetTransform()->GetRight();
         m_editorCameraData.up = m_editorCamera->GetTransform()->GetUp();
+        m_editorCameraData.position = m_editorCamera->GetTransform()->GetWorldPosition();
     };
 }
 

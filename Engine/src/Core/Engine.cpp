@@ -9,14 +9,18 @@
 
 #include "Resource/Mesh.h"
 #include "Resource/Model.h"
+#include "Resource/ComputeShader.h"
 #include "Resource/ResourceManager.h"
 
 #include "Scene/Scene.h"
+#include "Scene/GameObject.h"
 
 #include "Component/MeshComponent.h"
 #include "Component/TestComponent.h"
 #include "Component/TransformComponent.h"
-#include "Scene/GameObject.h"
+#include "Component/LightComponent.h"
+
+
 #include "Utils/Color.h"
 
 Engine* Engine::Create()
@@ -27,8 +31,10 @@ Engine* Engine::Create()
     return s_instance.get();
 }
 
+
 void Engine::MipMapInit()
 {
+    //TODO: move this on cubemap class to create on send to gpu method
     int size = 256;
     int mipLevels = static_cast<int>(floor(log2(size))) + 1;
     // auto mipmapCompute = m_resourceManager->Load<ComputeShader>(RESOURCE_PATH"/shaders/PBR/mapPrefilter.compute");
@@ -60,10 +66,9 @@ bool Engine::Initialize(EngineDesc desc)
     m_resourceManager->Initialize(m_renderer.get());
     m_resourceManager->LoadDefaultTexture(RESOURCE_PATH"/textures/debug.jpeg");
     m_resourceManager->LoadBlankTexture(RESOURCE_PATH"/textures/blank.png");
-    m_resourceManager->LoadDefaultShader(RESOURCE_PATH"/shaders/Unlit/unlit.shader");
-    m_resourceManager->LoadDefaultMaterial(RESOURCE_PATH"/shaders/unlit.mat");
-    
+    m_resourceManager->LoadDefaultCubeMap(RESOURCE_PATH"/envMap/clearNight.hdr");
     m_resourceManager->LoadDefaultShader(RESOURCE_PATH"/shaders/PBR/PBR.shader");
+    m_resourceManager->LoadDefaultMaterial(RESOURCE_PATH"/shaders/unlit.mat");
 
     m_renderer->GetLineRenderer()->Initialize(m_renderer.get());
     
@@ -71,6 +76,7 @@ bool Engine::Initialize(EngineDesc desc)
     m_componentRegister->RegisterComponent<TransformComponent>();
     m_componentRegister->RegisterComponent<MeshComponent>();
     m_componentRegister->RegisterComponent<TestComponent>();
+    m_componentRegister->RegisterComponent<LightComponent>();
     
     m_sceneHolder = std::make_unique<SceneHolder>();
     m_sceneHolder->Initialize();

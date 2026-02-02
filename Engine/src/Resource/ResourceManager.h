@@ -14,6 +14,7 @@
 #define RESOURCE_PATH "Engine/resources/"
 
 
+class CubeMap;
 class Material;
 class Shader;
 class Texture;
@@ -66,6 +67,7 @@ public:
     void LoadDefaultTexture(const std::filesystem::path& texturePath);
     void LoadBlankTexture(const std::filesystem::path& texturePath);
     void LoadDefaultMaterial(const std::filesystem::path& materialPath);
+    void LoadDefaultCubeMap(const std::filesystem::path& cubeMapPath);
 
     SafePtr<Material> CreateMaterial(std::filesystem::path path);
 
@@ -73,6 +75,7 @@ public:
     std::shared_ptr<Texture> GetDefaultTexture() const;
     std::shared_ptr<Texture> GetBlankTexture() const;
     std::shared_ptr<Material> GetDefaultMaterial() const;
+    std::shared_ptr<CubeMap> GetDefaultCubeMap() const;
 
     static std::filesystem::path GetCacheDir();
     static std::filesystem::path GetCompiledCacheDir();
@@ -100,6 +103,7 @@ private:
     Core::UUID m_blankTexture;
     Core::UUID m_defaultShader;
     Core::UUID m_defaultMaterial;
+    Core::UUID m_defaultCubeMap;
 };
 template<typename T>
 std::shared_ptr<T> ResourceManager::GetResource(const std::filesystem::path& resourcePath) const

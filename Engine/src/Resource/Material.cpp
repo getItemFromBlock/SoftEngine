@@ -3,6 +3,7 @@
 #include <map>
 #include <ranges>
 
+#include "CubeMap.h"
 #include "Shader.h"
 #include "Core/Engine.h"
 #include "Debug/Log.h"
@@ -155,6 +156,31 @@ void Material::SetAttribute(const std::string& name, const SafePtr<Texture>& tex
     else if (m_shader && !m_shader->SentToGPU())
     {
         m_temporaryAttributes.samplerAttributes[name] = texture;
+    }
+}
+
+void Material::SetAttribute(const std::string& name, const SafePtr<CubeMap>& cubeMap)
+{
+    if (m_attributes.sampler3DAttributes.contains(name))
+    {
+        m_attributes.sampler3DAttributes[name] = cubeMap;
+        
+        if (!cubeMap || !m_shader)
+            return;
+        m_shader->EOnSentToGPU.Bind([this, cubeMap, name]()
+        {
+            cubeMap->EOnSentToGPU.Bind([this, cubeMap, name]()
+            {
+                if (!m_shader)
+                    return;
+                auto uniform = m_shader->GetUniform(name);
+                SendCubeMap(cubeMap.getPtr(), uniform);
+            });
+        });
+    }
+    else if (m_shader && !m_shader->SentToGPU())
+    {
+        m_temporaryAttributes.sampler3DAttributes[name] = cubeMap;
     }
 }
 
@@ -367,9 +393,9 @@ void Material::OnShaderChanged()
                     m_temporaryAttributes.samplerAttributes.contains(uniform.name)
                         ? m_temporaryAttributes.samplerAttributes[uniform.name].value
                         : blankTexture;
-                
-                
-                auto texture = m_attributes.samplerAttributes[uniform.name].value;
+
+
+                SafePtr<Texture> texture = m_attributes.samplerAttributes[uniform.name].value;
                 if (!texture)
                     continue;
                 texture->EOnSentToGPU.Bind([this, texture, uniform]()
@@ -379,6 +405,22 @@ void Material::OnShaderChanged()
             }
             break;
         case UniformType::SamplerCube:
+            {
+                auto defaultCubeMap = Engine::Get()->GetResourceManager()->GetDefaultCubeMap();
+                m_attributes.sampler3DAttributes[uniform.name] =
+                    m_temporaryAttributes.sampler3DAttributes.contains(uniform.name)
+                        ? m_temporaryAttributes.sampler3DAttributes[uniform.name].value
+                        : defaultCubeMap;
+
+
+                SafePtr<CubeMap> cubeMap = m_attributes.sampler3DAttributes[uniform.name].value;
+                if (!cubeMap)
+                    continue;
+                cubeMap->EOnSentToGPU.Bind([this, cubeMap, uniform]()
+                {
+                    SendCubeMap(cubeMap.getPtr(), uniform);
+                });
+            }
             break;
         default:
             PrintError("Unknown uniform type: %d", static_cast<int>(uniform.type));
@@ -393,4 +435,12 @@ void Material::SendTexture(Texture* texture, const Uniform& uniform) const
     VulkanMaterial* rhiMat = m_handle.get();
     rhiMat->SetTexture(uniform.set, uniform.binding, texture, renderer);
     PrintLog("Send Texture %s to material %s", texture->GetPath().filename().generic_string().c_str(), GetPath().generic_string().c_str());
+}
+
+void Material::SendCubeMap(CubeMap* cubeMap, const Uniform& uniform) const
+{
+    VulkanRenderer* renderer = Engine::Get()->GetRenderer();
+    VulkanMaterial* rhiMat = m_handle.get();
+    rhiMat->SetCubemap(uniform.set, uniform.binding, cubeMap, renderer);
+    PrintLog("Send Texture %s to material %s", cubeMap->GetPath().filename().generic_string().c_str(), GetPath().generic_string().c_str());
 }

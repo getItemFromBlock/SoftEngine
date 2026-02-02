@@ -26,10 +26,13 @@ void MeshComponent::OnUpdate(float deltaTime)
     if (!m_visible)
         return;
     Mat4 VP = cameraData.VP;
+    auto lightManager = GetGameObject()->GetScene()->GetLightManager();
 
     for (auto& material : m_materials)
     {
+        lightManager->SendLights(material.getPtr());
         material->SetAttribute("viewProj", VP);
+        material->SetAttribute("camPos", cameraData.position);
     }
 }
 

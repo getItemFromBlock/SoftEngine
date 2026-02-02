@@ -23,7 +23,22 @@ public:
 
     bool CreateFromImage(const ImageLoader::Image& image, VulkanDevice* device,
                          VulkanCommandPool* commandBuffer, VulkanQueue& graphicsQueue);
+    
+    bool CreateCubemapFromHDR(const ImageLoader::HDRImage& hdr, VulkanDevice* device, 
+                        VulkanCommandPool* commandPool,VulkanQueue& graphicsQueue);
+    bool ConvertEquirectangularToCubemap(const ImageLoader::HDRImage& hdr, float* cubemapData, uint32_t faceSize);
+    bool CreateAndSetupCubemap(VkBuffer stagingBuffer, uint32_t faceSize, VulkanCommandPool* commandPool,
+                               VulkanQueue& graphicsQueue);
 
+    void CreateCubemapImageView(VkFormat format);
+    void CreateCubemapSampler();
+    void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout,
+                               uint32_t layerCount, VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);
+    void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t layerCount,
+                           VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);
+    VkCommandBuffer BeginSingleTimeCommands(VulkanCommandPool* commandPool);
+    void EndSingleTimeCommands(VkCommandBuffer commandBuffer, VulkanCommandPool* commandPool,
+                               VulkanQueue& graphicsQueue);
     bool Create(VulkanDevice* device, uint32_t width, uint32_t height,
                 VkFormat format, VkImageUsageFlags usage, VkCommandPool commandPool,
                 VkQueue graphicsQueue);

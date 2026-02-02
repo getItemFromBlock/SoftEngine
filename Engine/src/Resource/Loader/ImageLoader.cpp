@@ -40,6 +40,26 @@ void ImageLoader::SaveImage(const char* filename, const Image& image)
     stbi_write_png(filename, image.size.x, image.size.y, 4, image.data, 4 * image.size.x);
 }
 
+bool ImageLoader::LoadHDR(const std::filesystem::path& path, HDRImage& image)
+{
+    int x, y, comp;
+    float* data = stbi_loadf(path.generic_string().c_str(), &x, &y, &comp, 0);
+    
+    if (!data)
+    {
+        image.data = nullptr;
+        image.size = Vec2f::Zero();
+        image.channels = 0;
+        return false;
+    }
+    
+    image.data = data;
+    image.size.x = x;
+    image.size.y = y;
+    image.channels = comp;
+    return true;
+}
+
 ImageLoader::Image ImageLoader::LoadFromMemory(unsigned char* data, int len)
 {
     Image image;
@@ -54,6 +74,11 @@ ImageLoader::Image ImageLoader::LoadFromMemory(unsigned char* data, int len)
 void ImageLoader::ImageFree(void* data)
 {
     stbi_image_free(data);
+}
+
+void ImageLoader::ImageFree(const HDRImage& image)
+{
+    stbi_image_free(image.data);
 }
 
 void ImageLoader::ImageFree(const Image& image)

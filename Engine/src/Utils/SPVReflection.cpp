@@ -552,6 +552,10 @@ Uniforms SPV::SpirvReflectUniforms(const std::string& spirv)
             break;
 
         case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+            u.type = UniformType::SamplerCube;
+            u.offset = 0;
+            u.size = 0;
+            break;
         case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
         case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER:
             u.type = UniformType::Sampler2D;

@@ -7,6 +7,7 @@
 #include "Utils/Type.h"
 #include "Render/Vulkan/VulkanMaterial.h"
 
+class CubeMap;
 class Shader;
 class Texture;
 
@@ -37,6 +38,7 @@ struct MaterialAttributes
     std::unordered_map<std::string, Attribute<Vec3f>> vec3Attributes;
     std::unordered_map<std::string, Attribute<Vec4f>> vec4Attributes;
     std::unordered_map<std::string, Attribute<SafePtr<Texture>>> samplerAttributes;
+    std::unordered_map<std::string, Attribute<SafePtr<CubeMap>>> sampler3DAttributes;
     std::unordered_map<std::string, Attribute<Mat4>> matrixAttributes;
     
     void Clear()
@@ -47,6 +49,7 @@ struct MaterialAttributes
         vec3Attributes.clear();
         vec4Attributes.clear();
         samplerAttributes.clear();
+        sampler3DAttributes.clear();
     }
 };
 
@@ -70,6 +73,7 @@ public:
     void SetAttribute(const std::string& name, const Vec3f& attribute);
     void SetAttribute(const std::string& name, const Vec4f& attribute);
     void SetAttribute(const std::string& name, const SafePtr<Texture>& texture);
+    void SetAttribute(const std::string& name, const SafePtr<CubeMap>& cubeMap);
     void SetAttribute(const std::string& name, const Mat4& attribute);
 
     void SendAllValues(VulkanRenderer* renderer) const;
@@ -82,6 +86,7 @@ private:
     void OnShaderChanged();
     
     void SendTexture(Texture* texture, const Uniform& uniform) const;
+    void SendCubeMap(CubeMap* cubeMap, const Uniform& uniform) const;
 private:
     std::unique_ptr<VulkanMaterial> m_handle;
     SafePtr<Shader> m_shader;
