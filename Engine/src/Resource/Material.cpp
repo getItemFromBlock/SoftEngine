@@ -23,7 +23,10 @@ bool Material::SendToGPU(VulkanRenderer* renderer)
 void Material::Unload()
 {
     if (m_handle)
+    {
         m_handle->Cleanup();
+        m_handle.reset();
+    }
 }
 
 void Material::Describe(ClassDescriptor& descriptor)
@@ -278,7 +281,7 @@ void Material::OnShaderChanged()
     if (m_handle)
     {
         m_handle->Cleanup();
-        m_handle.release();
+        m_handle.reset();
     }
     m_handle = renderer->CreateMaterial(m_shader.getPtr());
 

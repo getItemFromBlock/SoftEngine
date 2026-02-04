@@ -91,7 +91,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
         uint32_t particleCount;
     } push;
 
-    push.deltaTime = deltaTime;
+    push.deltaTime = std::min(deltaTime, 1/60.0f);
     push.particleCount = totalParticleCount;
     
 
@@ -164,6 +164,18 @@ void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
     m_material->GetHandle()->SetStorageBuffer(0, 2, m_particleBuffer->GetBuffer(), 0,
         PBufSizeAligned, renderer);
     
+    struct Push
+    {
+        Vec3i size;
+        float unused;
+    } push;
+
+    push.size = m_particleSettings.general.particleAmount;
+    push.unused = 0;
+
+
+    vkCmdPushConstants(renderer->GetCommandBuffer(), m_material->GetHandle()->GetPipeline()->GetPipelineLayout(),
+        VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Push), &push);
 
     m_material->SendAllValues(renderer);
     if (!renderer->BindMaterial(m_material.getPtr()))
@@ -274,7 +286,7 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<ParticleData> &par
     const Vec3f scale = p_gameObject->GetTransform()->GetWorldScale();
 
     const Vec3i amount = m_particleSettings.general.particleAmount;
-    const uint32_t maxL = m_particleSettings.general.connectionStrength;
+    const int32_t maxL = m_particleSettings.general.connectionStrength;
 
     totalParticleCount = amount.x * amount.y * amount.z;
     particles.resize(totalParticleCount);
@@ -285,7 +297,7 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<ParticleData> &par
         {
             for (int32_t k = 0; k < amount.z; k++)
             {
-                const Vec3f offset = Vec3f(i / (amount.x-1), j / (amount.y-1), k / (amount.z-1)) - Vec3f(0.5f, 0.5f, 0.5f);
+                const Vec3f offset = Vec3f(i / float(amount.x-1), j / float(amount.y-1), k / float(amount.z-1)) - Vec3f(0.5f, 0.5f, 0.5f);
                 const Vec3f pos = worldPosition + rotation * offset * (scale * m_particleSettings.shape.radius * 2);
                 const uint32_t index = i + j * (amount.x * amount.z) + k * (amount.x);
 

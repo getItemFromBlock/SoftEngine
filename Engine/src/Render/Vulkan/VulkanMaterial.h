@@ -16,7 +16,7 @@ class VulkanMaterial
 {
 public:
     VulkanMaterial(VulkanPipeline* pipeline);
-    ~VulkanMaterial();
+    virtual ~VulkanMaterial();
 
     bool Initialize(uint32_t maxFramesInFlight, Texture* defaultTexture, VulkanPipeline* pipeline);
     void Cleanup();

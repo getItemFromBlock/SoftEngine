@@ -13,8 +13,11 @@ public:
 
     bool Initialize(VulkanDevice* device, VkExtent2D extent);
     void Cleanup();
+    bool HasLigma() const { return m_hasLigma; }
+    void ValidateTransition() { m_hasLigma = false; }
 
     VkImageView GetImageView() const { return m_depthImageView; }
+    VkImage GetImage() const { return m_depthImage; }
     VkFormat GetDepthFormat() const { return m_depthFormat; }
 
     static VkFormat FindDepthFormat(VulkanDevice* device);
@@ -40,4 +43,5 @@ private:
     VkDeviceMemory m_depthImageMemory = VK_NULL_HANDLE;
     VkImageView m_depthImageView = VK_NULL_HANDLE;
     VkFormat m_depthFormat = VK_FORMAT_UNDEFINED;
+    bool m_hasLigma = true;
 };

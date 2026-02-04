@@ -52,6 +52,7 @@ void ResourceManager::RemoveResource(Core::UUID uuid)
     auto it = m_resources.find(uuid);
     if (it != m_resources.end())
     {
+        it->second->Unload();
         m_resources.erase(it);
     }
 }

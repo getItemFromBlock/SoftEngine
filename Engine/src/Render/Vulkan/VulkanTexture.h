@@ -41,8 +41,6 @@ private:
                      VkMemoryPropertyFlags properties);
     bool CreateImageView(VkImageAspectFlags aspectFlags);
     bool CreateSampler();
-    void TransitionImageLayout(VulkanCommandPool* _commandBuffer, VulkanQueue& graphicsQueue,
-                               VkImageLayout oldLayout, VkImageLayout newLayout);
     void CopyBufferToImage(VulkanCommandPool* _commandBuffer, VulkanQueue& graphicsQueue,
                            VkBuffer buffer, uint32_t width, uint32_t height);
     bool CopyDataToBuffer(VulkanBuffer& buffer, const void* data, VkDeviceSize size);

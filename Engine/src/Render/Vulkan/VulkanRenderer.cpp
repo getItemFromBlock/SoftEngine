@@ -25,6 +25,7 @@
 #include "VulkanShaderBuffer.h"
 #include "VulkanTexture.h"
 #include "VulkanVertexBuffer.h"
+#include "VulkanUtils.h"
 #include "Core/Engine.h"
 
 #include "Debug/Log.h"
@@ -380,7 +381,7 @@ std::string VulkanRenderer::CompileShader(ShaderType type, const std::string& co
 
     if (module.GetCompilationStatus() != shaderc_compilation_status_success)
     {
-        PrintError("Shader compilation failed: %s", module.GetErrorMessage().c_str());;
+        PrintError("Shader compilation failed: %s", module.GetErrorMessage().c_str());
         return {};
     }
 
@@ -638,6 +639,15 @@ void VulkanRenderer::ClearColor() const
     std::vector<VkClearValue> clearValues(2);
     clearValues[0].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
     clearValues[1].depthStencil = {.depth = 1.0f, .stencil = 0};
+
+    if (m_depthBuffer->HasLigma())
+    {
+        VulkanUtils::TransitionImageLayout(m_commandPool.get(), m_device->GetGraphicsQueue(),
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            m_device.get(), m_depthBuffer->GetImage());
+        m_depthBuffer->ValidateTransition();
+    }
 
     m_renderPass->Begin(commandBuffer, 
                        m_swapChain->GetImageViews()[imageIndex], 

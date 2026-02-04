@@ -28,6 +28,8 @@ layout(push_constant) uniform Push {
     uint  particleCount;
 } pc;
 
+const float DAMPING = 1.5;
+
 void main()
 {
     uint id = gl_GlobalInvocationID.x;
@@ -53,8 +55,10 @@ void main()
 		ConnectionData c = connections[cOff + i];
 		vec3 dif = particles[c.particleID].position - pos;
 		float f = length(dif) - c.initialLength;
-		vel += dif * (f * pc.deltaTime);
+		vel += dif * (f * pc.deltaTime * 500);
 	}
+	
+	vel = vel * (1 - DAMPING * pc.deltaTime);
 	
 	float l = length(vel);
 	if (l > 10.)
