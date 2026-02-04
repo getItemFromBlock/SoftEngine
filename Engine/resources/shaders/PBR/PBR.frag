@@ -1,5 +1,25 @@
 #version 450
 
+layout(location = 1) in vec3 vNormal;
+layout(location = 3) in vec3 vViewDir;
+
+layout(location = 0) out vec4 outColor;
+
+layout(binding = 9) uniform samplerCube debugCubemap;
+
+void main()
+{
+    vec3 N = normalize(vNormal);
+    vec3 V = normalize(vViewDir);
+    vec3 R = reflect(-V, N);
+
+    vec3 color = texture(debugCubemap, R).rgb;
+    outColor = vec4(color, 1.0);
+}
+
+/*
+#version 450
+
 layout(location = 0) in vec3 vWorldPos;
 layout(location = 1) in vec3 vNormal;
 layout(location = 2) in vec2 vTexCoord;
@@ -97,3 +117,4 @@ void main()
 
     outColor = vec4(color, material.color.a);
 }
+*/

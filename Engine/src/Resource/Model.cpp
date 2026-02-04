@@ -136,6 +136,11 @@ SafePtr<GameObject> Model::CreateGameObject(Model* model, Scene* scene)
                 meshComp->AddMaterial(resourceManager->GetDefaultMaterial());
                 continue;
             }
+            if (!model->m_materials[materialIndex].valid())
+            {
+                meshComp->AddMaterial(resourceManager->GetDefaultMaterial());
+                continue;
+            }
             meshComp->AddMaterial(model->m_materials[materialIndex++].get());
         }
         meshComp->SetMesh(model->m_meshes[i]);

@@ -165,6 +165,8 @@ bool Shader::Load(ResourceManager* resourceManager)
     {
         m_topology = topology;
     }
+    if (parser.HasKey("depthTest"))
+        m_depthTestEnabled = parser["depthTest"].As<bool>();
     
     
     bool hasGraphics = (m_vertexShader && m_fragmentShader);
@@ -172,7 +174,7 @@ bool Shader::Load(ResourceManager* resourceManager)
 
     if (!hasGraphics && !hasCompute)
     {
-        PrintError("Shader %s is invalid: Must have (Vert + Frag) or (Compute)", p_path.c_str());
+        PrintError("Shader %s is invalid: Must have (Vert + Frag) or (Compute)", p_path.generic_string().c_str());
         return false;
     }
     

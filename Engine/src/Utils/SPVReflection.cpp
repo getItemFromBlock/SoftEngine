@@ -550,15 +550,18 @@ Uniforms SPV::SpirvReflectUniforms(const std::string& spirv)
                 }
             }
             break;
-
-        case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-            u.type = UniformType::SamplerCube;
+        case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+            u.type = UniformType::ImageCube;
             u.offset = 0;
             u.size = 0;
             break;
+        case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
         case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
         case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER:
-            u.type = UniformType::Sampler2D;
+            if (binding->image.dim == SpvDimCube)
+                u.type = UniformType::SamplerCube;
+            else if (binding->image.dim == SpvDim2D)
+                u.type = UniformType::Sampler2D;
             u.offset = 0;
             u.size = 0;
             break;

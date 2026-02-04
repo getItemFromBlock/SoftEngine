@@ -54,6 +54,7 @@ void Scene::OnRender(VulkanRenderer* renderer)
         }
     }
     
+    m_editorCamera->RenderSkybox(renderer);
     auto renderQueueManager = renderer->GetRenderQueueManager();
     renderQueueManager->SortAll();
     renderQueueManager->ExecuteAll(renderer);

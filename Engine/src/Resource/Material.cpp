@@ -214,7 +214,6 @@ void Material::SendAllValues(VulkanRenderer* renderer) const
         auto key = std::make_pair(uniform.set, uniform.binding);
         auto& buffer = uniformBuffers[key];
 
-        // Find the member with matching name
         uint32_t memberOffset = 0;
         bool found = false;
         for (const auto& member : uniform.members)
@@ -229,18 +228,15 @@ void Material::SendAllValues(VulkanRenderer* renderer) const
 
         if (!found)
         {
-            // Member not found, skip this attribute
             return;
         }
 
-        // Ensure buffer is large enough to hold data at memberOffset + size
         size_t requiredSize = memberOffset + size;
         if (buffer.data.size() < requiredSize)
         {
             buffer.data.resize(requiredSize, 0);
         }
 
-        // Copy data at the correct offset
         const uint8_t* bytePtr = static_cast<const uint8_t*>(valuePtr);
         std::memcpy(buffer.data.data() + memberOffset, bytePtr, size);
     };

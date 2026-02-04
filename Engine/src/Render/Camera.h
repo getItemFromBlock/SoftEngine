@@ -5,6 +5,8 @@
 #include "Component/TransformComponent.h"
 #include "Physic/Frustum.h"
 
+class CubeMap;
+
 enum class ViewMode
 {
     Perspective,
@@ -45,6 +47,10 @@ public:
     void UpdateFrustum();
     const Frustum& GetFrustum() const;
 
+    void SetSkybox(SafePtr<CubeMap> skybox);
+    SafePtr<CubeMap> GetSkybox() const;
+    
+    void RenderSkybox(VulkanRenderer* renderer) const;
 private:
     std::shared_ptr<TransformComponent> m_transform;
 
@@ -60,4 +66,6 @@ protected:
     ViewMode p_viewMode = ViewMode::Perspective;
     
     Frustum p_frustum;
+    
+    SafePtr<CubeMap> m_skybox;
 };

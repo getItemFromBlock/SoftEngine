@@ -1,11 +1,16 @@
 ﻿#include "Camera.h"
 
 #include "Component/TransformComponent.h"
+#include "Core/Engine.h"
+#include "Vulkan/VulkanRenderer.h"
+
+#undef far
+#undef near
 
 Camera::Camera()
 {
-    //TODO: Frustum culling
     m_transform = std::make_shared<TransformComponent>();
+    m_skybox = Engine::Get()->GetResourceManager()->GetDefaultCubeMap();
 }
 
 Camera& Camera::operator=(const Camera& other) = default;
@@ -61,6 +66,27 @@ Vec4f Camera::GetClearColor() const
 const Frustum& Camera::GetFrustum() const
 {
     return p_frustum;
+}
+
+void Camera::SetSkybox(SafePtr<CubeMap> skybox)
+{
+    m_skybox = skybox;
+}
+
+SafePtr<CubeMap> Camera::GetSkybox() const
+{
+    return m_skybox;
+}
+
+void Camera::RenderSkybox(VulkanRenderer* renderer) const
+{
+    if (!m_skybox)
+        return;
+    
+    Mat4 view = GetViewMatrix();
+    view[3] = Vec3f::Zero();
+    Mat4 proj = GetProjectionMatrix();
+    renderer->GetSkyboxRenderer()->RenderSkybox(renderer, m_skybox, proj * view);
 }
 
 Mat4 Camera::GetViewMatrix() const

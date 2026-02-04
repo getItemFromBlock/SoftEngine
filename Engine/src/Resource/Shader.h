@@ -65,7 +65,8 @@ enum class UniformType
     NestedStruct,
     StorageBuffer,
     Sampler2D,
-    SamplerCube
+    SamplerCube,
+    ImageCube
 };
 
 struct UniformMember {
@@ -154,6 +155,7 @@ public:
     bool IsGraphic() const { return m_graphic; }
     
     Topology GetTopology() const { return m_topology; }
+    bool IsDepthTestEnabled() const { return m_depthTestEnabled; }
     
     std::unique_ptr<ComputeDispatch> CreateDispatch(VulkanRenderer* renderer);
     
@@ -167,6 +169,7 @@ private:
     std::unique_ptr<VulkanPipeline> m_pipeline;
     
     Topology m_topology = Topology::Triangle;
+    bool m_depthTestEnabled = true;
     
     bool m_graphic = true;
 };

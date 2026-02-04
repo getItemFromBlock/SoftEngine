@@ -106,7 +106,7 @@ bool VulkanRenderer::Initialize(Window* window)
             return false;
         }
         m_syncObjects->ResizeRenderFinishedSemaphores(m_swapChain->GetImageCount());
-
+        
         m_initialized = true;
 
         window->EResizeEvent.Bind([this](Vec2i)
@@ -518,6 +518,13 @@ std::unique_ptr<VulkanTexture> VulkanRenderer::CreateCubeMap(const ImageLoader::
 {
     std::unique_ptr<VulkanTexture> texture = std::make_unique<VulkanTexture>();
     texture->CreateCubemapFromHDR(image, m_device.get(), m_commandPool.get(), m_device->GetGraphicsQueue());
+    return texture;
+}
+
+std::unique_ptr<VulkanTexture> VulkanRenderer::CreateCubeMapWithMips(int resolution, int mipLevels)
+{
+    std::unique_ptr<VulkanTexture> texture = std::make_unique<VulkanTexture>();
+    texture->CreateCubemapWithMips(resolution, mipLevels, m_device.get(), m_commandPool.get(), m_device->GetGraphicsQueue());
     return texture;
 }
 

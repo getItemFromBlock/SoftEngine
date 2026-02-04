@@ -42,6 +42,7 @@ void ImageLoader::SaveImage(const char* filename, const Image& image)
 
 bool ImageLoader::LoadHDR(const std::filesystem::path& path, HDRImage& image)
 {
+    FlipVerticalOnLoad(true);
     int x, y, comp;
     float* data = stbi_loadf(path.generic_string().c_str(), &x, &y, &comp, 0);
     

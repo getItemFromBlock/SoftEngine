@@ -71,6 +71,7 @@ bool Engine::Initialize(EngineDesc desc)
     m_resourceManager->LoadDefaultMaterial(RESOURCE_PATH"/shaders/unlit.mat");
 
     m_renderer->GetLineRenderer()->Initialize(m_renderer.get());
+    m_renderer->GetSkyboxRenderer()->Initialize();
     
     m_componentRegister = std::make_unique<ComponentRegister>();
     m_componentRegister->RegisterComponent<TransformComponent>();

@@ -85,3 +85,11 @@ void MeshComponent::AddMaterial(const SafePtr<Material>& material)
 {
     m_materials.push_back(material);
 }
+
+void MeshComponent::RemoveMaterial(const SafePtr<Material>& material)
+{
+    m_materials.erase(std::ranges::find_if(m_materials, [material](const SafePtr<Material>& mat)
+    {
+        return mat.getPtr() == material.getPtr();
+    }));
+}

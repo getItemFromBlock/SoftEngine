@@ -6,6 +6,7 @@
 
 #include "Resource/Loader/ImageLoader.h"
 
+class VulkanRenderer;
 class VulkanCommandPool;
 class VulkanDevice;
 
@@ -29,7 +30,6 @@ public:
     bool ConvertEquirectangularToCubemap(const ImageLoader::HDRImage& hdr, float* cubemapData, uint32_t faceSize);
     bool CreateAndSetupCubemap(VkBuffer stagingBuffer, uint32_t faceSize, VulkanCommandPool* commandPool,
                                VulkanQueue& graphicsQueue);
-
     void CreateCubemapImageView(VkFormat format);
     void CreateCubemapSampler();
     void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout,
@@ -39,11 +39,21 @@ public:
     VkCommandBuffer BeginSingleTimeCommands(VulkanCommandPool* commandPool);
     void EndSingleTimeCommands(VkCommandBuffer commandBuffer, VulkanCommandPool* commandPool,
                                VulkanQueue& graphicsQueue);
+    
+    
     bool Create(VulkanDevice* device, uint32_t width, uint32_t height,
                 VkFormat format, VkImageUsageFlags usage, VkCommandPool commandPool,
                 VkQueue graphicsQueue);
 
     void Cleanup();
+    bool CreateCubemapWithMips(int resolution, int mipLevels, VulkanDevice* device, VulkanCommandPool* commandPool,
+                               VulkanQueue& graphicsQueue);
+    VkImageView GetMipLevelView(int mipLevel) const;
+    void CreateCubemapImageView(VkFormat format, uint32_t mipLevels);
+    void CreateCubemapSamplerWithMips(uint32_t mipLevels);
+    void TransitionImageLayoutWithMips(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout,
+                                       uint32_t mipLevels, uint32_t layerCount, VulkanCommandPool* commandPool,
+                                       VulkanQueue& graphicsQueue);
 
     VkImage GetImage() const { return m_image; }
     VkImageView GetImageView() const { return m_imageView; }
@@ -63,6 +73,7 @@ private:
     bool CopyDataToBuffer(VulkanBuffer& buffer, const void* data, VkDeviceSize size);
     bool CreateAndSetupImage(VkBuffer stagingBuffer, VulkanCommandPool* commandBuffer, VulkanQueue& graphicsQueue);
 
+private:
     VulkanDevice* m_device = nullptr;
     VkImage m_image = VK_NULL_HANDLE;
     VkDeviceMemory m_imageMemory = VK_NULL_HANDLE;
@@ -72,4 +83,7 @@ private:
     
     uint32_t p_width = 0;
     uint32_t p_height = 0;
+    
+    std::vector<VkImageView> m_mipLevelViews;
+    uint32_t m_mipLevels = 1;
 };
