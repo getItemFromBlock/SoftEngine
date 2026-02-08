@@ -505,6 +505,42 @@ void Inspector::ShowProperty(const ClassDescriptor& descriptor)
             }
             break;
         }
+        case PropertyType::Vec2i:
+        {
+            Vec2i local = *static_cast<Vec2i *>(property.data);
+            if (ImGui::DragInt2(property.name.c_str(), &local.x))
+            {
+                if (property.setter)
+                    property.setter(static_cast<void *>(&local));
+                else
+                    *static_cast<Vec2i *>(property.data) = local;
+            }
+            break;
+        }
+        case PropertyType::Vec3i:
+        {
+            Vec3i local = *static_cast<Vec3i *>(property.data);
+            if (ImGui::DragInt3(property.name.c_str(), &local.x))
+            {
+                if (property.setter)
+                    property.setter(static_cast<void *>(&local));
+                else
+                    *static_cast<Vec3i *>(property.data) = local;
+            }
+            break;
+        }
+        case PropertyType::Vec4i:
+        {
+            Vec4i local = *static_cast<Vec4i *>(property.data);
+            if (ImGui::DragInt4(property.name.c_str(), &local.x))
+            {
+                if (property.setter)
+                    property.setter(static_cast<void *>(&local));
+                else
+                    *static_cast<Vec4i *>(property.data) = local;
+            }
+            break;
+        }
         case PropertyType::Quat:
         {
             auto quat = static_cast<Quat*>(property.data);
@@ -541,6 +577,18 @@ void Inspector::ShowProperty(const ClassDescriptor& descriptor)
                     property.setter(static_cast<void*>(&local));
                 else
                     *static_cast<Vec4f*>(property.data) = local;
+            }
+            break;
+        }
+        case PropertyType::Enum:
+        {
+            int32_t *index = static_cast<int32_t *>(property.data);
+            if (ImGui::Combo(property.name.c_str(), index, static_cast<const char*>(property.desc)))
+            {
+                if (property.setter)
+                    property.setter(static_cast<void *>(index));
+                else
+                    *static_cast<int32_t *>(property.data) = *index;
             }
             break;
         }

@@ -80,6 +80,7 @@ void Editor::Run()
         m_imguiHandler->EndFrame();
         
         m_engine->EndFrame();
+        //std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 }
 

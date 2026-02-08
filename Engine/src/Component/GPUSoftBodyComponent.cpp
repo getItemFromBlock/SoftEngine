@@ -19,7 +19,53 @@ uint64_t align(uint64_t value, uint64_t alignement)
 
 void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
 {
-    d.AddProperty("GPUSoftBodyComponent", PropertyType::ParticleSystem, this);
+    auto &res = d.AddProperty("Block Size", PropertyType::Vec3i, &m_particleSettings.general.particleAmount);
+    res.setter = [this](void *value)
+        {
+            Vec3i *val = static_cast<Vec3i *>(value);
+            for (int i = 0; i < 3; i++)
+            {
+                if ((*val)[i] < 3)
+                    (*val)[i] = 3;
+            }
+            m_particleSettings.general.particleAmount = *val;
+            m_needsRecreation = true;
+        };
+
+    auto &res2 = d.AddProperty("Connections Amount", PropertyType::Int, &m_particleSettings.general.connectionStrength);
+    res2.setter = [this](void *value)
+        {
+            int *val = static_cast<int *>(value);
+            if (*val < 1)
+                *val = 1;
+
+            m_particleSettings.general.connectionStrength = *val;
+            m_needsRecreation = true;
+        };
+
+    auto &res3 = d.AddProperty("Solid Layers", PropertyType::Int, &m_particleSettings.general.solidLayers);
+    res3.setter = [this](void *value)
+        {
+            int *val = static_cast<int *>(value);
+            if (*val < 1)
+                *val = 1;
+
+            m_particleSettings.general.solidLayers = *val;
+            m_needsRecreation = true;
+        };
+
+    auto &res4 = d.AddEnum("Shape", reinterpret_cast<int32_t *>(&m_particleSettings.shape.type), m_particleSettings.shape.to_cstr());
+    res4.setter = [this](void *value)
+        {
+            int val = *static_cast<int *>(value);
+            if (val < 0)
+                val = 0;
+            else if (val > 2)
+                val = 2;
+
+            m_particleSettings.shape.type = BodySettings::Shape::Type(val);
+            m_needsRecreation = true;
+        };
 }
 
 void GPUSoftBodyComponent::OnCreate()
@@ -75,7 +121,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
 
     VulkanMaterial* mat0 = m_simulationCompute0->GetMaterial();
     VulkanMaterial* mat1 = m_simulationCompute1->GetMaterial();
-    VulkanMaterial* mat2 = m_material->GetHandle();
+    //VulkanMaterial* mat2 = m_material->GetHandle();
 
     // First compute pass needs both particle data and connections
     mat0->SetStorageBuffer(0, 0, m_particleBuffer->GetBuffer(), 0,
@@ -210,14 +256,16 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
     if (m_particleBuffer)
         m_particleBuffer->Cleanup();
 
-    std::vector<ParticleData> particles;
+    std::vector<SBParticleData> particles;
     std::vector<ConnectionData> connections;
     InitializeParticleData(particles, connections);
 
-    VkDeviceSize PBufSize = sizeof(ParticleData) * particles.size();
+    VkDeviceSize PBufSize = sizeof(SBParticleData) * particles.size();
     VkDeviceSize CBufSize = sizeof(ConnectionData) * connections.size();
     PBufSizeAligned = align(PBufSize, 0x40);
+    PBufSizeAligned = std::max(0x40llu, PBufSize);
     CBufSizeAligned = align(CBufSize, 0x40);
+    CBufSizeAligned = std::max(0x40llu, CBufSize);
 
     auto particleBuffer = std::make_unique<VulkanBuffer>();
     particleBuffer->Initialize(device, PBufSizeAligned + CBufSizeAligned,
@@ -231,7 +279,8 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     stagingBuffer->CopyData(particles.data(), PBufSize);
-    stagingBuffer->CopyData(connections.data(), CBufSize, PBufSizeAligned);
+    if (CBufSize)
+        stagingBuffer->CopyData(connections.data(), CBufSize, PBufSizeAligned);
 
     VkCommandBufferAllocateInfo alloc{};
     alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -279,7 +328,7 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
     stagingBuffer->Cleanup();
 }
 
-void GPUSoftBodyComponent::InitializeParticleData(std::vector<ParticleData> &particles, std::vector<ConnectionData> &connections)
+void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &particles, std::vector<ConnectionData> &connections)
 {
     const Vec3f worldPosition = p_gameObject->GetTransform()->GetWorldPosition();
     const Quat rotation = p_gameObject->GetTransform()->GetWorldRotation();
@@ -298,7 +347,7 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<ParticleData> &par
             for (int32_t k = 0; k < amount.z; k++)
             {
                 const Vec3f offset = Vec3f(i / float(amount.x-1), j / float(amount.y-1), k / float(amount.z-1)) - Vec3f(0.5f, 0.5f, 0.5f);
-                const Vec3f pos = worldPosition + rotation * offset * (scale * m_particleSettings.shape.radius * 2);
+                const Vec3f pos = worldPosition + rotation * offset * (scale * m_particleSettings.shape.scale * 2);
                 const uint32_t index = i + j * (amount.x * amount.z) + k * (amount.x);
 
                 particles[index].position = pos;
@@ -315,7 +364,7 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<ParticleData> &par
                 if (j < m_particleSettings.general.solidLayers)
                     continue;
                 const uint32_t index0 = i + j * (amount.x * amount.z) + k * (amount.x);
-                particles[index0].connectionsOffset = connections.size();
+                particles[index0].connectionsOffset = (uint32_t)connections.size();
 
                 for (int32_t l = i - maxL; l <= i + maxL; l++)
                 {
@@ -340,10 +389,66 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<ParticleData> &par
                         }
                     }
                 }
-                particles[index0].connectionsCount = connections.size() - particles[index0].connectionsOffset;
+                particles[index0].connectionsCount = (uint32_t)connections.size() - particles[index0].connectionsOffset;
             }
         }
     }
+
+    if (m_particleSettings.shape.type == BodySettings::Shape::Type::Sphere)
+    {
+        std::vector<uint32_t> toRemove;
+        const Vec3f center = worldPosition + Vec3f(0.5f, 0.5f, 0.5f);
+        const float maxDist = powf((m_particleSettings.shape.scale), 2) + 0.01f;
+        SBParticleData *pPointer = &particles[0];
+
+        for (uint32_t i = 0; i < totalParticleCount; i++)
+        {
+            Vec3f delta = particles[i].position;
+            delta = Vec3f(delta.x / scale.x, delta.y / scale.y, delta.z / scale.z);
+            if (delta.LengthSquared() > maxDist)
+                toRemove.push_back(i);
+        }
+        toRemove.push_back((uint32_t)particles.size());
+
+        SBParticleData *ptr = pPointer + toRemove[0];
+        for (uint32_t i = 0; i < toRemove.size() - 1; i++)
+        {
+            std::copy(pPointer + toRemove[i] + 1, pPointer + toRemove[i + 1], ptr);
+            ptr += ((pPointer + toRemove[i + 1]) - (pPointer + toRemove[i] + 1));
+        }
+
+        for (uint32_t i = 1; i < toRemove.size(); i++)
+        {
+            particles.pop_back();
+        }
+
+        for (uint32_t i = 0; i < particles.size(); i++)
+        {
+            ConnectionData *cOffset = &connections[particles[i].connectionsOffset];
+            for (uint32_t j = 0; j < particles[i].connectionsCount; j++)
+            {
+                uint32_t offset = 0;
+                for (uint32_t k = 0; k < toRemove.size()-1; k++)
+                {
+                    if (cOffset[j].particleID == toRemove[k]) // Particle was deleted
+                    {
+                        std::copy(cOffset + (j + 1), cOffset + particles[i].connectionsCount, cOffset + j);
+                        particles[i].connectionsCount--;
+                        j--;
+                        offset = 0;
+                        break;
+                    }
+                    else if (cOffset[j].particleID < toRemove[k])
+                        break;
+                    offset++;
+                }
+                if (offset)
+                    cOffset[j].particleID -= offset;
+                assert(j >= particles[i].connectionsCount || cOffset[j].particleID != i);
+            }
+        }
+    }
+    totalParticleCount = uint32_t(particles.size());
 }
 
 void GPUSoftBodyComponent::ApplySettings()

@@ -28,7 +28,7 @@ layout(push_constant) uniform Push {
     uint  particleCount;
 } pc;
 
-const float DAMPING = 1.5;
+const float DAMPING = 1.0;
 
 void main()
 {
@@ -55,10 +55,10 @@ void main()
 		ConnectionData c = connections[cOff + i];
 		vec3 dif = particles[c.particleID].position - pos;
 		float f = length(dif) - c.initialLength;
-		vel += dif * (f * pc.deltaTime * 500);
+		vel += normalize(dif) * (f * pc.deltaTime * 500);
 	}
 	
-	vel = vel * (1 - DAMPING * pc.deltaTime);
+	vel = vel * max(1 - DAMPING * pc.deltaTime, 0.05);
 	
 	float l = length(vel);
 	if (l > 10.)

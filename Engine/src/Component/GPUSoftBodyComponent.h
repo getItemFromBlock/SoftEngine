@@ -13,12 +13,12 @@
 class Material;
 class Mesh;
 
-struct ParticleSettings
+struct BodySettings
 {
     struct General
     {
-        Vec3i particleAmount = Vec3i(10, 10, 10);
-        uint32_t solidLayers = 1;
+        Vec3i particleAmount = Vec3i(5, 5, 5);
+        int32_t solidLayers = 2;
         Vec2i boneCount = Vec2i(4, 4);
         Vec2i surfacePoints = Vec2i(32, 32);
         Vec2f surfaceHeightBounds = Vec2f(-0.3f, 0.3f);
@@ -27,24 +27,24 @@ struct ParticleSettings
 
     struct Shape
     {
-        enum class Type
+        enum class Type : int32_t
         {
             Cube,
             Sphere,
             Cone,
-        } type = Type::Sphere;
+        } type = Type::Cube;
 
         static const char* to_cstr()
         {
             return "Cube\0Sphere\0Cone";
         }
         
-        float radius = 1.f;
+        float scale = 1.f;
         
     } shape;
 };
 
-struct ParticleData
+struct SBParticleData
 {
     Vec3f position;
     uint32_t connectionsOffset;
@@ -77,7 +77,7 @@ public:
     void OnDestroy() override;
 
     void ApplySettings();
-    ParticleSettings& GetSettings() { return m_particleSettings; }
+    BodySettings& GetSettings() { return m_particleSettings; }
 
     void Restart();
     
@@ -85,7 +85,7 @@ public:
     SafePtr<Mesh> GetMesh() const { return m_mesh; }
 private:
     void CreateParticleBuffers();
-    void InitializeParticleData(std::vector<ParticleData> &particles, std::vector<ConnectionData> &connections);
+    void InitializeParticleData(std::vector<SBParticleData> &particles, std::vector<ConnectionData> &connections);
 
 private:
     std::unique_ptr<ComputeDispatch> m_simulationCompute0;
@@ -105,5 +105,5 @@ private:
     bool m_needsRecreation = false;
 
     Seed m_seed;
-    ParticleSettings m_particleSettings;
+    BodySettings m_particleSettings;
 };
