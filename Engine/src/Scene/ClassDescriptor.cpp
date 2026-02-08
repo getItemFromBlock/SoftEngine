@@ -24,7 +24,7 @@ Property& ClassDescriptor::AddQuat(const char* name, Quat& value)
 
 Property &ClassDescriptor::AddEnum(const char *name, int32_t *value, const char *description)
 {
-    Property &res = AddProperty(name, PropertyType::Enum, &value);
+    Property &res = AddProperty(name, PropertyType::Enum, value);
     res.desc = description;
     return res;
 }

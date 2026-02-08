@@ -17,8 +17,8 @@ struct BodySettings
 {
     struct General
     {
-        Vec3i particleAmount = Vec3i(5, 5, 5);
-        int32_t solidLayers = 2;
+        Vec3i particleAmount = Vec3i(11, 11, 11);
+        int32_t solidLayers = 1;
         Vec2i boneCount = Vec2i(4, 4);
         Vec2i surfacePoints = Vec2i(32, 32);
         Vec2f surfaceHeightBounds = Vec2f(-0.3f, 0.3f);
@@ -36,7 +36,7 @@ struct BodySettings
 
         static const char* to_cstr()
         {
-            return "Cube\0Sphere\0Cone";
+            return "Cube\0Sphere\0Cone\0";
         }
         
         float scale = 1.f;

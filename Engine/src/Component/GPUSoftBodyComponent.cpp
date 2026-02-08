@@ -394,7 +394,7 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &p
         }
     }
 
-    if (m_particleSettings.shape.type == BodySettings::Shape::Type::Sphere)
+    if (m_particleSettings.shape.type != BodySettings::Shape::Type::Cube)
     {
         std::vector<uint32_t> toRemove;
         const Vec3f center = worldPosition + Vec3f(0.5f, 0.5f, 0.5f);
@@ -405,8 +405,19 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &p
         {
             Vec3f delta = particles[i].position;
             delta = Vec3f(delta.x / scale.x, delta.y / scale.y, delta.z / scale.z);
-            if (delta.LengthSquared() > maxDist)
-                toRemove.push_back(i);
+            switch (m_particleSettings.shape.type)
+            {
+            case BodySettings::Shape::Type::Sphere:
+                if (delta.LengthSquared() > maxDist)
+                    toRemove.push_back(i);
+                break;
+            case BodySettings::Shape::Type::Cone:
+                if (Vec2f(delta.x, delta.z).Length() > (-delta.y / 2 + 0.5f + 0.01f))
+                    toRemove.push_back(i);
+                break;
+            default:
+                break;
+            }
         }
         toRemove.push_back((uint32_t)particles.size());
 
