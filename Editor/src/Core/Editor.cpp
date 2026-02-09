@@ -63,7 +63,7 @@ void Editor::Initialize()
     });
     
     // auto go = currentScene->CreateGameObject();
-    // go->AddComponent<ParticleSystemComponent>();
+    // go->AddComponent<TestComponent>();
 }
 
 void Editor::Run()

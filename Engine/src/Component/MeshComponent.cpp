@@ -12,7 +12,13 @@
 void MeshComponent::Describe(ClassDescriptor& d)
 {
     d.AddProperty("Mesh", PropertyType::Mesh, &m_mesh);
-    d.AddProperty("Materials", PropertyType::Materials, &m_materials);
+    
+    Property property;
+    property.data = &m_materials;
+    property.type = PropertyType::Material;
+    property.name = "Materials";
+    property.isList = true;
+    d.AddProperty(property);
 }
 
 void MeshComponent::OnUpdate(float deltaTime)
@@ -30,6 +36,8 @@ void MeshComponent::OnUpdate(float deltaTime)
 
     for (auto& material : m_materials)
     {
+        if (!material)
+            continue;
         lightManager->SendLights(material.getPtr());
         material->SetAttribute("viewProj", VP);
         material->SetAttribute("camPos", cameraData.position);

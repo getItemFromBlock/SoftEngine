@@ -125,7 +125,15 @@ SafePtr<GameObject> Model::CreateGameObject(Model* model, Scene* scene)
 	size_t materialIndex = 0;
     for (size_t i = 0; i < model->m_meshes.size(); i++)
     {
-        SafePtr<GameObject> child = scene->CreateGameObject(go.getPtr());
+        SafePtr<GameObject> child;
+        if (model->m_meshes.size() >= 2)
+        {
+            child = scene->CreateGameObject(go.getPtr());
+        }
+        else
+        {
+            child = go;
+        }
         child->SetName(model->m_meshes[i]->GetName());
         SafePtr<MeshComponent> meshComp = child->AddComponent<MeshComponent>();
         auto subMeshes = model->m_meshes[i]->GetSubMeshes();

@@ -282,20 +282,25 @@ void ResourceManager::ReadCache()
 void ResourceManager::CreateCache()
 {
     std::filesystem::path cachePath = GetCacheDir() / "resources.cache";
-    std::ofstream stream(cachePath);
 
-    if (!stream.is_open())
+    std::stringstream stream;
+    for (auto& [uuid, resource] : m_resources)
+    {
+        if (!resource || !resource->Exists())
+            continue;
+        stream << uuid << " " << std::quoted(resource->GetPath().generic_string()) << "\n";
+    }
+    
+    std::ofstream fileStream(cachePath);
+
+    if (!fileStream.is_open())
     {
         PrintError("Failed to create cache at %s", cachePath.generic_string().c_str());
         return;
     }
-
-    for (const auto& resource : m_resources | std::views::values)
-    {
-        if (!resource)
-            continue;
-        stream << resource->GetUUID() << " " << std::quoted(resource->GetPath().generic_string()) << "\n";
-    }
+    
+    fileStream << stream.str();
+    fileStream.close();
 }
 
 void ResourceManager::CreateCacheDir()

@@ -103,6 +103,11 @@ bool Shader::Load(ResourceManager* resourceManager)
     };
     
     CppSer::Parser parser(p_path);
+    if (!parser.IsFileOpen())
+    {
+        PrintError("Failed to open shader file: %s", p_path.c_str());
+        return false;
+    }
     if (auto vertPath = parser["vert"].As<std::string>(); !vertPath.empty())
     {
         std::filesystem::path resolvedPath = ResolvePath(vertPath);

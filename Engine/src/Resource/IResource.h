@@ -8,6 +8,7 @@
 #include "Scene/ClassDescriptor.h"
 
 #include "Utils/Event.h"
+#include "Utils/File.h"
 
 class ResourceManager;
 class VulkanRenderer;
@@ -81,7 +82,7 @@ public:
     IResource(const IResource&) = delete;
     IResource(IResource&&) = delete;
     IResource& operator=(const IResource&) = delete;
-    virtual ~IResource() = default;
+    virtual ~IResource();
 
     virtual bool Load(ResourceManager* resourceManager) = 0;
     virtual bool SendToGPU(VulkanRenderer* renderer) = 0;
@@ -94,6 +95,7 @@ public:
     Core::UUID GetUUID() const { return p_uuid; }
     std::filesystem::path GetPath() const { return p_path; }
 
+    virtual bool Exists() const { return File::Exist(p_path); }
     virtual std::string GetName(bool extension = false) const;
     bool IsLoaded() const { return p_isLoaded; }
     bool IsLoading() const { return p_isLoading; }

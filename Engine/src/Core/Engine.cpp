@@ -32,16 +32,6 @@ Engine* Engine::Create()
 }
 
 
-void Engine::MipMapInit()
-{
-    //TODO: move this on cubemap class to create on send to gpu method
-    int size = 256;
-    int mipLevels = static_cast<int>(floor(log2(size))) + 1;
-    // auto mipmapCompute = m_resourceManager->Load<ComputeShader>(RESOURCE_PATH"/shaders/PBR/mapPrefilter.compute");
-
-    // Dispatch for each faces
-}
-
 bool Engine::Initialize(EngineDesc desc)
 {
     m_window = desc.window;
@@ -64,11 +54,19 @@ bool Engine::Initialize(EngineDesc desc)
 
     m_resourceManager = std::make_unique<ResourceManager>();
     m_resourceManager->Initialize(m_renderer.get());
-    m_resourceManager->LoadDefaultTexture(RESOURCE_PATH"/textures/debug.jpeg");
-    m_resourceManager->LoadBlankTexture(RESOURCE_PATH"/textures/blank.png");
-    m_resourceManager->LoadDefaultCubeMap(RESOURCE_PATH"/envMap/clearNight.hdr");
-    m_resourceManager->LoadDefaultShader(RESOURCE_PATH"/shaders/PBR/PBR.shader");
-    m_resourceManager->LoadDefaultMaterial(RESOURCE_PATH"/shaders/unlit.mat");
+    
+    // Create default resources
+    {
+        m_resourceManager->LoadDefaultTexture(RESOURCE_PATH"/textures/debug.jpeg");
+        m_resourceManager->LoadBlankTexture(RESOURCE_PATH"/textures/blank.png");
+        m_resourceManager->LoadDefaultCubeMap(RESOURCE_PATH"/envMap/clearNight.hdr");
+        m_resourceManager->LoadDefaultShader(RESOURCE_PATH"/shaders/PBR/PBR.shader");
+        m_resourceManager->LoadDefaultMaterial(RESOURCE_PATH"/materials/pbr.mat");
+
+        SafePtr<Shader> unlit = m_resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/Unlit/Unlit.shader");
+        SafePtr<Material> mat = m_resourceManager->CreateMaterial(RESOURCE_PATH"/materials/unlit.mat");
+        mat->SetShader(unlit);
+    }
 
     m_renderer->GetLineRenderer()->Initialize(m_renderer.get());
     m_renderer->GetSkyboxRenderer()->Initialize();

@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <set>
 #include <galaxymath/Maths.h>
 
 #include "IResource.h"
@@ -76,7 +77,7 @@ public:
     void SetAttribute(const std::string& name, const SafePtr<CubeMap>& cubeMap);
     void SetAttribute(const std::string& name, const Mat4& attribute);
 
-    void SendAllValues(VulkanRenderer* renderer) const;
+    void SendAllValues(VulkanRenderer* renderer);
 
     bool Bind(VulkanRenderer* renderer);
 
@@ -93,6 +94,8 @@ private:
     
     MaterialAttributes m_attributes;
     MaterialAttributes m_temporaryAttributes;
+    
+    std::unordered_map<std::string, uint32_t> m_attributesToSync;
 
     EventHandle m_shaderChangeEvent;
 };

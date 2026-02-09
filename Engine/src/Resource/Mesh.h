@@ -39,6 +39,8 @@ public:
     bool Load(ResourceManager* resourceManager) override;
     bool SendToGPU(VulkanRenderer* renderer) override;
     void Unload() override;
+    
+    bool Exists() const override;
 
     VulkanVertexBuffer* GetVertexBuffer() const { return m_vertexBuffer.get(); }
     VulkanIndexBuffer* GetIndexBuffer() const { return m_indexBuffer.get(); }
