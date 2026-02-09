@@ -19,7 +19,7 @@ uint64_t align(uint64_t value, uint64_t alignement)
 
 void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
 {
-    auto &res = d.AddProperty("Block Size", PropertyType::Vec3i, &m_particleSettings.general.particleAmount);
+    auto &res = d.AddVec3i("Block Size", m_particleSettings.general.particleAmount);
     res.setter = [this](void *value)
         {
             Vec3i *val = static_cast<Vec3i *>(value);
@@ -43,7 +43,7 @@ void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
             m_needsRecreation = true;
         };
 
-    auto &res3 = d.AddProperty("Solid Layers", PropertyType::Int, &m_particleSettings.general.solidLayers);
+    auto &res3 = d.AddInt("Solid Layers", m_particleSettings.general.solidLayers);
     res3.setter = [this](void *value)
         {
             int *val = static_cast<int *>(value);
@@ -54,7 +54,7 @@ void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
             m_needsRecreation = true;
         };
 
-    auto &res4 = d.AddProperty("Damping", PropertyType::Float, &m_particleSettings.general.damping);
+    auto &res4 = d.AddFloat("Damping", m_particleSettings.general.damping);
     res4.setter = [this](void *value)
         {
             float *val = static_cast<float *>(value);
@@ -64,8 +64,18 @@ void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
             m_particleSettings.general.damping = *val;
         };
 
-    auto &res5 = d.AddEnum("Shape", reinterpret_cast<int32_t *>(&m_particleSettings.shape.type), m_particleSettings.shape.to_cstr());
+    auto &res5 = d.AddFloat("Connection Strength", m_particleSettings.general.strength);
     res5.setter = [this](void *value)
+        {
+            float *val = static_cast<float *>(value);
+            if (*val < 0)
+                *val = 0;
+
+            m_particleSettings.general.strength = *val;
+        };
+
+    auto &res6 = d.AddEnum("Shape", reinterpret_cast<int32_t *>(&m_particleSettings.shape.type), m_particleSettings.shape.to_cstr());
+    res6.setter = [this](void *value)
         {
             int val = *static_cast<int *>(value);
             if (val < 0)
@@ -145,12 +155,14 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
         Vec3f gravity;
         float deltaTime;
         float damping;
+        float strength;
         uint32_t  particleCount;
     } push0;
 
     push0.gravity = GetGameObject()->GetTransform()->GetWorldRotation().GetInverse() * Vec3f(0, 9.81f, 0);
     push0.deltaTime = std::min(deltaTime, 1/60.0f);
     push0.damping = m_particleSettings.general.damping;
+    push0.strength = m_particleSettings.general.strength;
     push0.particleCount = totalParticleCount;
 
     vkCmdPushConstants(cmd, mat0->GetPipeline()->GetPipelineLayout(),

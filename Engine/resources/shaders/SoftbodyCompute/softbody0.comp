@@ -27,6 +27,7 @@ layout(push_constant) uniform Push {
 	vec3 gravity;
     float deltaTime;
 	float damping;
+	float strength;
     uint  particleCount;
 } pc;
 
@@ -55,7 +56,7 @@ void main()
 		ConnectionData c = connections[cOff + i];
 		vec3 dif = particles[c.particleID].position - pos;
 		float f = length(dif) - c.initialLength;
-		vel += normalize(dif) * (f * pc.deltaTime * 500);
+		vel += normalize(dif) * (f * pc.deltaTime * pc.strength);
 	}
 	
 	vel = vel * max(1 - pc.damping * pc.deltaTime, 0.05);

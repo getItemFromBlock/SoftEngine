@@ -23,6 +23,7 @@ struct BodySettings
         Vec2i surfacePoints = Vec2i(32, 32);
         Vec2f surfaceHeightBounds = Vec2f(-0.3f, 0.3f);
         float damping = 1.0f;
+        float strength = 500.0f;
         uint32_t connectionStrength = 2;
     } general;
 
