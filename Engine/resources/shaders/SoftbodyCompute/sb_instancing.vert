@@ -13,8 +13,8 @@ struct ParticleData {
 };
 
 layout(push_constant) uniform Push {
+	mat4 transform;
     ivec3 size;
-    float unused;
 } pc;
 
 layout(set = 0, binding = 2) readonly buffer Particles {
@@ -30,6 +30,7 @@ layout(location = 1) out vec2 vTexCoord;
 
 void main() {
     vec4 worldPos = vec4(inPosition * 0.025 + particles[gl_InstanceIndex].position, 1.0);
+	worldPos = worldPos * pc.transform;
     gl_Position = cameraUBO.viewProj * worldPos;
     vTexCoord = inTexCoord;
 	int a = gl_InstanceIndex / (pc.size.x * pc.size.z);

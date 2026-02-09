@@ -54,8 +54,18 @@ void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
             m_needsRecreation = true;
         };
 
-    auto &res4 = d.AddEnum("Shape", reinterpret_cast<int32_t *>(&m_particleSettings.shape.type), m_particleSettings.shape.to_cstr());
+    auto &res4 = d.AddProperty("Damping", PropertyType::Float, &m_particleSettings.general.damping);
     res4.setter = [this](void *value)
+        {
+            float *val = static_cast<float *>(value);
+            if (*val < 0)
+                *val = 0;
+
+            m_particleSettings.general.damping = *val;
+        };
+
+    auto &res5 = d.AddEnum("Shape", reinterpret_cast<int32_t *>(&m_particleSettings.shape.type), m_particleSettings.shape.to_cstr());
+    res5.setter = [this](void *value)
         {
             int val = *static_cast<int *>(value);
             if (val < 0)
@@ -66,6 +76,11 @@ void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
             m_particleSettings.shape.type = BodySettings::Shape::Type(val);
             m_needsRecreation = true;
         };
+
+    d.AddButton("Reset", [this](void *value)
+        {
+            m_needsRecreation = true;
+        });
 }
 
 void GPUSoftBodyComponent::OnCreate()
@@ -96,12 +111,6 @@ void GPUSoftBodyComponent::OnCreate()
         });
     
     CreateParticleBuffers();
-    
-    auto transform = p_gameObject->GetTransform();
-    transform->EOnUpdateModelMatrix += [this]()
-    {
-        ApplySettings();  
-    };
 }
 
 void GPUSoftBodyComponent::OnUpdate(float deltaTime)
@@ -131,18 +140,21 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
 
     mat0->BindForCompute(cmd, renderer->GetFrameIndex());
 
-    struct Push
+    struct Push0
     {
+        Vec3f gravity;
         float deltaTime;
-        uint32_t particleCount;
-    } push;
+        float damping;
+        uint32_t  particleCount;
+    } push0;
 
-    push.deltaTime = std::min(deltaTime, 1/60.0f);
-    push.particleCount = totalParticleCount;
-    
+    push0.gravity = GetGameObject()->GetTransform()->GetWorldRotation().GetInverse() * Vec3f(0, 9.81f, 0);
+    push0.deltaTime = std::min(deltaTime, 1/60.0f);
+    push0.damping = m_particleSettings.general.damping;
+    push0.particleCount = totalParticleCount;
 
     vkCmdPushConstants(cmd, mat0->GetPipeline()->GetPipelineLayout(),
-                       VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(Push), &push);
+                       VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(Push0), &push0);
 
     uint32_t groups = (totalParticleCount + 63) / 64;
     mat0->DispatchCompute(renderer, groups, 1, 1);
@@ -168,8 +180,17 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
 
     mat1->BindForCompute(cmd, renderer->GetFrameIndex());
 
+    struct Push1
+    {
+        float deltaTime;
+        uint32_t particleCount;
+    } push1;
+
+    push1.deltaTime = deltaTime;
+    push1.particleCount = totalParticleCount;
+
     vkCmdPushConstants(cmd, mat1->GetPipeline()->GetPipelineLayout(),
-        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(Push), &push);
+        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(Push1), &push1);
 
     mat1->DispatchCompute(renderer, groups, 1, 1);
 
@@ -212,12 +233,12 @@ void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
     
     struct Push
     {
+        Mat4 transform;
         Vec3i size;
-        float unused;
     } push;
 
+    push.transform = GetGameObject()->GetTransform()->GetWorldMatrix().GetTranspose();
     push.size = m_particleSettings.general.particleAmount;
-    push.unused = 0;
 
 
     vkCmdPushConstants(renderer->GetCommandBuffer(), m_material->GetHandle()->GetPipeline()->GetPipelineLayout(),
@@ -330,10 +351,6 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
 
 void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &particles, std::vector<ConnectionData> &connections)
 {
-    const Vec3f worldPosition = p_gameObject->GetTransform()->GetWorldPosition();
-    const Quat rotation = p_gameObject->GetTransform()->GetWorldRotation();
-    const Vec3f scale = p_gameObject->GetTransform()->GetWorldScale();
-
     const Vec3i amount = m_particleSettings.general.particleAmount;
     const int32_t maxL = m_particleSettings.general.connectionStrength;
 
@@ -347,7 +364,7 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &p
             for (int32_t k = 0; k < amount.z; k++)
             {
                 const Vec3f offset = Vec3f(i / float(amount.x-1), j / float(amount.y-1), k / float(amount.z-1)) - Vec3f(0.5f, 0.5f, 0.5f);
-                const Vec3f pos = worldPosition + rotation * offset * (scale * m_particleSettings.shape.scale * 2);
+                const Vec3f pos = offset * (m_particleSettings.shape.scale * 2);
                 const uint32_t index = i + j * (amount.x * amount.z) + k * (amount.x);
 
                 particles[index].position = pos;
@@ -397,14 +414,13 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &p
     if (m_particleSettings.shape.type != BodySettings::Shape::Type::Cube)
     {
         std::vector<uint32_t> toRemove;
-        const Vec3f center = worldPosition + Vec3f(0.5f, 0.5f, 0.5f);
+        const Vec3f center = Vec3f(0.5f, 0.5f, 0.5f);
         const float maxDist = powf((m_particleSettings.shape.scale), 2) + 0.01f;
         SBParticleData *pPointer = &particles[0];
 
         for (uint32_t i = 0; i < totalParticleCount; i++)
         {
             Vec3f delta = particles[i].position;
-            delta = Vec3f(delta.x / scale.x, delta.y / scale.y, delta.z / scale.z);
             switch (m_particleSettings.shape.type)
             {
             case BodySettings::Shape::Type::Sphere:

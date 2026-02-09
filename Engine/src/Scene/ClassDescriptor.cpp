@@ -29,6 +29,13 @@ Property &ClassDescriptor::AddEnum(const char *name, int32_t *value, const char 
     return res;
 }
 
+Property &ClassDescriptor::AddButton(const char *name, const std::function<void(void *)> &callback)
+{
+    Property &res = AddProperty(name, PropertyType::Button, nullptr);
+    res.setter = callback;
+    return res;
+}
+
 Property& ClassDescriptor::AddVec2f(const char* name, Vec2f& value)
 {
     return AddProperty(name, PropertyType::Vec2f, &value);

@@ -606,6 +606,10 @@ void Inspector::ShowProperty(const ClassDescriptor& descriptor)
         case PropertyType::Transform:
             ShowTransform(property);
             break;
+        case PropertyType::Button:
+            if (ImGui::Button(property.name.c_str()) && property.setter)
+                property.setter(nullptr);
+            break;
         case PropertyType::ParticleSystem:
             ShowParticleSystem(property);
             break;

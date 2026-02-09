@@ -24,11 +24,11 @@ layout(set = 0, binding = 1) buffer Connections {
 };
 
 layout(push_constant) uniform Push {
+	vec3 gravity;
     float deltaTime;
+	float damping;
     uint  particleCount;
 } pc;
-
-const float DAMPING = 1.0;
 
 void main()
 {
@@ -39,7 +39,7 @@ void main()
     vec3 vel = particles[id].velocity;
 	vec3 pos = particles[id].position;
     
-	vel -= vec3(0, 9.81, 0) * pc.deltaTime;
+	vel -= pc.gravity * pc.deltaTime;
 	
 	const uint cCount = particles[id].connectionsCount;
 	const uint cOff = particles[id].connectionsOffset;
@@ -58,7 +58,7 @@ void main()
 		vel += normalize(dif) * (f * pc.deltaTime * 500);
 	}
 	
-	vel = vel * max(1 - DAMPING * pc.deltaTime, 0.05);
+	vel = vel * max(1 - pc.damping * pc.deltaTime, 0.05);
 	
 	float l = length(vel);
 	if (l > 10.)

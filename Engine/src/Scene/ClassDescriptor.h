@@ -31,6 +31,7 @@ enum class PropertyType
     Material,
     Materials,
     Transform,
+    Button,
     ParticleSystem
 };
 
@@ -59,5 +60,6 @@ struct ClassDescriptor
     Property& AddVec4i(const char* name, Vec4i& value);
     Property& AddQuat(const char* name, Quat& value);
     Property& AddEnum(const char* name, int32_t* value, const char* description);
+    Property& AddButton(const char* name, const std::function<void(void *)>& callback);
     Property& AddTexture(const char* name, SafePtr<Texture>& value);
 };
