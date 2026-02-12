@@ -10,7 +10,7 @@ class Inspector : public EditorWindow
 {
 public:
     Inspector(Engine* engine, ImGuiHandler* handler);
-    
+
     void OnRender() override;
     
     void SetSelectedObject(const Core::UUID& uuid);
@@ -20,6 +20,7 @@ private:
     static void ShowProperty(const Property& property);
     static void UpdateProperty(const Property& property, void* newValue);
     
+    #pragma region Property Renderers
     static void RenderBoolProperty(const Property& property, const std::string& id);
     static void RenderIntProperty(const Property& property, const std::string& id);
     static void RenderFloatProperty(const Property& property, const std::string& id);
@@ -34,6 +35,7 @@ private:
     static void RenderMeshProperty(const Property& property, const std::string& id);
     static void RenderMaterialProperty(const Property& property, const std::string& id);
     static void RenderListProperty(const Property& property, const std::string& id);
+    #pragma endregion 
     
     static void* GetListElement(const Property& property, size_t index);
     static size_t GetListSize(const Property& property);
@@ -42,13 +44,6 @@ private:
 
     template <typename T>
     static SafePtr<T> DisplayResourcePopup();
-    
-    void ShowMaterials(const Property& property);
-    void ShowMesh(const Property& property);
-    void ShowTransform(const Property& property);
-    void ShowParticleSystem(const Property& property);
-    void ShowTexture(const Property& property);
-    void ShowCubeMap(const Property& property);
 
     template<typename T>
     const ClassDescriptor& GetDescriptor(const Core::UUID& uuid, SafePtr<T> descriptorContainer)
@@ -58,6 +53,9 @@ private:
         return m_descriptors[uuid] = descriptor;
     }
     
+    void DisplayAddComponentPopup() const;
+    
+    static void ShowParticleSystem(const Property& property);
     
 private:
     SceneHolder* m_sceneHolder;

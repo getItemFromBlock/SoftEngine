@@ -11,7 +11,8 @@
     T(const T&) = default;\
     T(T&&) noexcept = default;\
     virtual ~T() override = default;\
-    const char* GetTypeName() const override { return #T; } \
+    static const char* GetStaticTypeName() { return #T; } \
+    const char* GetTypeName() const override { return T::GetStaticTypeName(); } \
     using Super = P;
 
 

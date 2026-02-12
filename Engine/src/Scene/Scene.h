@@ -63,6 +63,8 @@ public:
 
     template<typename T>
     SafePtr<T> AddComponent(GameObject* gameObject);
+    SafePtr<IComponent> AddComponent(GameObject* gameObject, ComponentID id);
+    SafePtr<IComponent> AddComponent(ComponentID id, std::shared_ptr<IComponent> component);
 
     template<typename T>
     void RemoveComponent(GameObject* gameObject);
@@ -71,6 +73,7 @@ public:
     void RemoveAllComponents(GameObject* gameObject);
 #pragma endregion 
     CameraData GetCameraData() const { return m_editorCameraData; }
+    Camera* GetEditorCamera() const { return m_editorCamera.get(); }
     
     LightManager* GetLightManager() const { return m_lightManager.get(); }
 private:
@@ -139,11 +142,8 @@ SafePtr<T> Scene::AddComponent(GameObject* gameObject)
 {
     static_assert(std::is_base_of_v<IComponent, T>, "T must inherit from IComponent");
     auto component = std::make_shared<T>(gameObject);
-
-    std::scoped_lock lock(m_componentsMutex);
-    m_components[ComponentRegister::GetComponentID<T>()].push_back(component);
-    component->OnCreate();
     
+    AddComponent(ComponentRegister::GetComponentID<T>(), component);
     return component;
 }
 

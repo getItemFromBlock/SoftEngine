@@ -15,7 +15,7 @@
 
 #include "Resource/Mesh.h"
 
-Inspector::Inspector(Engine* engine, ImGuiHandler* handler) : EditorWindow(engine, handler)
+Inspector::Inspector(Engine* engine, ImGuiHandler* handler) : EditorWindow(handler)
 {
     m_sceneHolder = engine->GetSceneHolder();
 }
@@ -38,6 +38,7 @@ void Inspector::OnRender()
 
             auto components = object->GetComponents();
             size_t i = 0;
+            Core::UUID deletedID = UUID_INVALID;
             for (SafePtr<IComponent>& component : components)
             {
                 const ClassDescriptor& descriptor = GetDescriptor(component->GetUUID(), component);
@@ -50,11 +51,15 @@ void Inspector::OnRender()
                 }
                 ImGui::SameLine();
 
-                bool destroy = true;
-                const bool open = ImGui::CollapsingHeader(component->GetTypeName(), &destroy,
+                bool visible = true;
+                const bool open = ImGui::CollapsingHeader(component->GetTypeName(), &visible,
                                                           ImGuiTreeNodeFlags_AllowOverlap |
                                                           ImGuiTreeNodeFlags_DefaultOpen);
 
+                if (!visible)
+                {
+                    deletedID = component->GetUUID();
+                }
                 if (open)
                 {
                     ShowDescriptor(descriptor);
@@ -62,6 +67,19 @@ void Inspector::OnRender()
                 ImGui::PopID();
                 i++;
             }
+            if (deletedID != UUID_INVALID)
+            {
+                object->RemoveComponent(deletedID);
+            }
+        
+            ImGui::Separator();
+            ImGui::NewLine();
+            ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Add Component").x) * 0.5f);
+            if (ImGui::Button("Add Component"))
+            {
+                ImGui::OpenPopup("Add Component");
+            }
+            DisplayAddComponentPopup();
         }
     }
     ImGui::End();
@@ -97,10 +115,8 @@ SafePtr<Material> Inspector::DisplayResourcePopup<Material>()
             ImGui::PushID(material->GetUUID());
             if (ImGui::MenuItem(material->GetName().c_str()))
             {
-                result = material;
+                result = resourceManager->Load<Material>(material->GetPath());
                 ImGui::CloseCurrentPopup();
-                ImGui::PopID();
-                break;
             }
             ImGui::PopID();
         }
@@ -122,7 +138,7 @@ SafePtr<Mesh> Inspector::DisplayResourcePopup<Mesh>()
             ImGui::PushID(mesh->GetUUID());
             if (ImGui::MenuItem(mesh->GetName().c_str()))
             {
-                result = mesh;
+                result = resourceManager->Load<Mesh>(mesh->GetPath());
                 ImGui::CloseCurrentPopup();
             }
             ImGui::PopID();
@@ -146,7 +162,7 @@ SafePtr<Texture> Inspector::DisplayResourcePopup<Texture>()
             auto textureID = Editor::Get()->GetImGuiHandler()->GetTextureID(texture.get());
             if (ImGui::ImageButton(texture->GetPath().generic_string().c_str(), textureID, ImVec2(64, 64)))
             {
-                result = texture;
+                result = resourceManager->Load<Texture>(texture->GetPath());
                 ImGui::CloseCurrentPopup();
             }
             ImGui::SameLine();
@@ -171,7 +187,7 @@ SafePtr<CubeMap> Inspector::DisplayResourcePopup<CubeMap>()
             ImGui::PushID(cubeMap->GetUUID());
             if (ImGui::MenuItem(cubeMap->GetName().c_str()))
             {
-                result = cubeMap;
+                result = resourceManager->Load<CubeMap>(cubeMap->GetPath());
                 ImGui::CloseCurrentPopup();
             }
             ImGui::PopID();
@@ -179,97 +195,6 @@ SafePtr<CubeMap> Inspector::DisplayResourcePopup<CubeMap>()
         ImGui::EndPopup();
     }
     return result;
-}
-
-void Inspector::ShowMaterials(const Property& property)
-{
-    auto materials = static_cast<std::vector<SafePtr<Material>>*>(property.data);
-    auto materialList = *materials;
-    size_t i = 0;
-    for (SafePtr<Material>& material : materialList)
-    {
-        ImGui::PushID(material->GetUUID());
-        ImGui::Text("Material %d:", i++);
-        ImGui::SameLine();
-        if (ImGui::Button(material->GetName().c_str()))
-        {
-            ImGui::OpenPopup("Material Popup");
-        }
-        if (ImGui::BeginPopup("Material Popup"))
-        {
-            auto resourceManager = Engine::Get()->GetResourceManager();
-            auto allMaterials = resourceManager->GetAll<Material>();
-            for (auto& mat : allMaterials)
-            {
-                ImGui::PushID(mat->GetUUID());
-                if (ImGui::MenuItem(mat->GetName().c_str()))
-                {
-                    material = mat;
-                }
-                ImGui::PopID();
-            }
-            ImGui::EndPopup();
-        }
-        if (ImGui::TreeNode("Details"))
-        {
-            const ClassDescriptor& descriptor = GetDescriptor(material->GetUUID(), material);
-            ShowDescriptor(descriptor);
-            ImGui::TreePop();
-        }
-        ImGui::PopID();
-    }
-    *materials = materialList;
-}
-
-void Inspector::ShowMesh(const Property& property)
-{
-    SafePtr<Mesh>* meshPtr = static_cast<SafePtr<Mesh>*>(property.data);
-    SafePtr<Mesh> mesh = *meshPtr;
-    auto meshName = mesh->GetName();
-    ImGui::TextUnformatted(("##" + property.name).c_str());
-    ImGui::SameLine();
-    if (ImGui::Button(meshName.c_str()))
-    {
-        ImGui::OpenPopup("Mesh Popup");
-    }
-    if (ImGui::BeginPopup("Mesh Popup"))
-    {
-        auto resourceManager = Engine::Get()->GetResourceManager();
-        auto meshes = resourceManager->GetAll<Mesh>();
-        for (auto& mesh : meshes)
-        {
-            ImGui::PushID(mesh->GetUUID());
-            if (ImGui::MenuItem(mesh->GetName().c_str()))
-            {
-                if (property.setter)
-                    property.setter(&mesh);
-                else
-                    *meshPtr = mesh;
-            }
-            ImGui::PopID();
-        }
-        ImGui::EndPopup();
-    }
-}
-
-void Inspector::ShowTransform(const Property& property)
-{
-    auto transform = static_cast<TransformComponent*>(property.data);
-    Vec3f position = transform->GetLocalPosition();
-    Vec3f eulerRotation = transform->GetLocalRotation().ToEuler();
-    Vec3f scale = transform->GetLocalScale();
-    if (ImGui::DragFloat3("Position", &position.x, 0.1f))
-    {
-        transform->SetLocalPosition(position);
-    }
-    if (ImGui::DragFloat3("Rotation", &eulerRotation.x, 0.1f))
-    {
-        transform->SetLocalRotation(eulerRotation.ToQuaternion());
-    }
-    if (ImGui::DragFloat3("Scale", &scale.x, 0.1f))
-    {
-        transform->SetLocalScale(scale);
-    }
 }
 
 template <typename T>
@@ -329,154 +254,13 @@ bool DisplayParticleValue(const std::string& name, ParticleProperty<T>& property
     return result;
 }
 
-void Inspector::ShowParticleSystem(const Property& property)
-{
-    auto ps = static_cast<ParticleSystemComponent*>(property.data);
-
-    if (!ps) return;
-
-    ParticleSettings& settings = ps->GetSettings();
-
-    bool changed = false;
-
-    bool isPlaying = ps->IsPlaying();
-    if (!isPlaying && ImGui::Button("Play"))
-    {
-        ps->Play();
-    }
-    else if (isPlaying && ImGui::Button("Pause"))
-    {
-        ps->Pause();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Restart"))
-    {
-        ps->Restart();
-    }
-    float currentTime = ps->GetPlaybackTime();
-    if (ImGui::SliderFloat("##PlaybackTime", &currentTime, 0, settings.general.duration))
-    {
-        ps->SetPlaybackTime(currentTime);
-    }
-
-    ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal);
-
-    if (ImGui::CollapsingHeader("General", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        ParticleSettings::General& general = settings.general;
-        ImGui::InputFloat("Duration", &general.duration);
-        ImGui::Checkbox("Looping", &general.looping);
-        changed |= ImGui::Checkbox("Prewarm", &general.preWarm);
-        changed |= DisplayParticleValue("Start Delay", general.startDelay);
-        changed |= DisplayParticleValue("Start Life Time", general.startLifeTime);
-        changed |= DisplayParticleValue("Start Speed", general.startSpeed);
-        changed |= DisplayParticleValue("Start Size", general.startSize);
-        int particleCount = general.particleCount;
-        if (ImGui::InputInt("Particle count", &particleCount) && particleCount > 0)
-        {
-            changed |= true;
-            general.particleCount = particleCount;
-        }
-        changed |= DisplayParticleValue("Start Color", general.startColor);
-        changed |= DisplayParticleValue("Gravity Scale", general.gravityScale);
-    }
-
-    if (ImGui::CollapsingHeader("Emission"))
-    {
-        ParticleSettings::Emission& emission = settings.emission;
-        changed |= DisplayParticleValue("Rate Over Time", emission.rateOverTime);
-    }
-
-    if (ImGui::CollapsingHeader("Shape##Collapsing"))
-    {
-        ParticleSettings::Shape& shape = settings.shape;
-        int index = static_cast<int>(shape.type);
-        if (ImGui::Combo("Shape", &index, ParticleSettings::Shape::to_cstr()))
-        {
-            shape.type = static_cast<ParticleSettings::Shape::Type>(index);
-            changed = true;
-        }
-        switch (shape.type)
-        {
-        case ParticleSettings::Shape::Type::None:
-            break;
-        case ParticleSettings::Shape::Type::Sphere:
-            changed |= ImGui::DragFloat("Radius", &shape.radius);
-            break;
-        case ParticleSettings::Shape::Type::Cube:
-            break;
-        case ParticleSettings::Shape::Type::Cone:
-            break;
-        }
-    }
-
-    if (ImGui::CollapsingHeader("Rendering"))
-    {
-        ParticleSettings::Rendering& rendering = settings.rendering;
-        if (ImGui::Checkbox("Billboard", &rendering.billboard))
-        {
-            ps->SetBillboard(rendering.billboard);
-        }
-        {
-            auto mat = ps->GetMaterial();
-            const ClassDescriptor& descriptor = GetDescriptor(mat->GetUUID(), mat);
-            ShowDescriptor(descriptor);
-        }
-        {
-            Property meshProp;
-            meshProp.name = "Mesh";
-            meshProp.type = PropertyType::Mesh;
-            meshProp.setter = [ps](void* data) { ps->SetMesh(*static_cast<SafePtr<Mesh>*>(data)); };
-            SafePtr<Mesh> mesh = ps->GetMesh();
-            meshProp.data = &mesh;
-            ShowMesh(meshProp);
-        }
-    }
-
-    if (changed)
-    {
-        ps->ApplySettings();
-    }
-}
-
-void Inspector::ShowTexture(const Property& property)
-{
-    auto texturePtr = static_cast<SafePtr<Texture>*>(property.data);
-    if (!texturePtr->getPtr())
-        return;
-
-    ImGui::Text(("##" + property.name).c_str());
-    ImGui::SameLine();
-    auto textureID = m_imguiHandler->GetTextureID(texturePtr->getPtr());
-    if (ImGui::ImageButton((*texturePtr)->GetPath().filename().generic_string().c_str(), textureID, ImVec2(64, 64)))
-    {
-        ImGui::OpenPopup("Resource Popup");
-    }
-    if (auto texture = DisplayResourcePopup<Texture>())
-    {
-        UpdateProperty(property, &texture);
-    }
-}
-
-void Inspector::ShowCubeMap(const Property& property)
-{
-    auto cubeMap = static_cast<SafePtr<CubeMap>*>(property.data);
-    if (!cubeMap->getPtr())
-        return;
-    ImGui::Text(("##" + property.name).c_str());
-    ImGui::SameLine();
-    if (ImGui::Button((*cubeMap)->GetPath().filename().generic_string().c_str()))
-    {
-        ImGui::OpenPopup("Resource Popup");
-    }
-    if (auto cubeMap = DisplayResourcePopup<CubeMap>())
-    {
-        UpdateProperty(property, &cubeMap);
-    }
-}
-
 void Inspector::ShowDescriptor(const ClassDescriptor& descriptor)
 {
+    if (descriptor.properties.size() == 1 && descriptor.properties[0].type == PropertyType::ParticleSystem)
+    {
+        ShowParticleSystem(descriptor.properties[0]);
+        return;
+    }
     if (ImGui::BeginTable("PropertiesTable", 2, ImGuiTableFlags_SizingStretchSame))
     {
         ImGui::TableSetupColumn("Property");
@@ -488,7 +272,6 @@ void Inspector::ShowDescriptor(const ClassDescriptor& descriptor)
             {
                 ImGui::TableNextRow();
 
-                // Property name in first column
                 ImGui::TableSetColumnIndex(0);
                 ImGui::TextUnformatted(property.name.c_str());
                 ImGui::SameLine();
@@ -496,16 +279,23 @@ void Inspector::ShowDescriptor(const ClassDescriptor& descriptor)
                 {
                     AddListElement(property);
                 }
-                ImGui::TableNextRow();
-                ImGui::TableSetColumnIndex(0);
-                ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal);
                 ImGui::TableSetColumnIndex(1);
-                ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal);
-                // List UI in second column
-                ImGui::TableNextRow();
-                ImGui::PushID(property.name.c_str());
-                RenderListProperty(property, "##" + property.name);
-                ImGui::PopID();
+                size_t listSize = GetListSize(property);
+                ImGui::Text("Size %d", listSize);
+
+                if (listSize > 0)
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal);
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal);
+
+                    ImGui::TableNextRow();
+                    ImGui::PushID(property.name.c_str());
+                    RenderListProperty(property, "##" + property.name);
+                    ImGui::PopID();
+                }
             }
             else
             {
@@ -613,17 +403,33 @@ void Inspector::UpdateProperty(const Property& property, void* newValue)
     if (!newValue)
         return;
 
-    // Use setter if available, otherwise write directly
     if (property.setter)
     {
         property.setter(newValue);
     }
     else if (property.data && !property.readOnly)
     {
-        size_t typeSize = GetPropertyTypeSize(property.type);
-        if (typeSize > 0)
+        switch (property.type) // Memcpy only work for primitive types
         {
-            memcpy(property.data, newValue, typeSize);
+        case PropertyType::Texture:
+            *static_cast<SafePtr<Texture>*>(property.data) = *static_cast<SafePtr<Texture>*>(newValue);
+            break;
+        case PropertyType::CubeMap:
+            *static_cast<SafePtr<CubeMap>*>(property.data) = *static_cast<SafePtr<CubeMap>*>(newValue);
+            break;
+        case PropertyType::Mesh:
+            *static_cast<SafePtr<Mesh>*>(property.data) = *static_cast<SafePtr<Mesh>*>(newValue);
+            break;
+        case PropertyType::Material:
+            *static_cast<SafePtr<Material>*>(property.data) = *static_cast<SafePtr<Material>*>(newValue);
+            break;
+        default:
+            size_t typeSize = GetPropertyTypeSize(property.type);
+            if (typeSize > 0)
+            {
+                memcpy(property.data, newValue, typeSize);
+            }
+            break;
         }
     }
 
@@ -769,7 +575,8 @@ void Inspector::RenderTextureProperty(const Property& property, const std::strin
     ImTextureRef textureID;
     if (!texture.getPtr())
     {
-        textureID = Editor::Get()->GetImGuiHandler()->GetTextureID(Engine::Get()->GetResourceManager()->GetDefaultTexture().get());
+        textureID = Editor::Get()->GetImGuiHandler()->GetTextureID(
+            Engine::Get()->GetResourceManager()->GetDefaultTexture().get());
     }
     else
     {
@@ -846,7 +653,7 @@ void Inspector::RenderListProperty(const Property& property, const std::string& 
         ImGui::Text("[%zu]", i);
 
         ImGui::TableSetColumnIndex(1);
-        
+
         Property elementProp = property;
         elementProp.isList = false;
         elementProp.data = GetListElement(property, i);
@@ -1074,31 +881,166 @@ void Inspector::AddListElement(const Property& property)
         static_cast<std::vector<float>*>(property.data)->push_back(0.0f);
         break;
     case PropertyType::Vec2f:
-        static_cast<std::vector<Vec2f>*>(property.data)->push_back(Vec2f(0.0f, 0.0f));
+        static_cast<std::vector<Vec2f>*>(property.data)->emplace_back(0.0f, 0.0f);
         break;
     case PropertyType::Vec3f:
-        static_cast<std::vector<Vec3f>*>(property.data)->push_back(Vec3f(0.0f, 0.0f, 0.0f));
+        static_cast<std::vector<Vec3f>*>(property.data)->emplace_back(0.0f, 0.0f, 0.0f);
         break;
     case PropertyType::Vec4f:
-        static_cast<std::vector<Vec4f>*>(property.data)->push_back(Vec4f(0.0f, 0.0f, 0.0f, 0.0f));
+        static_cast<std::vector<Vec4f>*>(property.data)->emplace_back(0.0f, 0.0f, 0.0f, 0.0f);
         break;
     case PropertyType::Quat:
-        static_cast<std::vector<Quat>*>(property.data)->push_back(Quat());
+        static_cast<std::vector<Quat>*>(property.data)->emplace_back();
         break;
     case PropertyType::Texture:
-        static_cast<std::vector<SafePtr<Texture>>*>(property.data)->push_back(SafePtr<Texture>());
+        static_cast<std::vector<SafePtr<Texture>>*>(property.data)->emplace_back();
         break;
     case PropertyType::CubeMap:
-        static_cast<std::vector<SafePtr<CubeMap>>*>(property.data)->push_back(SafePtr<CubeMap>());
+        static_cast<std::vector<SafePtr<CubeMap>>*>(property.data)->emplace_back();
         break;
     case PropertyType::Mesh:
-        static_cast<std::vector<SafePtr<Mesh>>*>(property.data)->push_back(SafePtr<Mesh>());
+        static_cast<std::vector<SafePtr<Mesh>>*>(property.data)->emplace_back();
         break;
     case PropertyType::Material:
-        static_cast<std::vector<SafePtr<Material>>*>(property.data)->push_back(SafePtr<Material>());
+        static_cast<std::vector<SafePtr<Material>>*>(property.data)->emplace_back();
         break;
     }
 
     if (property.onModified)
         property.onModified();
+}
+
+void Inspector::DisplayAddComponentPopup() const
+{
+    auto componentList = Engine::Get()->GetComponentRegister()->GetComponentTypes();
+    if (ImGui::BeginPopup("Add Component"))
+    {
+        Scene* scene = m_sceneHolder->GetCurrentScene();
+        SafePtr<GameObject> object = scene->GetGameObject(m_selectedObject);
+        ASSERT(object);
+        for (auto& [id, info] : componentList)
+        {
+            if (ImGui::MenuItem(info.GetTypeName()))
+            {
+                scene->AddComponent(object.getPtr(), id);
+                ImGui::CloseCurrentPopup();
+                break;
+            }
+        }
+        ImGui::EndPopup();
+    }
+}
+
+void Inspector::ShowParticleSystem(const Property& property)
+{
+    auto ps = static_cast<ParticleSystemComponent*>(property.data);
+
+    if (!ps) return;
+
+    ParticleSettings& settings = ps->GetSettings();
+
+    bool changed = false;
+
+    bool isPlaying = ps->IsPlaying();
+    if (!isPlaying && ImGui::Button("Play"))
+    {
+        ps->Play();
+    }
+    else if (isPlaying && ImGui::Button("Pause"))
+    {
+        ps->Pause();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Restart"))
+    {
+        ps->Restart();
+    }
+    float currentTime = ps->GetPlaybackTime();
+    if (ImGui::SliderFloat("##PlaybackTime", &currentTime, 0, settings.general.duration))
+    {
+        ps->SetPlaybackTime(currentTime);
+    }
+
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal);
+
+    if (ImGui::CollapsingHeader("General", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ParticleSettings::General& general = settings.general;
+        ImGui::InputFloat("Duration", &general.duration);
+        ImGui::Checkbox("Looping", &general.looping);
+        changed |= ImGui::Checkbox("Prewarm", &general.preWarm);
+        changed |= DisplayParticleValue("Start Delay", general.startDelay);
+        changed |= DisplayParticleValue("Start Life Time", general.startLifeTime);
+        changed |= DisplayParticleValue("Start Speed", general.startSpeed);
+        changed |= DisplayParticleValue("Start Size", general.startSize);
+        int particleCount = general.particleCount;
+        if (ImGui::InputInt("Particle count", &particleCount) && particleCount > 0)
+        {
+            changed |= true;
+            general.particleCount = particleCount;
+        }
+        changed |= DisplayParticleValue("Start Color", general.startColor);
+        changed |= DisplayParticleValue("Gravity Scale", general.gravityScale);
+    }
+
+    if (ImGui::CollapsingHeader("Emission"))
+    {
+        ParticleSettings::Emission& emission = settings.emission;
+        changed |= DisplayParticleValue("Rate Over Time", emission.rateOverTime);
+    }
+
+    if (ImGui::CollapsingHeader("Shape##Collapsing"))
+    {
+        ParticleSettings::Shape& shape = settings.shape;
+        int index = static_cast<int>(shape.type);
+        if (ImGui::Combo("Shape", &index, ParticleSettings::Shape::to_cstr()))
+        {
+            shape.type = static_cast<ParticleSettings::Shape::Type>(index);
+            changed = true;
+        }
+        switch (shape.type)
+        {
+        case ParticleSettings::Shape::Type::None:
+            break;
+        case ParticleSettings::Shape::Type::Sphere:
+            changed |= ImGui::DragFloat("Radius", &shape.radius);
+            break;
+        case ParticleSettings::Shape::Type::Cube:
+            break;
+        case ParticleSettings::Shape::Type::Cone:
+            break;
+        }
+    }
+
+    if (ImGui::CollapsingHeader("Rendering"))
+    {
+        ParticleSettings::Rendering& rendering = settings.rendering;
+        if (ImGui::Checkbox("Billboard", &rendering.billboard))
+        {
+            ps->SetBillboard(rendering.billboard);
+        }
+        {
+            auto mat = ps->GetMaterial();
+            ClassDescriptor descriptor;
+            mat->Describe(descriptor);
+            ShowDescriptor(descriptor);
+        }
+        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal);
+        {
+            ClassDescriptor descriptor;
+            Property meshProp;
+            meshProp.name = "Mesh";
+            meshProp.type = PropertyType::Mesh;
+            meshProp.setter = [ps](void* data) { ps->SetMesh(*static_cast<SafePtr<Mesh>*>(data)); };
+            SafePtr<Mesh> mesh = ps->GetMesh();
+            meshProp.data = &mesh;
+            descriptor.AddProperty(meshProp);
+            ShowDescriptor(descriptor);
+        }
+    }
+
+    if (changed)
+    {
+        ps->ApplySettings();
+    }
 }

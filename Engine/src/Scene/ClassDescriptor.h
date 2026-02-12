@@ -29,8 +29,6 @@ enum class PropertyType
     CubeMap,
     Mesh,
     Material,
-    Materials,
-    Transform,
     ParticleSystem
 };
 
@@ -73,8 +71,6 @@ inline const char* to_string(PropertyType e)
     case PropertyType::CubeMap: return "CubeMap";
     case PropertyType::Mesh: return "Mesh";
     case PropertyType::Material: return "Material";
-    case PropertyType::Materials: return "Materials";
-    case PropertyType::Transform: return "Transform";
     case PropertyType::ParticleSystem: return "ParticleSystem";
     default: return "unknown";
     }

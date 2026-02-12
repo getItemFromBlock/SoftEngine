@@ -62,8 +62,9 @@ void Editor::Initialize()
         auto go = Model::CreateGameObject(model.getPtr(), currentScene);
     });
     
-    // auto go = currentScene->CreateGameObject();
-    // go->AddComponent<TestComponent>();
+    auto go = currentScene->CreateGameObject();
+    go->AddComponent<ParticleSystemComponent>();
+    go->GetTransform()->SetLocalPosition({10, 0, 0});
 }
 
 void Editor::Run()

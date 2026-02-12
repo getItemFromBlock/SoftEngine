@@ -9,7 +9,7 @@ class Engine;
 class EditorWindow
 {
 public:
-    EditorWindow(Engine* engine, ImGuiHandler* imguiHandler) : m_imguiHandler(imguiHandler) {}
+    EditorWindow(ImGuiHandler* imguiHandler) : m_imguiHandler(imguiHandler) {}
     virtual ~EditorWindow() = default;
     
     virtual void OnRender() = 0;

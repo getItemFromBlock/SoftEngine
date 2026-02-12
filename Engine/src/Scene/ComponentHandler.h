@@ -8,7 +8,8 @@
 
 struct ComponentTypeInfo
 {
-    std::unique_ptr<IComponent> (*Create)();
+    std::unique_ptr<IComponent> (*Create)(GameObject*);
+    const char* (*GetTypeName)();
     void (*Describe)(IComponent*, ClassDescriptor&);
 };
 
@@ -24,9 +25,10 @@ public:
         ComponentID id = GetComponentID<T>();
 
         m_types[id] = {
-            []() -> std::unique_ptr<IComponent> {
-                return std::make_unique<T>();
+            [](GameObject* gameObject) -> std::unique_ptr<IComponent> {
+                return std::make_unique<T>(gameObject);
             },
+            &T::GetStaticTypeName,
             [](IComponent* c, ClassDescriptor& d) {
                 static_cast<T*>(c)->Describe(d);
             }
@@ -39,12 +41,16 @@ public:
         return it != m_types.end() ? &it->second : nullptr;
     }
 
+    std::shared_ptr<IComponent> CreateComponent(GameObject* gameObject, uint64_t id);
+
     template<typename T>
     static ComponentID GetComponentID()
     {
         static ComponentID id = s_nextID++;
         return id;
     }
+    
+    std::unordered_map<ComponentID, ComponentTypeInfo> GetComponentTypes() const { return m_types; }
 
 private:
     std::unordered_map<ComponentID, ComponentTypeInfo> m_types;

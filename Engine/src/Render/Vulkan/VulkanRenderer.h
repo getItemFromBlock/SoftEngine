@@ -110,7 +110,7 @@ private:
     void RecreateSwapChain();
     void TransitionImageForPresent() const;
 
-private:
+private:    
     bool m_initialized = false;
     std::unique_ptr<RenderQueueManager> m_renderQueueManager;
     uint64_t p_triangleCount = 0;

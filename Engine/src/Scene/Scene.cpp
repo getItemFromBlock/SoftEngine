@@ -19,11 +19,7 @@ Scene::Scene()
     m_editorCamera->GetTransform()->SetLocalPosition(Vec3f::Zero());
 
     m_editorCamera->GetTransform()->EOnUpdateModelMatrix += [this]()
-    {
-        float aspect = Engine::Get()->GetWindow()->GetAspectRatio();
-        
-        m_editorCamera->SetAspectRatio(aspect);
-        
+    {        
         m_editorCamera->UpdateFrustum();
 
         m_editorCameraData.frustum = m_editorCamera->GetFrustum();
@@ -33,6 +29,9 @@ Scene::Scene()
         m_editorCameraData.up = m_editorCamera->GetTransform()->GetUp();
         m_editorCameraData.position = m_editorCamera->GetTransform()->GetWorldPosition();
     };
+    
+    auto size = Engine::Get()->GetWindow()->GetSize();
+    m_editorCamera->InitializeRenderTarget(Engine::Get()->GetRenderer(), size.x, size.y);
 }
 
 Scene::~Scene()
@@ -43,6 +42,8 @@ Scene::~Scene()
 
 void Scene::OnRender(VulkanRenderer* renderer)
 {
+    m_editorCamera->BeginRenderTarget();
+    m_editorCamera->RenderSkybox(renderer);
     std::scoped_lock lock(m_componentsMutex);
     
     for (const std::vector<std::shared_ptr<IComponent>>& componentList : m_components | std::views::values)
@@ -54,11 +55,14 @@ void Scene::OnRender(VulkanRenderer* renderer)
         }
     }
     
-    m_editorCamera->RenderSkybox(renderer);
     auto renderQueueManager = renderer->GetRenderQueueManager();
     renderQueueManager->SortAll();
     renderQueueManager->ExecuteAll(renderer);
     renderQueueManager->ClearAll();
+    renderer->GetLineRenderer()->Render(renderer, m_editorCameraData.VP);
+    m_editorCamera->EndRenderTarget();
+    
+    renderer->ClearColor();
 }
 
 void Scene::OnUpdate(float deltaTime)
@@ -107,6 +111,25 @@ SafePtr<GameObject> Scene::GetRootObject() const
     if (m_rootUUID != UUID_INVALID)
         return GetGameObject(m_rootUUID);
     return {};
+}
+
+void Scene::DestroyGameObject(GameObject* gameObject)
+{
+    std::scoped_lock lock(m_gameObjectsMutex);
+    
+    auto it = m_gameObjects.find(gameObject->GetUUID());
+    if (it == m_gameObjects.end())
+        return;
+    
+    for (auto& childUUID : gameObject->m_childrenUUID)
+    {
+        GameObject* object = GetGameObject(childUUID).getPtr();
+        DestroyGameObject(object);
+    }
+
+    RemoveAllComponents(gameObject);
+
+    m_gameObjects.erase(it);
 }
 
 void Scene::SetParent(GameObject* object, GameObject* parent)
@@ -161,40 +184,37 @@ std::vector<SafePtr<IComponent>> Scene::GetComponents(const GameObject* gameObje
     return result;
 }
 
-void Scene::DestroyGameObject(GameObject* gameObject)
+SafePtr<IComponent> Scene::AddComponent(GameObject* gameObject, ComponentID id)
 {
-    std::scoped_lock lock(m_gameObjectsMutex);
-    
-    auto it = m_gameObjects.find(gameObject->GetUUID());
-    if (it == m_gameObjects.end())
-        return;
-    
-    for (auto& childUUID : gameObject->m_childrenUUID)
-    {
-        GameObject* object = GetGameObject(childUUID).getPtr();
-        DestroyGameObject(object);
-    }
+    std::shared_ptr<IComponent> component = Engine::Get()->GetComponentRegister()->CreateComponent(gameObject, id);
+    ASSERT(component)
+    return AddComponent(id, component);
+}
 
-    RemoveAllComponents(gameObject);
-
-    m_gameObjects.erase(it);
+SafePtr<IComponent> Scene::AddComponent(ComponentID id, std::shared_ptr<IComponent> component)
+{
+    std::scoped_lock lock(m_componentsMutex);
+    m_components[id].push_back(component);
+    component->OnCreate();
+    return component;
 }
 
 void Scene::RemoveComponent(Core::UUID compId)
 {
+    std::scoped_lock lock(m_componentsMutex);
+
     for (auto& componentList : m_components | std::views::values)
     {
-        auto removeIt = std::ranges::remove_if(componentList,
-           [compId](const std::shared_ptr<IComponent>& component)
-           {
-               if (component->GetUUID() == compId)
-               {
-                   component->OnDestroy();
-                   return true;
-               }
-               return false;
-           }
-        ).begin();
+        std::erase_if(componentList,
+            [compId](const std::shared_ptr<IComponent>& component)
+            {
+                if (component->GetUUID() == compId)
+                {
+                    component->OnDestroy();
+                    return true;
+                }
+                return false;
+            });
     }
 }
 
@@ -204,24 +224,22 @@ void Scene::RemoveAllComponents(GameObject* gameObject)
         return;
 
     std::scoped_lock lock(m_componentsMutex);
-    
+
     for (auto& componentList : m_components | std::views::values)
     {
-        auto removeIt = std::ranges::remove_if(componentList,
-           [gameObject](const std::shared_ptr<IComponent>& component)
-           {
-               if (component->GetGameObject() == gameObject)
-               {
-                   component->OnDestroy();
-                   return true;
-               }
-               return false;
-           }
-        ).begin();
-
-        componentList.erase(removeIt, componentList.end());
+        std::erase_if(componentList,
+            [gameObject](const std::shared_ptr<IComponent>& component)
+            {
+                if (component->GetGameObject() == gameObject)
+                {
+                    component->OnDestroy();
+                    return true;
+                }
+                return false;
+            });
     }
 }
+
 
 void Scene::UpdateCamera(float deltaTime) const
 {

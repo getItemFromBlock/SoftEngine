@@ -42,7 +42,13 @@ void ResourcesWindow::OnRender()
                     ImGui::PopID();
                     continue;
                 }
-                if (ImGui::TreeNode(resource->GetName().c_str()))
+                std::string title = resource->GetName();
+                const char* hint = to_string(resource->GetResourceType());
+                bool open = ImGui::TreeNode(title.c_str());
+                ImGui::SameLine();
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImMax(0.0f, ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(hint).x));
+                ImGui::TextDisabled("%s", hint);
+                if (open)
                 {
                     ImGui::BeginDisabled();
                     ImGui::Text("UUID: %s", std::to_string(resource->GetUUID()).c_str());
@@ -53,9 +59,13 @@ void ResourcesWindow::OnRender()
                     bool sentToGpu = resource->SentToGPU();
                     ImGui::Checkbox("Sent to GPU", &sentToGpu);
                     ImGui::EndDisabled();
-                    ClassDescriptor descriptor;
-                    resource->Describe(descriptor);
-                    Inspector::ShowDescriptor(descriptor);
+                    if (ImGui::TreeNode("Details"))
+                    {
+                        ClassDescriptor descriptor;
+                        resource->Describe(descriptor);
+                        Inspector::ShowDescriptor(descriptor);
+                        ImGui::TreePop();
+                    }
                     ImGui::TreePop();
                 }
                 ImGui::PopID();

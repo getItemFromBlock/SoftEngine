@@ -10,55 +10,11 @@
 
 #include "VulkanCommandPool.h"
 #include "Debug/Log.h"
+#include "Resource/Loader/ImageLoader.h"
 
 VulkanTexture::~VulkanTexture()
 {
     Cleanup();
-}
-
-bool VulkanTexture::LoadFromFile(VulkanDevice* device, const std::string& filepath,
-                                 VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue)
-{
-    if (!device)
-    {
-        return false;
-    }
-
-    m_device = device;
-
-    ImageLoader::Image image;
-    if (!ImageLoader::Load(filepath.c_str(), image))
-        return false;
-
-    p_width = static_cast<uint32_t>(image.size.x);
-    p_height = static_cast<uint32_t>(image.size.y);
-    VkDeviceSize imageSize = p_width * p_height * 4;
-
-    VulkanBuffer stagingBuffer;
-
-    if (!stagingBuffer.Initialize(m_device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
-    {
-        ImageLoader::ImageFree(image);
-        return false;
-    }
-
-    // Copy pixel data to staging buffer
-    if (!CopyDataToBuffer(stagingBuffer, image.data, imageSize))
-    {
-        ImageLoader::ImageFree(image);
-        return false;
-    }
-
-    ImageLoader::ImageFree(image);
-
-    // Create and setup image
-    if (!CreateAndSetupImage(stagingBuffer.GetBuffer(), commandPool, graphicsQueue))
-    {
-        return false;
-    }
-
-    return true;
 }
 
 bool VulkanTexture::CreateFromImage(const ImageLoader::Image& image, VulkanDevice* device,
@@ -94,6 +50,86 @@ bool VulkanTexture::CreateFromImage(const ImageLoader::Image& image, VulkanDevic
     return true;
 }
 
+bool VulkanTexture::CreateRenderTarget(const VkImageCreateInfo& imageInfo, VulkanDevice* device,
+                                       VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue)
+{
+    if (!device)
+    {
+        return false;
+    }
+
+    m_device = device;
+    p_width = imageInfo.extent.width;
+    p_height = imageInfo.extent.height;
+    m_format = imageInfo.format;
+
+    if (vkCreateImage(m_device->GetDevice(), &imageInfo, nullptr, &m_image) != VK_SUCCESS)
+    {
+        return false;
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(m_device->GetDevice(), m_image, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = m_device->FindMemoryType(memRequirements.memoryTypeBits,
+                                                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    if (vkAllocateMemory(m_device->GetDevice(), &allocInfo, nullptr, &m_imageMemory) != VK_SUCCESS)
+    {
+        vkDestroyImage(m_device->GetDevice(), m_image, nullptr);
+        m_image = VK_NULL_HANDLE;
+        return false;
+    }
+
+    vkBindImageMemory(m_device->GetDevice(), m_image, m_imageMemory, 0);
+
+    VkCommandBuffer commandBuffer = BeginSingleTimeCommands(commandPool);
+
+    VkImageMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = m_image;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+    barrier.srcAccessMask = 0;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    vkCmdPipelineBarrier(
+        commandBuffer,
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        0,
+        0, nullptr,
+        0, nullptr,
+        1, &barrier
+    );
+
+    EndSingleTimeCommands(commandBuffer, commandPool, graphicsQueue);
+
+    if (!CreateImageView(VK_IMAGE_ASPECT_COLOR_BIT))
+    {
+        Cleanup();
+        return false;
+    }
+
+    if (!CreateSampler())
+    {
+        Cleanup();
+        return false;
+    }
+
+    return true;
+}
+
 bool VulkanTexture::CreateCubemapFromHDR(const ImageLoader::HDRImage& hdr,
                                          VulkanDevice* device,
                                          VulkanCommandPool* commandPool,
@@ -112,7 +148,7 @@ bool VulkanTexture::CreateCubemapFromHDR(const ImageLoader::HDRImage& hdr,
     p_height = faceSize;
 
     const uint32_t numFaces = 6;
-    VkDeviceSize imageSize = faceSize * faceSize * 4 * sizeof(float) * numFaces; // RGBA32F
+    VkDeviceSize imageSize = faceSize * faceSize * 4 * sizeof(float) * numFaces;
 
     VulkanBuffer stagingBuffer;
     if (!stagingBuffer.Initialize(m_device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -150,17 +186,11 @@ bool VulkanTexture::ConvertEquirectangularToCubemap(const ImageLoader::HDRImage&
     };
 
     CubeFace faces[6] = {
-        // -X
         {Vec3f(0, 0, -1), Vec3f(0, -1, 0), Vec3f(-1, 0, 0)},
-        // +X
         {Vec3f(0, 0, 1), Vec3f(0, -1, 0), Vec3f(1, 0, 0)},
-        // +Y
         {Vec3f(-1, 0, 0), Vec3f(0, 0, 1), Vec3f(0, 1, 0)},
-        // -Y
         {Vec3f(-1, 0, 0), Vec3f(0, 0, -1), Vec3f(0, -1, 0)},
-        // +Z
         {Vec3f(-1, 0, 0), Vec3f(0, -1, 0), Vec3f(0, 0, 1)},
-        // -Z
         {Vec3f(1, 0, 0), Vec3f(0, -1, 0), Vec3f(0, 0, -1)}
     };
 
@@ -179,15 +209,12 @@ bool VulkanTexture::ConvertEquirectangularToCubemap(const ImageLoader::HDRImage&
                     v * faces[face].up
                 );
 
-                // Convert direction to equirectangular coordinates
                 float theta = std::atan2f(dir.z, dir.x);
                 float phi = std::asinf(dir.y);
 
-                // Convert to texture coordinates [0, 1]
                 float texU = (theta / (2.0f * PI)) + 0.5f;
                 float texV = (phi / PI) + 0.5f;
 
-                // Sample from HDR image (with wrapping/clamping)
                 int hdrX = static_cast<int>(texU * hdr.size.x) % hdr.size.x;
                 int hdrY = std::clamp(static_cast<int>(texV * hdr.size.y), 0, static_cast<int>(hdr.size.y - 1));
 
@@ -196,7 +223,6 @@ bool VulkanTexture::ConvertEquirectangularToCubemap(const ImageLoader::HDRImage&
                 int hdrIndex = (hdrY * hdr.size.x + hdrX) * hdr.channels;
                 int outIndex = (face * faceSize * faceSize + y * faceSize + x) * 4;
 
-                // Copy RGB (and add alpha if needed)
                 cubemapData[outIndex + 0] = hdr.data[hdrIndex + 0];
                 cubemapData[outIndex + 1] = hdr.data[hdrIndex + 1];
                 cubemapData[outIndex + 2] = hdr.data[hdrIndex + 2];
@@ -221,7 +247,7 @@ bool VulkanTexture::CreateAndSetupCubemap(VkBuffer stagingBuffer,
     imageInfo.extent.depth = 1;
     imageInfo.mipLevels = 1;
     imageInfo.arrayLayers = 6;
-    imageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT; 
+    imageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -289,7 +315,7 @@ void VulkanTexture::CreateCubemapSampler()
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     samplerInfo.magFilter = VK_FILTER_LINEAR;
     samplerInfo.minFilter = VK_FILTER_LINEAR;
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE; // Important for cubemaps!
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     samplerInfo.anisotropyEnable = VK_TRUE;
@@ -308,7 +334,6 @@ void VulkanTexture::CreateCubemapSampler()
         throw std::runtime_error("Failed to create cubemap sampler!");
     }
 }
-
 
 VkCommandBuffer VulkanTexture::BeginSingleTimeCommands(VulkanCommandPool* commandPool)
 {
@@ -470,7 +495,6 @@ void VulkanTexture::CopyBufferToImage(VkBuffer buffer, VkImage image,
         regions.data()
     );
 
-    // Pass the SAME commandPool pointer to EndSingleTimeCommands
     EndSingleTimeCommands(commandBuffer, commandPool, graphicsQueue);
 }
 
@@ -518,7 +542,6 @@ void VulkanTexture::Cleanup()
 
     VkDevice device = m_device->GetDevice();
 
-    // Cleanup mip level views
     for (auto& mipView : m_mipLevelViews)
     {
         if (mipView != VK_NULL_HANDLE)
@@ -570,7 +593,6 @@ bool VulkanTexture::CreateCubemapWithMips(int resolution, int mipLevels,
     p_height = resolution;
     m_mipLevels = mipLevels;
 
-    // Create image
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -579,7 +601,7 @@ bool VulkanTexture::CreateCubemapWithMips(int resolution, int mipLevels,
     imageInfo.extent.depth = 1;
     imageInfo.mipLevels = mipLevels;
     imageInfo.arrayLayers = 6;
-    imageInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;  // Match your shader's rgba16f
+    imageInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
@@ -592,7 +614,6 @@ bool VulkanTexture::CreateCubemapWithMips(int resolution, int mipLevels,
         return false;
     }
 
-    // Allocate memory
     VkMemoryRequirements memRequirements;
     vkGetImageMemoryRequirements(device->GetDevice(), m_image, &memRequirements);
 
@@ -611,15 +632,12 @@ bool VulkanTexture::CreateCubemapWithMips(int resolution, int mipLevels,
 
     vkBindImageMemory(device->GetDevice(), m_image, m_imageMemory, 0);
 
-    // Transition all mip levels to GENERAL layout for compute shader writes
     TransitionImageLayoutWithMips(m_image, VK_FORMAT_R16G16B16A16_SFLOAT,
                                   VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
                                   mipLevels, 6, commandPool, graphicsQueue);
 
-    // Create full cubemap view (for reading in shaders later)
     CreateCubemapImageView(VK_FORMAT_R16G16B16A16_SFLOAT, mipLevels);
 
-    // Create individual mip level views for storage image binding
     m_mipLevelViews.resize(mipLevels);
     for (int mip = 0; mip < mipLevels; ++mip)
     {
@@ -641,7 +659,6 @@ bool VulkanTexture::CreateCubemapWithMips(int resolution, int mipLevels,
         }
     }
 
-    // Create sampler with mip mapping
     CreateCubemapSamplerWithMips(mipLevels);
 
     return true;
@@ -935,7 +952,6 @@ bool VulkanTexture::CopyDataToBuffer(VulkanBuffer& buffer, const void* data, VkD
 bool VulkanTexture::CreateAndSetupImage(VkBuffer stagingBuffer, VulkanCommandPool* commandBuffer,
                                         VulkanQueue& graphicsQueue)
 {
-    // Create image
     if (!CreateImage(p_width, p_height, m_format, VK_IMAGE_TILING_OPTIMAL,
                      VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
@@ -943,14 +959,12 @@ bool VulkanTexture::CreateAndSetupImage(VkBuffer stagingBuffer, VulkanCommandPoo
         return false;
     }
 
-    // Transition image layout and copy buffer to image
     TransitionImageLayout(commandBuffer, graphicsQueue, VK_IMAGE_LAYOUT_UNDEFINED,
                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     CopyBufferToImage(commandBuffer, graphicsQueue, stagingBuffer, p_width, p_height);
     TransitionImageLayout(commandBuffer, graphicsQueue, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-    // Create image view and sampler
     if (!CreateImageView(VK_IMAGE_ASPECT_COLOR_BIT))
     {
         Cleanup();

@@ -18,17 +18,24 @@ struct CustomAttributes
     size_t size = 0;
 };
 
-template<typename T>
+template <typename T>
 struct Attribute
 {
     std::string uniformName;
     T value;
-    
+
     Attribute() = default;
-    Attribute(const std::string& uniformName, T value) : uniformName(uniformName), value(value) {}
-    
+
+    Attribute(const std::string& uniformName, T value) : uniformName(uniformName), value(value)
+    {
+    }
+
     void operator=(const T& _value) { this->value = _value; }
-    void operator=(const Attribute& attribute) { this->uniformName = attribute.uniformName, this->value = attribute.value; }
+
+    void operator=(const Attribute& attribute)
+    {
+        this->uniformName = attribute.uniformName, this->value = attribute.value;
+    }
 };
 
 struct MaterialAttributes
@@ -41,7 +48,7 @@ struct MaterialAttributes
     std::unordered_map<std::string, Attribute<SafePtr<Texture>>> samplerAttributes;
     std::unordered_map<std::string, Attribute<SafePtr<CubeMap>>> sampler3DAttributes;
     std::unordered_map<std::string, Attribute<Mat4>> matrixAttributes;
-    
+
     void Clear()
     {
         floatAttributes.clear();
@@ -58,13 +65,13 @@ class Material : public IResource
 {
 public:
     DECLARE_RESOURCE_TYPE(Material)
-    
+
     bool Load(ResourceManager* resourceManager) override;
     bool SendToGPU(VulkanRenderer* renderer) override;
     void Unload() override;
-    
+
     void Describe(ClassDescriptor& descriptor) override;
-    
+
     void SetShader(const SafePtr<Shader>& shader);
     SafePtr<Shader> GetShader() const { return m_shader; }
 
@@ -83,18 +90,20 @@ public:
 
     MaterialAttributes GetAttributes() const { return m_attributes; }
     VulkanMaterial* GetHandle() const { return m_handle.get(); }
+
 private:
     void OnShaderChanged();
-    
+
     void SendTexture(Texture* texture, const Uniform& uniform) const;
     void SendCubeMap(CubeMap* cubeMap, const Uniform& uniform) const;
+
 private:
     std::unique_ptr<VulkanMaterial> m_handle;
     SafePtr<Shader> m_shader;
-    
+
     MaterialAttributes m_attributes;
     MaterialAttributes m_temporaryAttributes;
-    
+
     std::unordered_map<std::string, uint32_t> m_attributesToSync;
 
     EventHandle m_shaderChangeEvent;

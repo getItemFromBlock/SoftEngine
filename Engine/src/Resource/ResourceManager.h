@@ -42,7 +42,7 @@ public:
     bool Contains(const Core::UUID& uuid) const;
 
     template<typename T>
-    SafePtr<T> AddResource(std::shared_ptr<T> resource);
+    SafePtr<T> AddResource(const std::shared_ptr<T>& resource);
 
     void AddResource(const Core::UUID& uuid, const std::shared_ptr<IResource>& resource, uint64_t hash);
 
@@ -104,6 +104,8 @@ private:
     Core::UUID m_defaultShader;
     Core::UUID m_defaultMaterial;
     Core::UUID m_defaultCubeMap;
+    
+    std::unordered_map<Core::UUID, std::filesystem::path> m_tempDebug;
 };
 template<typename T>
 std::shared_ptr<T> ResourceManager::GetResource(const std::filesystem::path& resourcePath) const
@@ -145,7 +147,7 @@ std::vector<std::shared_ptr<T>> ResourceManager::GetAll() const
 }
 
 template<typename T>
-SafePtr<T> ResourceManager::AddResource(std::shared_ptr<T> resource)
+SafePtr<T> ResourceManager::AddResource(const std::shared_ptr<T>& resource)
 {
     Hash hash = GetHash(resource->GetPath());
     auto it = m_hashToUUID.find(hash);

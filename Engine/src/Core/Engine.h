@@ -32,6 +32,7 @@ public:
     VulkanRenderer* GetRenderer() const { return m_renderer.get(); }
     SceneHolder* GetSceneHolder() const { return m_sceneHolder.get(); }
     ResourceManager* GetResourceManager() const { return m_resourceManager.get(); }
+    ComponentRegister* GetComponentRegister() const { return m_componentRegister.get(); }
 private:
     Window* m_window;
     std::unique_ptr<VulkanRenderer> m_renderer;

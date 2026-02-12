@@ -4,7 +4,12 @@
 
 #include <string>
 
-#include "Resource/Loader/ImageLoader.h"
+
+namespace ImageLoader
+{
+    struct HDRImage;
+    struct Image;
+}
 
 class VulkanRenderer;
 class VulkanCommandPool;
@@ -18,15 +23,14 @@ public:
     VulkanTexture(const VulkanTexture&) = default;
     VulkanTexture(VulkanTexture&&) noexcept = default;
     virtual ~VulkanTexture();
- 
-    bool LoadFromFile(VulkanDevice* device, const std::string& filepath,
-                      VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);
 
     bool CreateFromImage(const ImageLoader::Image& image, VulkanDevice* device,
                          VulkanCommandPool* commandBuffer, VulkanQueue& graphicsQueue);
+    bool CreateRenderTarget(const VkImageCreateInfo& imageInfo, VulkanDevice* device, VulkanCommandPool* commandPool,
+                            VulkanQueue& graphicsQueue);
     
     bool CreateCubemapFromHDR(const ImageLoader::HDRImage& hdr, VulkanDevice* device, 
-                        VulkanCommandPool* commandPool,VulkanQueue& graphicsQueue);
+                              VulkanCommandPool* commandPool,VulkanQueue& graphicsQueue);
     bool ConvertEquirectangularToCubemap(const ImageLoader::HDRImage& hdr, float* cubemapData, uint32_t faceSize);
     bool CreateAndSetupCubemap(VkBuffer stagingBuffer, uint32_t faceSize, VulkanCommandPool* commandPool,
                                VulkanQueue& graphicsQueue);
@@ -54,7 +58,7 @@ public:
     void TransitionImageLayoutWithMips(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout,
                                        uint32_t mipLevels, uint32_t layerCount, VulkanCommandPool* commandPool,
                                        VulkanQueue& graphicsQueue);
-
+    
     VkImage GetImage() const { return m_image; }
     VkImageView GetImageView() const { return m_imageView; }
     VkSampler GetSampler() const { return m_sampler; }

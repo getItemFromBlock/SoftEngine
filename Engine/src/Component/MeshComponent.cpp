@@ -101,3 +101,9 @@ void MeshComponent::RemoveMaterial(const SafePtr<Material>& material)
         return mat.getPtr() == material.getPtr();
     }));
 }
+
+std::vector<SafePtr<Material>> MeshComponent::GetMaterials() const
+{
+    return m_materials;
+}
+

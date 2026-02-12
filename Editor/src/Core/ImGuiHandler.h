@@ -23,8 +23,9 @@ public:
     void BeginFrame();
     void EndFrame();
 
+    void UpdateTextureID(const Texture* texture);
     ImTextureRef GetTextureID(Texture* texture);
-    ImTextureRef GetCubeMapID(CubeMap* cubeMap);
+
 private:
     VkDescriptorPool m_descriptorPool;
     VulkanDevice* m_device;

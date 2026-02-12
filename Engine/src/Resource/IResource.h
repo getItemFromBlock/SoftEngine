@@ -25,6 +25,7 @@ enum class ResourceType
     Shader,
     Material,
     CubeMap,
+    RenderTargetTexture,
     Count
 };
 

@@ -141,6 +141,24 @@ void ImGuiHandler::EndFrame()
     }
 }
 
+void ImGuiHandler::UpdateTextureID(const Texture* texture)
+{
+    auto it = m_textureIDs.find(texture->GetUUID());
+    if (it != m_textureIDs.end())
+    {
+        ImGui_ImplVulkan_RemoveTexture(it->second);
+        m_textureIDs.erase(it);
+    }
+    
+    auto buffer = texture->GetBuffer();
+    VkDescriptorSet ID = ImGui_ImplVulkan_AddTexture(
+        buffer->GetSampler(),
+        buffer->GetImageView(),
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    );
+    m_textureIDs[texture->GetUUID()] = ID;
+}
+
 ImTextureRef ImGuiHandler::GetTextureID(Texture* texture)
 {
     VkDescriptorSet ID;
@@ -154,28 +172,6 @@ ImTextureRef ImGuiHandler::GetTextureID(Texture* texture)
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         );
         m_textureIDs[texture->GetUUID()] = ID;
-    }
-    else
-    {
-        ID = it->second;
-    }
-    return ImTextureRef(reinterpret_cast<ImTextureID>(ID));
-}
-
-ImTextureRef ImGuiHandler::GetCubeMapID(CubeMap* cubeMap)
-{
-   
-    VkDescriptorSet ID;
-    auto it = m_textureIDs.find(cubeMap->GetUUID());
-    if (it == m_textureIDs.end())
-    {
-        auto buffer = cubeMap->GetBuffer();
-        ID = ImGui_ImplVulkan_AddTexture(
-            buffer->GetSampler(),
-            buffer->GetImageView(),
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-        );
-        m_textureIDs[cubeMap->GetUUID()] = ID;
     }
     else
     {

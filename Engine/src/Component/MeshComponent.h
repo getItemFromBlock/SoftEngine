@@ -9,18 +9,19 @@ class MeshComponent : public IComponent
 {
 public:
     DECLARE_COMPONENT_TYPE(MeshComponent)
-    
+
     void Describe(ClassDescriptor& d) override;
-    
+
     void OnUpdate(float deltaTime) override;
     void OnRender(VulkanRenderer* renderer) override;
-    
+
     void SetMesh(const SafePtr<Mesh>& mesh);
-    
+
     void AddMaterial(const SafePtr<Material>& material);
     void RemoveMaterial(const SafePtr<Material>& material);
-    
-    std::vector<SafePtr<Material>> GetMaterials() const { return m_materials; }
+
+    std::vector<SafePtr<Material>> GetMaterials() const;
+
 private:
     std::vector<SafePtr<Material>> m_materials;
     SafePtr<Mesh> m_mesh;

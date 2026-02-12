@@ -19,6 +19,7 @@
 #include "Component/TestComponent.h"
 #include "Component/TransformComponent.h"
 #include "Component/LightComponent.h"
+#include "Component/ParticleSystemComponent.h"
 
 
 #include "Utils/Color.h"
@@ -76,6 +77,7 @@ bool Engine::Initialize(EngineDesc desc)
     m_componentRegister->RegisterComponent<MeshComponent>();
     m_componentRegister->RegisterComponent<TestComponent>();
     m_componentRegister->RegisterComponent<LightComponent>();
+    m_componentRegister->RegisterComponent<ParticleSystemComponent>();
     
     m_sceneHolder = std::make_unique<SceneHolder>();
     m_sceneHolder->Initialize();
@@ -104,18 +106,7 @@ void Engine::Update()
 
 void Engine::Render()
 {        
-    m_renderer->ClearColor();
-    
-    m_renderer->AddLine(Vec3f(0, 0, 0), Vec3f::Right(), Vec4f(1, 0, 0, 1));
-    m_renderer->AddLine(Vec3f(0, 0, 0), Vec3f::Up(), Vec4f(0, 1, 0, 1));
-    m_renderer->AddLine(Vec3f(0, 0, 0), Vec3f::Forward(), Vec4f(0, 0, 1, 1));
-
     m_sceneHolder->Render(m_renderer.get());
-    
-    auto currentScene = m_sceneHolder->GetCurrentScene();
-    auto cameraData = currentScene->GetCameraData();
-    
-    m_renderer->GetLineRenderer()->Render(m_renderer.get(), cameraData.VP);
 }
 
 void Engine::EndFrame()
