@@ -46,7 +46,7 @@ void ViewportWindow::OnRender()
 
         ImTextureRef textureID = m_imguiHandler->GetTextureID(m_camera->GetRenderTarget().getPtr());
         
-        ImGui::Image(textureID, ImVec2(width, height));
+        ImGui::Image(textureID, ImVec2(int(width), int(height)));
         ImGui::SetCursorPos(ImVec2(cursorPos.x + xPos, cursorPos.y + yPos));
         
         auto renderTargetSize = m_camera->GetRenderTargetSize();

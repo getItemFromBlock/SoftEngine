@@ -160,7 +160,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
         uint32_t particleCount;
     } push1;
 
-    push1.deltaTime = deltaTime;
+    push1.deltaTime = std::min(deltaTime, 1 / 60.0f);
     push1.particleCount = totalParticleCount;
 
     vkCmdPushConstants(cmd, mat1->GetPipeline()->GetPipelineLayout(),
