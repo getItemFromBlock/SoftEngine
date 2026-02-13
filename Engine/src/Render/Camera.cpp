@@ -89,7 +89,7 @@ void Camera::InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, ui
     p_requestedSize = p_renderTargetSize;
 
     std::shared_ptr<RenderTargetTexture> renderTarget = std::make_shared<RenderTargetTexture>("Editor Render Target");
-    renderTarget->CreateRenderTarget(renderer, width, height);
+    renderTarget->CreateRenderTarget(renderer, width, height, VK_FILTER_NEAREST);
     
     m_renderTarget = Engine::Get()->GetResourceManager()->AddResource(renderTarget);
     
@@ -110,7 +110,7 @@ void Camera::ResizeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32
     
     renderer->WaitForGPU();
     
-    m_renderTarget->Resize(renderer, width, height);
+    m_renderTarget->Resize(renderer, width, height, VK_FILTER_NEAREST);
     OnRenderTargetResized.Invoke(Vec2i(static_cast<int32_t>(width), static_cast<int32_t>(height)));
     
     p_renderTargetSize = Vec2i(static_cast<int32_t>(width), static_cast<int32_t>(height));

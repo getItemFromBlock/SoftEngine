@@ -24,7 +24,7 @@ void RenderTargetTexture::Unload()
     }
 }
 
-void RenderTargetTexture::CreateRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height)
+void RenderTargetTexture::CreateRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height, VkFilter filter)
 {
     VulkanDevice* device = renderer->GetDevice();
     
@@ -44,6 +44,7 @@ void RenderTargetTexture::CreateRenderTarget(VulkanRenderer* renderer, uint32_t 
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     
     m_buffer = std::make_unique<VulkanTexture>();
+    m_buffer->SetPreferredFilterType(filter);
     m_buffer->CreateRenderTarget(imageInfo, device, renderer->GetCommandPool(), 
                                            renderer->GetDevice()->GetGraphicsQueue());
     
@@ -57,8 +58,8 @@ void RenderTargetTexture::CreateRenderTarget(VulkanRenderer* renderer, uint32_t 
     p_sendToGPU = true;
 }
 
-void RenderTargetTexture::Resize(VulkanRenderer* renderer, uint32_t width, uint32_t height)
+void RenderTargetTexture::Resize(VulkanRenderer* renderer, uint32_t width, uint32_t height, VkFilter filter)
 {
     Unload();
-    CreateRenderTarget(renderer, width, height);
+    CreateRenderTarget(renderer, width, height, filter);
 }

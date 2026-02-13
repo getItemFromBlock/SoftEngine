@@ -5,5 +5,5 @@
 namespace VulkanUtils
 {
 	void TransitionImageLayout(VulkanCommandPool *_commandBuffer, VulkanQueue &graphicsQueue,
-		VkImageLayout oldLayout, VkImageLayout newLayout, VulkanDevice* m_device, VkImage image);
+		VkImageLayout oldLayout, VkImageLayout newLayout, VulkanDevice* m_device, VkImage image, uint32_t layerCount = 1);
 }

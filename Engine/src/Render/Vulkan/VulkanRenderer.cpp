@@ -654,7 +654,7 @@ void VulkanRenderer::ClearColor() const
     clearValues[0].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
     clearValues[1].depthStencil = {.depth = 1.0f, .stencil = 0};
 
-    if (m_depthBuffer->HasLigma())
+    if (m_depthBuffer->NeedsTransition())
     {
         VulkanUtils::TransitionImageLayout(m_commandPool.get(), m_device->GetGraphicsQueue(),
             VK_IMAGE_LAYOUT_UNDEFINED,

@@ -36,8 +36,6 @@ public:
                                VulkanQueue& graphicsQueue);
     void CreateCubemapImageView(VkFormat format);
     void CreateCubemapSampler();
-    void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout,
-                               uint32_t layerCount, VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);
     void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t layerCount,
                            VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);
     VkCommandBuffer BeginSingleTimeCommands(VulkanCommandPool* commandPool);
@@ -58,6 +56,7 @@ public:
     void TransitionImageLayoutWithMips(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout,
                                        uint32_t mipLevels, uint32_t layerCount, VulkanCommandPool* commandPool,
                                        VulkanQueue& graphicsQueue);
+    void SetPreferredFilterType(VkFilter filterType) { m_preferredFilter = filterType; }
     
     VkImage GetImage() const { return m_image; }
     VkImageView GetImageView() const { return m_imageView; }
@@ -81,6 +80,7 @@ private:
     VkDeviceMemory m_imageMemory = VK_NULL_HANDLE;
     VkImageView m_imageView = VK_NULL_HANDLE;
     VkSampler m_sampler = VK_NULL_HANDLE;
+    VkFilter m_preferredFilter = VK_FILTER_LINEAR;
     VkFormat m_format = VK_FORMAT_R8G8B8A8_SRGB;
     
     uint32_t p_width = 0;
