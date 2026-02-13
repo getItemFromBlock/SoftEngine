@@ -210,6 +210,13 @@ void ResourceManager::LoadDefaultCubeMap(const std::filesystem::path& cubeMapPat
     m_defaultCubeMap = cubeMap->GetUUID();
 }
 
+void ResourceManager::LoadBlankCubeMap(const std::filesystem::path& cubeMapPath)
+{
+    SafePtr<CubeMap> cubeMap = Load<CubeMap>(cubeMapPath, false);
+
+    m_blankCubeMap = cubeMap->GetUUID();
+}
+
 SafePtr<Material> ResourceManager::CreateMaterial(std::filesystem::path path)
 {
     if (path.extension() != ".mat")
@@ -252,6 +259,11 @@ std::shared_ptr<Material> ResourceManager::GetDefaultMaterial() const
 std::shared_ptr<CubeMap> ResourceManager::GetDefaultCubeMap() const
 {
     return GetResource<CubeMap>(m_defaultCubeMap);
+}
+
+std::shared_ptr<CubeMap> ResourceManager::GetBlankCubeMap() const
+{
+    return GetResource<CubeMap>(m_blankCubeMap);
 }
 
 std::filesystem::path ResourceManager::GetCacheDir()

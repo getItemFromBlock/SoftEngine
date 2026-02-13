@@ -76,7 +76,7 @@ inline static std::unordered_map<std::string, ResourceType> extensionToResourceT
 
 #define DECLARE_RESOURCE_TYPE(T) DECLARE_RESOURCE_TYPE_PARENT(T, IResource)
 
-class IResource
+class IResource : public IDescribe
 {
 public:
     IResource(const std::filesystem::path& path);
@@ -88,8 +88,8 @@ public:
     virtual bool Load(ResourceManager* resourceManager) = 0;
     virtual bool SendToGPU(VulkanRenderer* renderer) = 0;
     virtual void Unload() = 0;
-    
-    virtual void Describe(ClassDescriptor& descriptor) {}
+
+    virtual void Describe(ClassDescriptor& descriptor) override {}
     
     virtual ResourceType GetResourceType() const = 0;
 

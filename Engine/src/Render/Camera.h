@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿// Camera.h
+#pragma once
 #include <memory>
 #include <galaxymath/Maths.h>
 
@@ -7,6 +8,7 @@
 #include "Vulkan/VulkanDepthBuffer.h"
 #include "Vulkan/VulkanTexture.h"
 
+class Shader;
 class RenderTargetTexture;
 class CubeMap;
 
@@ -16,16 +18,18 @@ enum class ViewMode
     Orthographic
 };
 
-class Camera
+class Camera : public IDescribe
 {
 public:
     Camera();
-    virtual ~Camera();
+    ~Camera() override;
 
     Mat4 GetViewMatrix() const;
     Mat4 GetProjectionMatrix() const;
     Mat4 GetOrthographicMatrix() const;
     Mat4 GetViewProjectionMatrix() const;
+    
+    void Describe(ClassDescriptor& descriptor) override;
 
     float GetFOV() const;
     void SetFOV(float fov);
@@ -49,8 +53,11 @@ public:
     void UpdateFrustum();
     const Frustum& GetFrustum() const;
 
-    void SetSkybox(SafePtr<CubeMap> skybox);
+    void SetSkybox(const SafePtr<CubeMap>& skybox);
     SafePtr<CubeMap> GetSkybox() const;
+    
+    void SetPostProcess(SafePtr<Shader> shader);
+    SafePtr<Shader> GetPostProcess() const;
     
     void InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height);
     void ResizeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height);
@@ -63,11 +70,9 @@ public:
     void EndRenderTarget();
     
     void RenderSkybox(VulkanRenderer* renderer) const;
+    void RenderPostProcess(VulkanRenderer* renderer) const;
 
     Event<Vec2i> OnRenderTargetResized;
-private:
-    std::shared_ptr<TransformComponent> m_transform;
-    bool m_firstFrame = true;
 
 protected:
     float p_fov = 70.f;
@@ -81,9 +86,17 @@ protected:
     Frustum p_frustum;
     
     SafePtr<CubeMap> m_skybox;
+    SafePtr<Material> m_skyboxMaterial;
+    
+    SafePtr<Mesh> m_quad;
+    SafePtr<Material> m_postProcessMaterial;
     
     Vec2i p_requestedSize;
     Vec2i p_renderTargetSize;
     SafePtr<RenderTargetTexture> m_renderTarget;
     bool m_useRenderTarget = false;
+
+private:
+    std::shared_ptr<TransformComponent> m_transform;
+    bool m_firstFrame = true;
 };

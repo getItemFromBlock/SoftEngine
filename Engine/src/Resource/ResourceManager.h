@@ -68,6 +68,7 @@ public:
     void LoadBlankTexture(const std::filesystem::path& texturePath);
     void LoadDefaultMaterial(const std::filesystem::path& materialPath);
     void LoadDefaultCubeMap(const std::filesystem::path& cubeMapPath);
+    void LoadBlankCubeMap(const std::filesystem::path& cubeMapPath);
 
     SafePtr<Material> CreateMaterial(std::filesystem::path path);
 
@@ -76,6 +77,7 @@ public:
     std::shared_ptr<Texture> GetBlankTexture() const;
     std::shared_ptr<Material> GetDefaultMaterial() const;
     std::shared_ptr<CubeMap> GetDefaultCubeMap() const;
+    std::shared_ptr<CubeMap> GetBlankCubeMap() const;
 
     static std::filesystem::path GetCacheDir();
     static std::filesystem::path GetCompiledCacheDir();
@@ -104,6 +106,7 @@ private:
     Core::UUID m_defaultShader;
     Core::UUID m_defaultMaterial;
     Core::UUID m_defaultCubeMap;
+    Core::UUID m_blankCubeMap;
     
     std::unordered_map<Core::UUID, std::filesystem::path> m_tempDebug;
 };

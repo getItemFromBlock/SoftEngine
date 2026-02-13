@@ -43,7 +43,7 @@ private:
     static void AddListElement(const Property& property);
 
     template <typename T>
-    static SafePtr<T> DisplayResourcePopup();
+    static std::optional<SafePtr<T>> DisplayResourcePopup();
 
     template<typename T>
     const ClassDescriptor& GetDescriptor(const Core::UUID& uuid, SafePtr<T> descriptorContainer)

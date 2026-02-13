@@ -131,3 +131,10 @@ struct ClassDescriptor
     Property& AddCubeMap(const char* name, SafePtr<CubeMap>& value);
     Property& AddMesh(const char* name, SafePtr<Mesh>& value);
 };
+
+class IDescribe
+{
+public:
+    virtual ~IDescribe() = default;
+    virtual void Describe(ClassDescriptor& descriptor) = 0;
+};

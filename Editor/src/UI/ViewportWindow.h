@@ -8,6 +8,7 @@ class ViewportWindow : public EditorWindow
 public:
     ViewportWindow(ImGuiHandler* imguiHandler, Camera* camera);
 
+    void RenderMenuBar() const;
     void OnRender() override;
     
 private:

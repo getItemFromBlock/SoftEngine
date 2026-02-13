@@ -1,5 +1,6 @@
 #include "ViewportWindow.h"
 
+#include "Inspector.h"
 #include "Core/Engine.h"
 #include "Core/ImGuiHandler.h"
 #include "Resource/RenderTargetTexture.h"
@@ -11,10 +12,27 @@ ViewportWindow::ViewportWindow(ImGuiHandler* imguiHandler, Camera* camera): Edit
     };
 }
 
+void ViewportWindow::RenderMenuBar() const
+{
+    if (ImGui::BeginMenuBar())
+    {
+        if (ImGui::BeginMenu("Camera"))
+        {
+            ClassDescriptor descriptor;
+            m_camera->Describe(descriptor);
+            Inspector::ShowDescriptor(descriptor);
+            ImGui::EndMenu();
+        }
+        ImGui::EndMenuBar();
+    }
+}
+
 void ViewportWindow::OnRender()
 {
-    if (ImGui::Begin("Viewport"))
+    if (ImGui::Begin("Viewport", nullptr, ImGuiWindowFlags_MenuBar))
     {
+        RenderMenuBar();
+        
         const float contentWidth = ImGui::GetContentRegionAvail().x;
         const float contentHeight = ImGui::GetContentRegionAvail().y;
 
