@@ -49,9 +49,14 @@ void RenderQueue::SubmitMeshRenderer(GameObject* gameObject, Mesh* mesh,
         
     for (size_t i = 0; i < subMeshes.size(); ++i)
     {
+        if (subMeshes[i].count == 0 || materialCount == 0)
+            continue;
         size_t materialIndex = i % materialCount;
         auto& material = materials[materialIndex];
-            
+     
+        if (!material)
+            continue;
+        
         RenderCommand cmd;
         cmd.mesh = mesh;
         cmd.subMeshIndex = i;

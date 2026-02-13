@@ -21,6 +21,11 @@ public:
     
     SafePtr(const std::weak_ptr<T>& ptr) : weak(ptr) {}
     
+    ~SafePtr()
+    {
+        weak.reset();
+    }
+    
     SafePtr& operator=(const std::shared_ptr<T>& ptr) {
         weak = ptr;
         return *this;

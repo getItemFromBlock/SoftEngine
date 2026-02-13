@@ -4,6 +4,11 @@
 
 #include "Component/TransformComponent.h"
 #include "Physic/Frustum.h"
+#include "Vulkan/VulkanDepthBuffer.h"
+#include "Vulkan/VulkanTexture.h"
+
+class RenderTargetTexture;
+class CubeMap;
 
 enum class ViewMode
 {
@@ -15,9 +20,6 @@ class Camera
 {
 public:
     Camera();
-    Camera& operator=(const Camera& other);
-    Camera(const Camera&);
-    Camera(Camera&&) noexcept;
     virtual ~Camera();
 
     Mat4 GetViewMatrix() const;
@@ -33,9 +35,11 @@ public:
 
     float GetNear() const;
     void SetNear(float near);
+    
+    void SetRenderTargetSize(uint32_t width, uint32_t height);
+    Vec2i GetRenderTargetSize() const;
 
     float GetAspectRatio() const;
-    void SetAspectRatio(float aspectRatio);
 
     void SetClearColor(const Vec4f& color);
     Vec4f GetClearColor() const;
@@ -45,19 +49,41 @@ public:
     void UpdateFrustum();
     const Frustum& GetFrustum() const;
 
+    void SetSkybox(SafePtr<CubeMap> skybox);
+    SafePtr<CubeMap> GetSkybox() const;
+    
+    void InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height);
+    void ResizeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height);
+    void CleanupRenderTarget();
+
+    SafePtr<RenderTargetTexture> GetRenderTarget() const;
+    bool IsUsingRenderTarget() const;
+    
+    void BeginRenderTarget();
+    void EndRenderTarget();
+    
+    void RenderSkybox(VulkanRenderer* renderer) const;
+
+    Event<Vec2i> OnRenderTargetResized;
 private:
     std::shared_ptr<TransformComponent> m_transform;
+    bool m_firstFrame = true;
 
 protected:
     float p_fov = 70.f;
     float p_far = 1000.f;
     float p_near = 0.03f;
-    float p_aspectRatio = 4.f / 3.f;
-    Vec2i p_framebufferSize;
 
     Vec4f p_clearColor = Vec4f(70.f / 255.f, 70.f / 255.f, 70.f / 255.f, 1.00f);
 
     ViewMode p_viewMode = ViewMode::Perspective;
     
     Frustum p_frustum;
+    
+    SafePtr<CubeMap> m_skybox;
+    
+    Vec2i p_requestedSize;
+    Vec2i p_renderTargetSize;
+    SafePtr<RenderTargetTexture> m_renderTarget;
+    bool m_useRenderTarget = false;
 };

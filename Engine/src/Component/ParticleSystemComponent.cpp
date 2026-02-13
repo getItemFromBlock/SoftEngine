@@ -54,11 +54,15 @@ void ParticleSystemComponent::OnCreate()
 
     auto computeShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/ParticleCompute/particle.shader");
     auto instancingShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/Instancing/instancing.shader");
-
-    m_material = resourceManager->CreateMaterial("ParticleInstancing");
-    m_material->SetShader(instancingShader);
     
-    m_material->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
+    m_material = resourceManager->GetResource<Material>("ParticleInstancing");
+    if (!m_material)
+    {
+        m_material = resourceManager->CreateMaterial("ParticleInstancing");
+        m_material->SetShader(instancingShader);
+    
+        m_material->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
+    }
 
     m_mesh = resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cube.obj/Cube.mesh");
     SetParticleCount(m_particleSettings.general.particleCount);

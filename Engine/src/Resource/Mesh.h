@@ -53,6 +53,8 @@ public:
     bool SendToGPU(VulkanRenderer *renderer) override;
     void CreateFrom(float *vertices, uint32_t verticeCount, uint32_t *indices, uint32_t indiceCount, bool isWeighted = false);
     void Unload() override;
+    
+    bool Exists() const override;
 
     VulkanVertexBuffer* GetVertexBuffer() const { return m_vertexBuffer.get(); }
     VulkanIndexBuffer* GetIndexBuffer() const { return m_indexBuffer.get(); }

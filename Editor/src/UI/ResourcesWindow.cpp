@@ -1,14 +1,16 @@
 ﻿#include "ResourcesWindow.h"
 
+#include "Inspector.h"
 #include "Core/Engine.h"
 
 void ResourcesWindow::OnRender()
 {
     if (ImGui::Begin("Resources"))
     {
+        auto engine = Engine::Get();
         ImGui::Text("FPS: %f", ImGui::GetIO().Framerate);
-        ImGui::Text("Triangle Count: %llu", p_engine->GetRenderer()->GetTriangleCount());
-        ImGui::Text("Vertex Count: %llu", p_engine->GetRenderer()->GetVertexCount());
+        ImGui::Text("Triangle Count: %llu", engine->GetRenderer()->GetTriangleCount());
+        ImGui::Text("Vertex Count: %llu", engine->GetRenderer()->GetVertexCount());
         
         if (ImGui::CollapsingHeader("Resources"))
         {
@@ -25,7 +27,7 @@ void ResourcesWindow::OnRender()
                 }
                 ImGui::EndCombo();
             }
-            for (const auto& pair : p_engine->GetResourceManager()->GetResources())
+            for (const auto& pair : engine->GetResourceManager()->GetResources())
             {
                 ImGui::PushID(pair.first);
                 auto resource = pair.second;
@@ -40,10 +42,16 @@ void ResourcesWindow::OnRender()
                     ImGui::PopID();
                     continue;
                 }
-                if (ImGui::TreeNode(resource->GetName().c_str()))
+                std::string title = resource->GetName();
+                const char* hint = to_string(resource->GetResourceType());
+                bool open = ImGui::TreeNode(title.c_str());
+                ImGui::SameLine();
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImMax(0.0f, ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(hint).x));
+                ImGui::TextDisabled("%s", hint);
+                if (open)
                 {
                     ImGui::BeginDisabled();
-                    ImGui::Text("UUID: %llu", resource->GetUUID());
+                    ImGui::Text("UUID: %s", std::to_string(resource->GetUUID()).c_str());
                     ImGui::Text("Type: %s", to_string(resource->GetResourceType()));
                     ImGui::Text("Path: %s", resource->GetPath().generic_string().c_str());
                     bool isLoaded = resource->IsLoaded();
@@ -51,6 +59,13 @@ void ResourcesWindow::OnRender()
                     bool sentToGpu = resource->SentToGPU();
                     ImGui::Checkbox("Sent to GPU", &sentToGpu);
                     ImGui::EndDisabled();
+                    if (ImGui::TreeNode("Details"))
+                    {
+                        ClassDescriptor descriptor;
+                        resource->Describe(descriptor);
+                        Inspector::ShowDescriptor(descriptor);
+                        ImGui::TreePop();
+                    }
                     ImGui::TreePop();
                 }
                 ImGui::PopID();

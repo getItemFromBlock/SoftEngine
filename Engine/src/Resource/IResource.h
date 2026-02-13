@@ -8,6 +8,7 @@
 #include "Scene/ClassDescriptor.h"
 
 #include "Utils/Event.h"
+#include "Utils/File.h"
 
 class ResourceManager;
 class VulkanRenderer;
@@ -23,6 +24,8 @@ enum class ResourceType
     ComputeShader,
     Shader,
     Material,
+    CubeMap,
+    RenderTargetTexture,
     Count
 };
 
@@ -39,6 +42,7 @@ inline const char* to_string(ResourceType e)
     case ResourceType::ComputeShader: return "ComputeShader";
     case ResourceType::Shader: return "Shader";
     case ResourceType::Material: return "Material";
+    case ResourceType::CubeMap: return "CubeMap";
     default: return "unknown";
     }
 }
@@ -57,7 +61,8 @@ inline static std::unordered_map<std::string, ResourceType> extensionToResourceT
     { "frag", ResourceType::FragmentShader },
     { "comp", ResourceType::ComputeShader },
     { "shader", ResourceType::Shader },
-    { "mat", ResourceType::Material }
+    { "mat", ResourceType::Material },
+    { "hdr", ResourceType::CubeMap }
 };
 
 #define DECLARE_RESOURCE_TYPE_PARENT(T, U) \
@@ -78,7 +83,7 @@ public:
     IResource(const IResource&) = delete;
     IResource(IResource&&) = delete;
     IResource& operator=(const IResource&) = delete;
-    virtual ~IResource() = default;
+    virtual ~IResource();
 
     virtual bool Load(ResourceManager* resourceManager) = 0;
     virtual bool SendToGPU(VulkanRenderer* renderer) = 0;
@@ -91,6 +96,7 @@ public:
     Core::UUID GetUUID() const { return p_uuid; }
     std::filesystem::path GetPath() const { return p_path; }
 
+    virtual bool Exists() const { return File::Exist(p_path); }
     virtual std::string GetName(bool extension = false) const;
     bool IsLoaded() const { return p_isLoaded; }
     bool IsLoading() const { return p_isLoading; }

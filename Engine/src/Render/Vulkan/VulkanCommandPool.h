@@ -26,6 +26,8 @@ public:
     void Reset(size_t index);
 
     std::mutex& GetMutex() { return m_mutex; }
+    
+    VulkanDevice* GetDevice() const { return m_device; }
 private:
     VulkanDevice* m_device = nullptr;
     VkCommandPool m_commandPool = VK_NULL_HANDLE;

@@ -24,6 +24,7 @@
 #include "VulkanVertexBuffer.h"
 #include "Render/LineRenderer.h"
 #include "Render/RenderQueue.h"
+#include "Render/SkyboxRenderer.h"
 
 enum class ShaderType;
 class Window;
@@ -75,6 +76,8 @@ public:
     bool BindMaterial(Material* material);
     
     std::unique_ptr<VulkanTexture> CreateTexture(const ImageLoader::Image& image);
+    std::unique_ptr<VulkanTexture> CreateCubeMap(const ImageLoader::HDRImage& image);
+    std::unique_ptr<VulkanTexture> CreateCubeMapWithMips(int resolution, int mipLevels);
     std::unique_ptr<VulkanVertexBuffer> CreateVertexBuffer(const float* data, uint32_t size, uint32_t floatPerVertex);
     std::unique_ptr<VulkanIndexBuffer> CreateIndexBuffer(const uint32_t* data, uint32_t size);
     std::unique_ptr<VulkanShaderBuffer> CreateShaderBuffer(const std::string& code);
@@ -102,12 +105,13 @@ public:
     uint64_t GetVertexCount() const { return p_vertexCount; }
 
     LineRenderer* GetLineRenderer() { return &m_lineRenderer; }
+    SkyboxRenderer* GetSkyboxRenderer() { return &m_skyboxRenderer; }
     void AddLine(const Vec3f& start, const Vec3f& end, const Vec4f& color, float thickness = 1.f);
 private:
     void RecreateSwapChain();
     void TransitionImageForPresent() const;
 
-private:
+private:    
     bool m_initialized = false;
     std::unique_ptr<RenderQueueManager> m_renderQueueManager;
     uint64_t p_triangleCount = 0;
@@ -133,4 +137,5 @@ private:
     uint32_t m_currentFrame = 0;
     
     LineRenderer m_lineRenderer;
+    SkyboxRenderer m_skyboxRenderer;
 };
