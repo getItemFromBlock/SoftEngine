@@ -50,10 +50,10 @@ public:
     void RotateAround(const Vec3f axis, const float angle);
     Vec3f TransformDirection(Vec3f dir) const;
     
+    void SetDirty() { m_dirty = true; }
 public:
     Event<> EOnUpdateModelMatrix;
 private:
-    void SetDirty() { m_dirty = true; }
     
     void UpdateMatrix(bool force = false);
     void ComputeModelMatrix(const Mat4& parentMatrix);

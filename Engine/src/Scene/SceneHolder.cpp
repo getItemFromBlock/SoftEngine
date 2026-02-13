@@ -9,8 +9,7 @@ SceneHolder::SceneHolder()
 
 SceneHolder::~SceneHolder()
 {
-    if (m_currentScene)
-        m_currentScene.reset();
+    m_currentScene.reset();
 }
 
 void SceneHolder::Initialize()

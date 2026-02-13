@@ -1,15 +1,18 @@
 ﻿#include "Editor.h"
+#include "Core/Engine.h"
 
 #include "Component/MeshComponent.h"
 #include "Component/ParticleSystemComponent.h"
 #include "Component/TestComponent.h"
 #include "Component/TransformComponent.h"
-#include "Core/Engine.h"
-#include "Resource/ComputeShader.h"
+#include "Component/LightComponent.h"
 
+#include "Resource/ComputeShader.h"
 #include "Resource/Mesh.h"
 #include "Resource/Model.h"
+
 #include "Scene/GameObject.h"
+
 #include "Utils/Color.h"
 
 Editor::Editor()
@@ -51,14 +54,17 @@ void Editor::Initialize()
     auto model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Cube.obj");
     resourceManager->Load<Model>(RESOURCE_PATH"/models/Suzanne.obj");
     resourceManager->Load<Model>(RESOURCE_PATH"/models/Plane.obj");
-    model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Sponza/sponza.obj");
+    // model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Sponza/sponza.obj");
+    model = resourceManager->Load<Model>(RESOURCE_PATH"models/Sphere.obj");
+    
     model->EOnLoaded.Bind([model, this, currentScene]()
     {
         auto go = Model::CreateGameObject(model.getPtr(), currentScene);
     });
     
-    // auto go = currentScene->CreateGameObject();
-    // go->AddComponent<ParticleSystemComponent>();
+    auto go = currentScene->CreateGameObject();
+    go->AddComponent<ParticleSystemComponent>();
+    go->GetTransform()->SetLocalPosition({10, 0, 0});
 }
 
 void Editor::Run()

@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <set>
 #include <galaxymath/Maths.h>
 
 #include "IResource.h"
@@ -7,6 +8,7 @@
 #include "Utils/Type.h"
 #include "Render/Vulkan/VulkanMaterial.h"
 
+class CubeMap;
 class Shader;
 class Texture;
 
@@ -16,17 +18,24 @@ struct CustomAttributes
     size_t size = 0;
 };
 
-template<typename T>
+template <typename T>
 struct Attribute
 {
     std::string uniformName;
     T value;
-    
+
     Attribute() = default;
-    Attribute(const std::string& uniformName, T value) : uniformName(uniformName), value(value) {}
-    
+
+    Attribute(const std::string& uniformName, T value) : uniformName(uniformName), value(value)
+    {
+    }
+
     void operator=(const T& _value) { this->value = _value; }
-    void operator=(const Attribute& attribute) { this->uniformName = attribute.uniformName, this->value = attribute.value; }
+
+    void operator=(const Attribute& attribute)
+    {
+        this->uniformName = attribute.uniformName, this->value = attribute.value;
+    }
 };
 
 struct MaterialAttributes
@@ -37,8 +46,9 @@ struct MaterialAttributes
     std::unordered_map<std::string, Attribute<Vec3f>> vec3Attributes;
     std::unordered_map<std::string, Attribute<Vec4f>> vec4Attributes;
     std::unordered_map<std::string, Attribute<SafePtr<Texture>>> samplerAttributes;
+    std::unordered_map<std::string, Attribute<SafePtr<CubeMap>>> sampler3DAttributes;
     std::unordered_map<std::string, Attribute<Mat4>> matrixAttributes;
-    
+
     void Clear()
     {
         floatAttributes.clear();
@@ -47,6 +57,7 @@ struct MaterialAttributes
         vec3Attributes.clear();
         vec4Attributes.clear();
         samplerAttributes.clear();
+        sampler3DAttributes.clear();
     }
 };
 
@@ -54,13 +65,13 @@ class Material : public IResource
 {
 public:
     DECLARE_RESOURCE_TYPE(Material)
-    
+
     bool Load(ResourceManager* resourceManager) override;
     bool SendToGPU(VulkanRenderer* renderer) override;
     void Unload() override;
-    
+
     void Describe(ClassDescriptor& descriptor) override;
-    
+
     void SetShader(const SafePtr<Shader>& shader);
     SafePtr<Shader> GetShader() const { return m_shader; }
 
@@ -70,24 +81,30 @@ public:
     void SetAttribute(const std::string& name, const Vec3f& attribute);
     void SetAttribute(const std::string& name, const Vec4f& attribute);
     void SetAttribute(const std::string& name, const SafePtr<Texture>& texture);
+    void SetAttribute(const std::string& name, const SafePtr<CubeMap>& cubeMap);
     void SetAttribute(const std::string& name, const Mat4& attribute);
 
-    void SendAllValues(VulkanRenderer* renderer) const;
+    void SendAllValues(VulkanRenderer* renderer);
 
     bool Bind(VulkanRenderer* renderer);
 
     MaterialAttributes GetAttributes() const { return m_attributes; }
     VulkanMaterial* GetHandle() const { return m_handle.get(); }
+
 private:
     void OnShaderChanged();
-    
+
     void SendTexture(Texture* texture, const Uniform& uniform) const;
+    void SendCubeMap(CubeMap* cubeMap, const Uniform& uniform) const;
+
 private:
     std::unique_ptr<VulkanMaterial> m_handle;
     SafePtr<Shader> m_shader;
-    
+
     MaterialAttributes m_attributes;
     MaterialAttributes m_temporaryAttributes;
+
+    std::unordered_map<std::string, uint32_t> m_attributesToSync;
 
     EventHandle m_shaderChangeEvent;
 };

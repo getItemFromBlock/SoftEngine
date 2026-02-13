@@ -52,6 +52,8 @@ static VkDescriptorType ConvertType(UniformType type)
         return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     case UniformType::SamplerCube:
         return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    case UniformType::ImageCube:
+        return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     default:
         break;
     }
@@ -216,7 +218,7 @@ bool VulkanPipeline::InitializeGraphicsPipeline(const Shader* shader,
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
     VkPipelineDepthStencilStateCreateInfo depthStencil{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
-    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthTestEnable = shader->IsDepthTestEnabled();
     depthStencil.depthWriteEnable = VK_TRUE;
     depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
 
@@ -295,8 +297,8 @@ void VulkanPipeline::Cleanup()
 
 void VulkanPipeline::Bind(VkCommandBuffer commandBuffer, VkPipelineBindPoint bindPoint)
 {
-    if (m_pipeline != VK_NULL_HANDLE)
-        vkCmdBindPipeline(commandBuffer, bindPoint, m_pipeline);
+    ASSERT(m_pipeline != VK_NULL_HANDLE)
+    vkCmdBindPipeline(commandBuffer, bindPoint, m_pipeline);
 }
 
 VkShaderModule VulkanPipeline::CreateShaderModule(const std::vector<char>& code) const

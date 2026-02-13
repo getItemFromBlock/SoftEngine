@@ -106,7 +106,7 @@ bool VulkanRenderer::Initialize(Window* window)
             return false;
         }
         m_syncObjects->ResizeRenderFinishedSemaphores(m_swapChain->GetImageCount());
-
+        
         m_initialized = true;
 
         window->EResizeEvent.Bind([this](Vec2i)
@@ -488,21 +488,21 @@ bool VulkanRenderer::BindMaterial(Material* material)
     if (!material->Bind(this))
         return false;
 
-    auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
-    // Set viewport and scissor dynamically
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(m_swapChain->GetExtent().width);
-    viewport.height = static_cast<float>(m_swapChain->GetExtent().height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent = m_swapChain->GetExtent();
-    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+    // auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
+    // // Set viewport and scissor dynamically
+    // VkViewport viewport{};
+    // viewport.x = 0.0f;
+    // viewport.y = 0.0f;
+    // viewport.width = static_cast<float>(m_swapChain->GetExtent().width);
+    // viewport.height = static_cast<float>(m_swapChain->GetExtent().height);
+    // viewport.minDepth = 0.0f;
+    // viewport.maxDepth = 1.0f;
+    // vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+    //
+    // VkRect2D scissor{};
+    // scissor.offset = {0, 0};
+    // scissor.extent = m_swapChain->GetExtent();
+    // vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
     return true;
 }
@@ -514,8 +514,22 @@ std::unique_ptr<VulkanTexture> VulkanRenderer::CreateTexture(const ImageLoader::
     return texture;
 }
 
+std::unique_ptr<VulkanTexture> VulkanRenderer::CreateCubeMap(const ImageLoader::HDRImage& image)
+{
+    std::unique_ptr<VulkanTexture> texture = std::make_unique<VulkanTexture>();
+    texture->CreateCubemapFromHDR(image, m_device.get(), m_commandPool.get(), m_device->GetGraphicsQueue());
+    return texture;
+}
+
+std::unique_ptr<VulkanTexture> VulkanRenderer::CreateCubeMapWithMips(int resolution, int mipLevels)
+{
+    std::unique_ptr<VulkanTexture> texture = std::make_unique<VulkanTexture>();
+    texture->CreateCubemapWithMips(resolution, mipLevels, m_device.get(), m_commandPool.get(), m_device->GetGraphicsQueue());
+    return texture;
+}
+
 std::unique_ptr<VulkanVertexBuffer> VulkanRenderer::CreateVertexBuffer(const float* data, uint32_t size,
-                                                                    uint32_t floatPerVertex)
+                                                                       uint32_t floatPerVertex)
 {
     std::unique_ptr<VulkanVertexBuffer> vertexBuffer = std::make_unique<VulkanVertexBuffer>();
 
@@ -653,6 +667,8 @@ void VulkanRenderer::RecreateSwapChain()
     // Cleanup old swap chain resources
     m_swapChain->Cleanup();
     m_depthBuffer->Cleanup();
+    
+    // Engine::Get()->GetSceneHolder()->GetCurrentScene()->GetEditorCamera()->SetRenderTargetSize(windowSize.x, windowSize.y);
 
     // Recreate swap chain
     if (!m_swapChain->Initialize(m_device.get(), m_context->GetSurface(), m_window))

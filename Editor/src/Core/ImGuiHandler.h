@@ -8,6 +8,7 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
 
+class CubeMap;
 class Texture;
 class Window;
 class VulkanRenderer;
@@ -22,7 +23,9 @@ public:
     void BeginFrame();
     void EndFrame();
 
+    void UpdateTextureID(const Texture* texture);
     ImTextureRef GetTextureID(Texture* texture);
+
 private:
     VkDescriptorPool m_descriptorPool;
     VulkanDevice* m_device;
