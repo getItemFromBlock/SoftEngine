@@ -1,5 +1,4 @@
-﻿// Camera.h
-#pragma once
+﻿#pragma once
 #include <memory>
 #include <galaxymath/Maths.h>
 
@@ -56,21 +55,24 @@ public:
     void SetSkybox(const SafePtr<CubeMap>& skybox);
     SafePtr<CubeMap> GetSkybox() const;
     
-    void SetPostProcess(SafePtr<Shader> shader);
-    SafePtr<Shader> GetPostProcess() const;
+    void SetPostProcessShader(const SafePtr<Shader>& shader);
+    SafePtr<Shader> GetPostProcessShader() const;
     
     void InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height);
     void ResizeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height);
     void CleanupRenderTarget();
 
     SafePtr<RenderTargetTexture> GetRenderTarget() const;
-    bool IsUsingRenderTarget() const;
     
-    void BeginRenderTarget();
-    void EndRenderTarget();
+    void Begin();
+    void End();
+
+    void UpdateResizeRenderTarget(VulkanRenderer* renderer);
+    void BeginRenderTarget(RenderTargetTexture* rtt);
+    void EndRenderTarget(RenderTargetTexture* rtt);
     
     void RenderSkybox(VulkanRenderer* renderer) const;
-    void RenderPostProcess(VulkanRenderer* renderer) const;
+    void RenderPostProcess(VulkanRenderer* renderer);
 
     Event<Vec2i> OnRenderTargetResized;
 
@@ -85,16 +87,19 @@ protected:
     
     Frustum p_frustum;
     
+    // Skybox
     SafePtr<CubeMap> m_skybox;
     SafePtr<Material> m_skyboxMaterial;
     
+    // Post process
     SafePtr<Mesh> m_quad;
     SafePtr<Material> m_postProcessMaterial;
+    SafePtr<Shader> m_postProcessShader;
+    SafePtr<RenderTargetTexture> m_postProcessRenderTarget;
     
     Vec2i p_requestedSize;
     Vec2i p_renderTargetSize;
     SafePtr<RenderTargetTexture> m_renderTarget;
-    bool m_useRenderTarget = false;
 
 private:
     std::shared_ptr<TransformComponent> m_transform;

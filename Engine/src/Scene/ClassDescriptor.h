@@ -7,6 +7,7 @@
 
 #include "Utils/Type.h"
 
+class Shader;
 class Material;
 class Mesh;
 class CubeMap;
@@ -29,6 +30,7 @@ enum class PropertyType
     CubeMap,
     Mesh,
     Material,
+    Shader,
     ParticleSystem
 };
 
@@ -130,6 +132,7 @@ struct ClassDescriptor
     Property& AddTexture(const char* name, SafePtr<Texture>& value);
     Property& AddCubeMap(const char* name, SafePtr<CubeMap>& value);
     Property& AddMesh(const char* name, SafePtr<Mesh>& value);
+    Property& AddShader(const char* name, SafePtr<Shader>& safe);
 };
 
 class IDescribe

@@ -1,5 +1,4 @@
-﻿// Camera.cpp
-#include "Camera.h"
+﻿#include "Camera.h"
 
 #include <utility>
 
@@ -54,6 +53,12 @@ void Camera::Describe(ClassDescriptor& descriptor)
     descriptor.AddFloat("Far", p_far).setter = [this](void* data) { SetFar(*static_cast<float*>(data)); };
     descriptor.AddColor4("Clear Color", p_clearColor);
     descriptor.AddCubeMap("Skybox", m_skybox).setter = [this](void* data) { SetSkybox(*static_cast<SafePtr<CubeMap>*>(data)); };
+    descriptor.AddShader("Post process", m_postProcessShader).setter = 
+        [this](void* data)
+        {
+            SetPostProcessShader(*static_cast<SafePtr<Shader>*>(data));
+        };
+    // descriptor.AddEnum("View mode", p_viewMode).setter = [this](void* data) { SetViewMode(*static_cast<ViewMode*>(data)); };
     //TODO: Add view mode
 }
 
@@ -140,7 +145,6 @@ void Camera::SetSkybox(const SafePtr<CubeMap>& skybox)
         SafePtr<Shader> skyboxShader = resourceManager->Load<Shader>(RESOURCE_PATH"shaders/Skybox/skybox.shader");
         m_skyboxMaterial->SetShader(skyboxShader);
     }
-    //TODO: Add blank skybox
     m_skyboxMaterial->SetAttribute("skyboxSampler", m_skybox);
 }
 
@@ -149,13 +153,31 @@ SafePtr<CubeMap> Camera::GetSkybox() const
     return m_skybox;
 }
 
-void Camera::SetPostProcess(SafePtr<Shader> shader)
+void Camera::SetPostProcessShader(const SafePtr<Shader>& shader)
 {
+    m_postProcessShader = shader;
+    if (!m_postProcessMaterial && shader)
+    {
+        auto resourceManager = Engine::Get()->GetResourceManager();
+        m_postProcessMaterial = resourceManager->CreateMaterial("Post Process Material");
+        
+        m_quad = resourceManager->Load<Mesh>(RESOURCE_PATH"models/Plane.obj/Plane.mesh");
+        std::shared_ptr<RenderTargetTexture> renderTarget = std::make_shared<RenderTargetTexture>("Editor Render Target Post Process");
+        auto renderer = Engine::Get()->GetRenderer();
+        renderTarget->CreateRenderTarget(renderer, p_renderTargetSize.x, p_renderTargetSize.y);
+        
+        m_postProcessRenderTarget = resourceManager->AddResource(renderTarget);
+    }
+    if (shader)
+    {
+        m_postProcessMaterial->SetShader(shader);
+        m_postProcessMaterial->SetAttribute("albedoSampler", m_renderTarget);
+    }
 }
 
-SafePtr<Shader> Camera::GetPostProcess() const
+SafePtr<Shader> Camera::GetPostProcessShader() const
 {
-    return {};
+    return m_postProcessMaterial->GetShader();
 }
 
 void Camera::InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height)
@@ -167,8 +189,7 @@ void Camera::InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, ui
     renderTarget->CreateRenderTarget(renderer, width, height);
     
     m_renderTarget = Engine::Get()->GetResourceManager()->AddResource(renderTarget);
-    
-    m_useRenderTarget = true;
+
     m_firstFrame = true;
 }
 
@@ -186,6 +207,10 @@ void Camera::ResizeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32
     renderer->WaitForGPU();
     
     m_renderTarget->Resize(renderer, width, height);
+    if (m_postProcessRenderTarget)
+    {
+        m_postProcessRenderTarget->Resize(renderer, width, height);
+    }
     OnRenderTargetResized.Invoke(Vec2i(static_cast<int32_t>(width), static_cast<int32_t>(height)));
     
     p_renderTargetSize = Vec2i(static_cast<int32_t>(width), static_cast<int32_t>(height));
@@ -198,17 +223,14 @@ void Camera::CleanupRenderTarget()
 {
     if (!m_renderTarget)
         return;
-    
-    VulkanRenderer* renderer = Engine::Get()->GetRenderer();
-    if (renderer)
+
+    if (VulkanRenderer* renderer = Engine::Get()->GetRenderer())
     {
         renderer->WaitForGPU();
     }
     
     Engine::Get()->GetResourceManager()->RemoveResource(m_renderTarget->GetUUID());
     m_renderTarget.reset();
-    
-    m_useRenderTarget = false;
 }
 
 SafePtr<RenderTargetTexture> Camera::GetRenderTarget() const
@@ -216,17 +238,28 @@ SafePtr<RenderTargetTexture> Camera::GetRenderTarget() const
     return m_renderTarget;
 }
 
-bool Camera::IsUsingRenderTarget() const
+void Camera::Begin()
 {
-    return m_useRenderTarget;
+    UpdateResizeRenderTarget(Engine::Get()->GetRenderer());
+    BeginRenderTarget(m_renderTarget.getPtr());
+    m_firstFrame = false;
 }
 
-void Camera::BeginRenderTarget()
+void Camera::End()
 {
-    if (!m_useRenderTarget || !m_renderTarget)
+    EndRenderTarget(m_renderTarget.getPtr());
+    RenderPostProcess(Engine::Get()->GetRenderer());
+}
+
+void Camera::UpdateResizeRenderTarget(VulkanRenderer* renderer)
+{
+    ResizeRenderTarget(renderer, p_requestedSize.x, p_requestedSize.y);
+}
+
+void Camera::BeginRenderTarget(RenderTargetTexture* rtt)
+{
+    if (!rtt)
         return;
-    
-    ResizeRenderTarget(Engine::Get()->GetRenderer(), p_requestedSize.x, p_requestedSize.y);
     
     VulkanRenderer* renderer = Engine::Get()->GetRenderer();
     VkCommandBuffer commandBuffer = renderer->GetCommandPool()->GetCommandBuffer(renderer->GetFrameIndex());
@@ -237,7 +270,7 @@ void Camera::BeginRenderTarget()
     barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = m_renderTarget->GetBuffer()->GetImage();
+    barrier.image = rtt->GetBuffer()->GetImage();
     barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = 1;
@@ -262,8 +295,8 @@ void Camera::BeginRenderTarget()
 
     VkExtent2D extent = {static_cast<uint32_t>(p_renderTargetSize.x), static_cast<uint32_t>(p_renderTargetSize.y)};
     renderer->GetRenderPass()->Begin(commandBuffer, 
-                                    m_renderTarget->GetBuffer()->GetImageView(),
-                                    m_renderTarget->GetDepthBuffer()->GetImageView(),
+                                    rtt->GetBuffer()->GetImageView(),
+                                    rtt->GetDepthBuffer()->GetImageView(),
                                     extent,
                                     clearValues);
     VkViewport viewport{};
@@ -279,14 +312,11 @@ void Camera::BeginRenderTarget()
     scissor.offset = {0, 0};
     scissor.extent = extent;
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-    
-    
-    m_firstFrame = false;
 }
 
-void Camera::EndRenderTarget()
+void Camera::EndRenderTarget(RenderTargetTexture* rtt)
 {
-    if (!m_useRenderTarget || !m_renderTarget)
+    if (!rtt)
         return;
     
     VulkanRenderer* renderer = Engine::Get()->GetRenderer();
@@ -300,7 +330,7 @@ void Camera::EndRenderTarget()
     barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = m_renderTarget->GetBuffer()->GetImage();
+    barrier.image = rtt->GetBuffer()->GetImage();
     barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = 1;
@@ -320,9 +350,30 @@ void Camera::EndRenderTarget()
     );
 }
 
-void Camera::RenderPostProcess(VulkanRenderer* renderer) const
+void Camera::RenderPostProcess(VulkanRenderer* renderer)
 {
+    if (!m_postProcessMaterial)
+        return;
     
+    BeginRenderTarget(m_postProcessRenderTarget.getPtr());
+    
+    if (!m_postProcessMaterial.valid() || !m_quad.valid())
+        return;
+    if (!m_postProcessMaterial->SentToGPU() || !m_quad->SentToGPU())
+        return;
+    
+    if (!renderer->BindShader(m_postProcessMaterial->GetShader().getPtr()))
+        return;
+    if (!renderer->BindMaterial(m_postProcessMaterial.getPtr()))
+        return;
+    m_postProcessMaterial->SendAllValues(renderer);
+    renderer->BindVertexBuffers(m_quad->GetVertexBuffer(), m_quad->GetIndexBuffer());
+    uint32_t startIndex = m_quad->GetSubMeshes()[0].startIndex;
+    uint32_t indexCount = m_quad->GetSubMeshes()[0].count;
+    renderer->DrawVertexSubMesh(m_quad->GetIndexBuffer(), 
+                                startIndex, 
+                                indexCount);
+    EndRenderTarget(m_postProcessRenderTarget.getPtr());
 }
 
 void Camera::RenderSkybox(VulkanRenderer* renderer) const

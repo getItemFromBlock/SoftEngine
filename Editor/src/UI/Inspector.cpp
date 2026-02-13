@@ -218,6 +218,34 @@ std::optional<SafePtr<CubeMap>> Inspector::DisplayResourcePopup<CubeMap>()
     return result;
 }
 
+template <>
+std::optional<SafePtr<Shader>> Inspector::DisplayResourcePopup<Shader>()
+{
+    std::optional<SafePtr<Shader>> result;
+    if (ImGui::BeginPopup("Resource Popup"))
+    {
+        auto resourceManager = Engine::Get()->GetResourceManager();
+        auto shaders = resourceManager->GetAll<Shader>();
+        if (ImGui::MenuItem("None"))
+        {
+            result = nullptr;
+            ImGui::CloseCurrentPopup();
+        }
+        for (auto& shader : shaders)
+        {
+            ImGui::PushID(shader->GetUUID());
+            if (ImGui::MenuItem(shader->GetName().c_str()))
+            {
+                result = resourceManager->Load<Shader>(shader->GetPath());
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndPopup();
+    }
+    return result;
+}
+
 template <typename T>
 bool DisplayWithType(const std::string& name, T* value)
 {
@@ -426,6 +454,11 @@ void Inspector::ShowProperty(const Property& property)
     case PropertyType::Material:
         {
             RenderMaterialProperty(property, id);
+            break;
+        }
+    case PropertyType::Shader:
+        {
+            RenderShaderProperty(property, id);
             break;
         }
     default:
@@ -678,6 +711,22 @@ void Inspector::RenderMaterialProperty(const Property& property, const std::stri
     if (result.has_value())
     {
         SafePtr<Material> newValue = result.value();
+        UpdateProperty(property, &newValue);
+    }
+}
+
+void Inspector::RenderShaderProperty(const Property& property, const std::string& id)
+{
+    SafePtr<Shader> shader = *static_cast<SafePtr<Shader>*>(property.data);
+    std::string name = shader ? shader->GetName() : "None";
+    if (ImGui::Button(name.c_str()))
+    {
+        ImGui::OpenPopup("Resource Popup");
+    }
+    auto result = DisplayResourcePopup<Shader>();
+    if (result.has_value())
+    {
+        SafePtr<Shader> newValue = result.value();
         UpdateProperty(property, &newValue);
     }
 }
