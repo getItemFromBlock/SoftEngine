@@ -21,15 +21,20 @@ private:
     static void UpdateProperty(const Property& property, void* newValue);
     
     #pragma region Property Renderers
+    static void RenderButtonProperty(const Property& property, const std::string& id);
     static void RenderBoolProperty(const Property& property, const std::string& id);
     static void RenderIntProperty(const Property& property, const std::string& id);
+    static void RenderIVec2Property(const Property& property, const std::string& id);
+    static void RenderIVec3Property(const Property& property, const std::string& id);
+    static void RenderIVec4Property(const Property& property, const std::string& id);
     static void RenderFloatProperty(const Property& property, const std::string& id);
-    static void RenderVec2Property(const Property& property, const std::string& id);
-    static void RenderVec3Property(const Property& property, const std::string& id);
-    static void RenderVec4Property(const Property& property, const std::string& id);
+    static void RenderFVec2Property(const Property& property, const std::string& id);
+    static void RenderFVec3Property(const Property& property, const std::string& id);
+    static void RenderFVec4Property(const Property& property, const std::string& id);
     static void RenderQuatProperty(const Property& property, const std::string& id);
     static void RenderColor3Property(const Property& property, const std::string& id);
     static void RenderColor4Property(const Property& property, const std::string& id);
+    static void RenderEnumProperty(const Property& property, const std::string& id);
     static void RenderTextureProperty(const Property& property, const std::string& id);
     static void RenderCubeMapProperty(const Property& property, const std::string& id);
     static void RenderMeshProperty(const Property& property, const std::string& id);

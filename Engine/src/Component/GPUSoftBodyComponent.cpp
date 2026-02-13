@@ -19,78 +19,40 @@ uint64_t align(uint64_t value, uint64_t alignement)
 
 void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
 {
-    auto &res = d.AddVec3i("Block Size", m_particleSettings.general.particleAmount);
-    res.setter = [this](void *value)
+    auto &res = d.AddVec3i("Block Size", m_particleSettings.general.particleAmount).SetRangeInt(3, 1024);
+    res.onModified = [this](void)
         {
-            Vec3i *val = static_cast<Vec3i *>(value);
-            for (int i = 0; i < 3; i++)
-            {
-                if ((*val)[i] < 3)
-                    (*val)[i] = 3;
-            }
-            m_particleSettings.general.particleAmount = *val;
             m_needsRecreation = true;
         };
 
-    auto &res2 = d.AddProperty("Connections Amount", PropertyType::Int, &m_particleSettings.general.connectionStrength);
-    res2.setter = [this](void *value)
+    auto &res2 = d.AddProperty("Connections Amount", PropertyType::Int, &m_particleSettings.general.connectionStrength)
+        .SetRangeInt(1, 256);
+    res2.onModified = [this](void)
         {
-            int *val = static_cast<int *>(value);
-            if (*val < 1)
-                *val = 1;
-
-            m_particleSettings.general.connectionStrength = *val;
             m_needsRecreation = true;
         };
 
-    auto &res3 = d.AddInt("Solid Layers", m_particleSettings.general.solidLayers);
-    res3.setter = [this](void *value)
+    auto &res3 = d.AddInt("Solid Layers", m_particleSettings.general.solidLayers).SetRangeInt(1, 1024);
+    res3.onModified = [this](void)
         {
-            int *val = static_cast<int *>(value);
-            if (*val < 1)
-                *val = 1;
-
-            m_particleSettings.general.solidLayers = *val;
             m_needsRecreation = true;
         };
 
-    auto &res4 = d.AddFloat("Damping", m_particleSettings.general.damping);
-    res4.setter = [this](void *value)
-        {
-            float *val = static_cast<float *>(value);
-            if (*val < 0)
-                *val = 0;
+    d.AddFloat("Damping", m_particleSettings.general.damping).SetRangeFloat(0, 65536);
 
-            m_particleSettings.general.damping = *val;
-        };
-
-    auto &res5 = d.AddFloat("Connection Strength", m_particleSettings.general.strength);
-    res5.setter = [this](void *value)
-        {
-            float *val = static_cast<float *>(value);
-            if (*val < 0)
-                *val = 0;
-
-            m_particleSettings.general.strength = *val;
-        };
+    d.AddFloat("Connection Strength", m_particleSettings.general.strength).SetRangeFloat(0, 65536);
 
     auto &res6 = d.AddEnum("Shape", reinterpret_cast<int32_t *>(&m_particleSettings.shape.type), m_particleSettings.shape.to_cstr());
-    res6.setter = [this](void *value)
+    res6.onModified = [this](void)
         {
-            int val = *static_cast<int *>(value);
-            if (val < 0)
-                val = 0;
-            else if (val > 2)
-                val = 2;
-
-            m_particleSettings.shape.type = BodySettings::Shape::Type(val);
             m_needsRecreation = true;
         };
 
-    d.AddButton("Reset", [this](void *value)
+    d.AddButton("Reset")
+        .onModified = [this](void)
         {
             m_needsRecreation = true;
-        });
+        };
 }
 
 void GPUSoftBodyComponent::OnCreate()

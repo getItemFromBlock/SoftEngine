@@ -343,17 +343,17 @@ void Inspector::ShowProperty(const Property& property)
         }
     case PropertyType::Vec2i:
     {
-        RenderVec2IProperty(property, id);
+        RenderIVec2Property(property, id);
         break;
     }
     case PropertyType::Vec3i:
     {
-        RenderVec3IProperty(property, id);
+        RenderIVec3Property(property, id);
         break;
     }
     case PropertyType::Vec4i:
     {
-        RenderVec4IProperty(property, id);
+        RenderIVec4Property(property, id);
         break;
     }
     case PropertyType::Float:
@@ -363,17 +363,17 @@ void Inspector::ShowProperty(const Property& property)
         }
     case PropertyType::Vec2f:
         {
-            RenderVec2FProperty(property, id);
+            RenderFVec2Property(property, id);
             break;
         }
     case PropertyType::Vec3f:
         {
-            RenderVec3FProperty(property, id);
+            RenderFVec3Property(property, id);
             break;
         }
     case PropertyType::Vec4f:
         {
-            RenderVec4FProperty(property, id);
+            RenderFVec4Property(property, id);
             break;
         }
     case PropertyType::Quat:
@@ -425,9 +425,6 @@ void Inspector::ShowProperty(const Property& property)
 
 void Inspector::UpdateProperty(const Property& property, void* newValue)
 {
-    if (!newValue)
-        return;
-
     if (property.setter)
     {
         property.setter(newValue);
@@ -465,6 +462,14 @@ void Inspector::UpdateProperty(const Property& property, void* newValue)
     }
 }
 
+void Inspector::RenderButtonProperty(const Property& property, const std::string& id)
+{
+    if (ImGui::Button(id.c_str()))
+    {
+        UpdateProperty(property, nullptr);
+    }
+}
+
 void Inspector::RenderBoolProperty(const Property& property, const std::string& id)
 {
     bool value = *static_cast<const bool*>(property.data);
@@ -495,28 +500,52 @@ void Inspector::RenderIntProperty(const Property& property, const std::string& i
 void Inspector::RenderIVec2Property(const Property& property, const std::string& id)
 {
     Vec2i value = *static_cast<const Vec2i*>(property.data);
-    if (ImGui::DragInt2(id.c_str(), &value.x))
-    {
+    
+    ImGuiSliderFlags flags = ImGuiSliderFlags_None;
+    bool changed = false;
+
+    if (property.hasRange)
+        changed = ImGui::SliderInt2(id.c_str(), &value.x, property.range.intRange.minInt,
+            property.range.intRange.maxInt);
+    else
+        changed = ImGui::DragInt2(id.c_str(), &value.x);
+
+    if (changed)
         UpdateProperty(property, &value);
-    }
 }
 
 void Inspector::RenderIVec3Property(const Property& property, const std::string& id)
 {
-    Vec3f value = *static_cast<const Vec3f*>(property.data);
-    if (ImGui::DragFloat3(id.c_str(), &value.x, 0.01f))
-    {
+    Vec3i value = *static_cast<const Vec3i*>(property.data);
+    
+    ImGuiSliderFlags flags = ImGuiSliderFlags_None;
+    bool changed = false;
+
+    if (property.hasRange)
+        changed = ImGui::SliderInt3(id.c_str(), &value.x, property.range.intRange.minInt,
+            property.range.intRange.maxInt);
+    else
+        changed = ImGui::DragInt3(id.c_str(), &value.x);
+
+    if (changed)
         UpdateProperty(property, &value);
-    }
 }
 
 void Inspector::RenderIVec4Property(const Property& property, const std::string& id)
 {
-    Vec4f value = *static_cast<const Vec4f*>(property.data);
-    if (ImGui::DragFloat4(id.c_str(), &value.x, 0.01f))
-    {
+    Vec4i value = *static_cast<const Vec4i*>(property.data);
+    
+    ImGuiSliderFlags flags = ImGuiSliderFlags_None;
+    bool changed = false;
+
+    if (property.hasRange)
+        changed = ImGui::SliderInt4(id.c_str(), &value.x, property.range.intRange.minInt,
+            property.range.intRange.maxInt);
+    else
+        changed = ImGui::DragInt4(id.c_str(), &value.x);
+
+    if (changed)
         UpdateProperty(property, &value);
-    }
 }
 
 void Inspector::RenderFloatProperty(const Property& property, const std::string& id)
@@ -527,22 +556,16 @@ void Inspector::RenderFloatProperty(const Property& property, const std::string&
     bool changed = false;
 
     if (property.hasRange)
-    {
         changed = ImGui::SliderFloat(id.c_str(), &value, property.range.floatRange.minFloat,
                                      property.range.floatRange.maxFloat);
-    }
     else
-    {
         changed = ImGui::DragFloat(id.c_str(), &value, 0.01f);
-    }
 
     if (changed)
-    {
         UpdateProperty(property, &value);
-    }
 }
 
-void Inspector::RenderVec2Property(const Property& property, const std::string& id)
+void Inspector::RenderFVec2Property(const Property& property, const std::string& id)
 {
     Vec2f value = *static_cast<const Vec2f*>(property.data);
     if (ImGui::DragFloat2(id.c_str(), &value.x, 0.01f))
@@ -551,7 +574,7 @@ void Inspector::RenderVec2Property(const Property& property, const std::string& 
     }
 }
 
-void Inspector::RenderVec3Property(const Property& property, const std::string& id)
+void Inspector::RenderFVec3Property(const Property& property, const std::string& id)
 {
     Vec3f value = *static_cast<const Vec3f*>(property.data);
     if (ImGui::DragFloat3(id.c_str(), &value.x, 0.01f))
@@ -560,7 +583,7 @@ void Inspector::RenderVec3Property(const Property& property, const std::string& 
     }
 }
 
-void Inspector::RenderVec4Property(const Property& property, const std::string& id)
+void Inspector::RenderFVec4Property(const Property& property, const std::string& id)
 {
     Vec4f value = *static_cast<const Vec4f*>(property.data);
     if (ImGui::DragFloat4(id.c_str(), &value.x, 0.01f))
@@ -617,6 +640,15 @@ void Inspector::RenderColor4Property(const Property& property, const std::string
     if (ImGui::ColorEdit4(id.c_str(), &value.x, flags))
     {
         UpdateProperty(property, &value);
+    }
+}
+
+void Inspector::RenderEnumProperty(const Property & property, const std::string & id)
+{
+    int32_t *index = static_cast<int32_t *>(property.data);
+    if (ImGui::Combo(property.name.c_str(), index, static_cast<const char*>(property.dataDescriptor)))
+    {
+        UpdateProperty(property, index);
     }
 }
 

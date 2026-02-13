@@ -39,15 +39,13 @@ Property& ClassDescriptor::AddQuat(const char* name, Quat& value)
 Property &ClassDescriptor::AddEnum(const char *name, int32_t *value, const char *description)
 {
     Property &res = AddProperty(name, PropertyType::Enum, value);
-    res.desc = description;
+    res.dataDescriptor = description;
     return res;
 }
 
-Property &ClassDescriptor::AddButton(const char *name, const std::function<void(void *)> &callback)
+Property &ClassDescriptor::AddButton(const char *name)
 {
-    Property &res = AddProperty(name, PropertyType::Button, nullptr);
-    res.setter = callback;
-    return res;
+    return AddProperty(name, PropertyType::Button, nullptr);
 }
 
 Property& ClassDescriptor::AddVec2f(const char* name, Vec2f& value)

@@ -16,16 +16,16 @@ class IResource;
 enum class PropertyType
 {
     None,
+    Button,
     Bool,
-    Button, 
-    Float,
-    Vec2f,
-    Vec3f,
-    Vec4f,
     Int,
     Vec2i,
     Vec3i,
     Vec4i,
+    Float,
+    Vec2f,
+    Vec3f,
+    Vec4f,
     Quat,
     Color3,
     Color4,
@@ -45,6 +45,9 @@ inline size_t GetPropertyTypeSize(PropertyType type)
     {
     case PropertyType::Bool: return sizeof(bool);
     case PropertyType::Int: return sizeof(int);
+    case PropertyType::Vec2i: return sizeof(Vec2i);
+    case PropertyType::Vec3i: return sizeof(Vec3i);
+    case PropertyType::Vec4i: return sizeof(Vec4i);
     case PropertyType::Float: return sizeof(float);
     case PropertyType::Vec2f: return sizeof(Vec2f);
     case PropertyType::Vec3f: return sizeof(Vec3f);
@@ -52,11 +55,12 @@ inline size_t GetPropertyTypeSize(PropertyType type)
     case PropertyType::Quat: return sizeof(Quat);
     case PropertyType::Color3: return sizeof(Vec3f);
     case PropertyType::Color4: return sizeof(Vec4f);
+    case PropertyType::Enum: return sizeof(int);
     case PropertyType::Texture: return sizeof(SafePtr<Texture>);
     case PropertyType::CubeMap: return sizeof(SafePtr<CubeMap>);
     case PropertyType::Mesh: return sizeof(SafePtr<Mesh>);
     case PropertyType::Material: return sizeof(SafePtr<Material>);
-    default: return sizeof(void*);
+    default: return 0;
     }
 }
 
@@ -65,15 +69,20 @@ inline const char* to_string(PropertyType e)
     switch (e)
     {
     case PropertyType::None: return "None";
+    case PropertyType::Button: return "Button";
     case PropertyType::Bool: return "Bool";
-    case PropertyType::Float: return "Float";
     case PropertyType::Int: return "Int";
+    case PropertyType::Vec2i: return "Vec2i";
+    case PropertyType::Vec3i: return "Vec3i";
+    case PropertyType::Vec4i: return "Vec4i";
+    case PropertyType::Float: return "Float";
     case PropertyType::Vec2f: return "Vec2f";
     case PropertyType::Vec3f: return "Vec3f";
     case PropertyType::Vec4f: return "Vec4f";
     case PropertyType::Quat: return "Quat";
     case PropertyType::Color3: return "Color3";
     case PropertyType::Color4: return "Color4";
+    case PropertyType::Enum: return "Enum";
     case PropertyType::Texture: return "Texture";
     case PropertyType::CubeMap: return "CubeMap";
     case PropertyType::Mesh: return "Mesh";
@@ -118,6 +127,20 @@ struct Property
     Property() : type(PropertyType::None), data(nullptr)
     {
     }
+
+    Property &SetRangeFloat(float minF, float maxF)
+    {
+        range.floatRange.minFloat = minF;
+        range.floatRange.maxFloat = maxF;
+        return *this;
+    }
+
+    Property &SetRangeInt(int minI, int maxI)
+    {
+        range.intRange.minInt = minI;
+        range.intRange.maxInt = maxI;
+        return *this;
+    }
 };
 
 struct ClassDescriptor
@@ -126,6 +149,7 @@ struct ClassDescriptor
 
     Property& AddProperty(const char* name, PropertyType type, void* data);
     Property& AddProperty(const Property& property);
+    Property& AddButton(const char* name);
     Property& AddBool(const char* name, bool& value);
     Property& AddFloat(const char* name, float& value);
     Property& AddVec2f(const char* name, Vec2f& value);
@@ -139,7 +163,6 @@ struct ClassDescriptor
     Property& AddVec4i(const char* name, Vec4i& value);
     Property& AddQuat(const char* name, Quat& value);
     Property& AddEnum(const char* name, int32_t* value, const char* description);
-    Property& AddButton(const char* name, const std::function<void(void *)>& callback);
     Property& AddTexture(const char* name, SafePtr<Texture>& value);
     Property& AddCubeMap(const char* name, SafePtr<CubeMap>& value);
     Property& AddMesh(const char* name, SafePtr<Mesh>& value);
