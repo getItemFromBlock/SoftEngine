@@ -88,12 +88,15 @@ bool Model::Load(ResourceManager* resourceManager)
             m_meshes.push_back(meshResource);
             
             meshResource->m_vertices = mesh.finalVertices;
+            /*
+            // Unused
             for (const Vec3i& idx : mesh.indices)
             {                
                 meshResource->m_indices.push_back(idx.x);
                 meshResource->m_indices.push_back(idx.y);
                 meshResource->m_indices.push_back(idx.z);
             }
+            */
             meshResource->SetLoaded();
             ASSERT(!meshResource->m_vertices.empty())
             resourceManager->AddResourceToSend(meshResource.getPtr());

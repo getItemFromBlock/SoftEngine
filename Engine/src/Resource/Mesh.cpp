@@ -1,96 +1,9 @@
 ﻿#include "Mesh.h"
 
+#include "Core/Engine.h"
 #include "ResourceManager.h"
 #include "Debug/Log.h"
 #include "Render/Vulkan/VulkanRenderer.h"
-
-class VulkanRenderer;
-
-VkVertexInputBindingDescription Vertex::GetBindingDescription()
-{
-    VkVertexInputBindingDescription bindingDescription = {};
-    bindingDescription.binding = 0;
-    bindingDescription.stride = sizeof(Vertex);
-    bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    return bindingDescription;
-}
-
-std::array<VkVertexInputAttributeDescription, 4> Vertex::GetAttributeDescriptions()
-{
-    std::array<VkVertexInputAttributeDescription, 4> attributeDescriptions{};
-
-    // Position
-    attributeDescriptions[0].binding = 0;
-    attributeDescriptions[0].location = 0;
-    attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[0].offset = offsetof(Vertex, position);
-
-    // Normal
-    attributeDescriptions[1].binding = 0;
-    attributeDescriptions[1].location = 1;
-    attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[1].offset = offsetof(Vertex, normal);
-
-    // Texture coordinates
-    attributeDescriptions[2].binding = 0;
-    attributeDescriptions[2].location = 2;
-    attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-    attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
-
-    // Tangent
-    attributeDescriptions[3].binding = 0;
-    attributeDescriptions[3].location = 3;
-    attributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[3].offset = offsetof(Vertex, tangent);
-
-    return attributeDescriptions;
-}
-
-VkVertexInputBindingDescription WeightedVertex::GetBindingDescription()
-{
-    VkVertexInputBindingDescription bindingDescription = {};
-    bindingDescription.binding = 0;
-    bindingDescription.stride = sizeof(WeightedVertex);
-    bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    return bindingDescription;
-}
-
-std::array<VkVertexInputAttributeDescription, 5> WeightedVertex::GetAttributeDescriptions()
-{
-    std::array<VkVertexInputAttributeDescription, 5> attributeDescriptions{};
-
-    // Position
-    attributeDescriptions[0].binding = 0;
-    attributeDescriptions[0].location = 0;
-    attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[0].offset = offsetof(WeightedVertex, position);
-
-    // Normal
-    attributeDescriptions[1].binding = 0;
-    attributeDescriptions[1].location = 1;
-    attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[1].offset = offsetof(WeightedVertex, normal);
-
-    // Texture coordinates
-    attributeDescriptions[2].binding = 0;
-    attributeDescriptions[2].location = 2;
-    attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-    attributeDescriptions[2].offset = offsetof(WeightedVertex, texCoord);
-
-    // Tangent
-    attributeDescriptions[3].binding = 0;
-    attributeDescriptions[3].location = 3;
-    attributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[3].offset = offsetof(WeightedVertex, tangent);
-
-    // Weights
-    attributeDescriptions[4].binding = 0;
-    attributeDescriptions[4].location = 4;
-    attributeDescriptions[4].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-    attributeDescriptions[4].offset = offsetof(WeightedVertex, weights);
-
-    return attributeDescriptions;
-}
 
 bool Mesh::Load(ResourceManager* resourceManager)
 {   
@@ -100,13 +13,22 @@ bool Mesh::Load(ResourceManager* resourceManager)
 
 void Mesh::CreateFrom(float *vertices, uint32_t verticeCount, uint32_t *indices, uint32_t indiceCount, bool isWeighted)
 {
+    ASSERT(vertices != nullptr && verticeCount > 0 && indices != nullptr && indiceCount > 0);
+    ASSERT(indiceCount % 3 == 0);
 
+    const uint32_t verticeSize = isWeighted ? sizeof(WeightedVertex) : sizeof(Vertex);
+
+    m_vertices.resize(verticeCount * verticeSize);
+    std::copy(vertices, vertices + (verticeCount * verticeSize), m_vertices.data());
+    m_isWeighted = isWeighted;
+
+    SendToGPU(Engine::Get()->GetRenderer());
 }
 
 bool Mesh::SendToGPU(VulkanRenderer* renderer)
 {
     ASSERT(!m_vertices.empty());
-    uint32_t floatsPerVertex = sizeof(Vertex) / sizeof(float);
+    uint32_t floatsPerVertex = (m_isWeighted ? sizeof(WeightedVertex) : sizeof(Vertex)) / sizeof(float);
     m_vertexBuffer = renderer->CreateVertexBuffer(
         m_vertices.data(),
         static_cast<uint32_t>(m_vertices.size()),
@@ -119,14 +41,18 @@ bool Mesh::SendToGPU(VulkanRenderer* renderer)
         return false;
     }
 
-    std::vector<uint32_t> sequentialIndices(m_vertices.size() / floatsPerVertex);
-    for (uint32_t i = 0; i < sequentialIndices.size(); i++)
+    if (m_indices.empty())
     {
-        sequentialIndices[i] = i;
+        m_indices.resize(m_vertices.size() / floatsPerVertex);
+        for (uint32_t i = 0; i < m_indices.size(); i++)
+        {
+            m_indices[i] = i;
+        }
     }
+
     m_indexBuffer = renderer->CreateIndexBuffer(
-        sequentialIndices.data(),
-        static_cast<uint32_t>(sequentialIndices.size())
+        m_indices.data(),
+        static_cast<uint32_t>(m_indices.size())
     );
 
     if (!m_indexBuffer)
