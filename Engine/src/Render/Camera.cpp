@@ -4,6 +4,7 @@
 
 #include "Component/TransformComponent.h"
 #include "Core/Engine.h"
+#include "Resource/PostProcessShader.h"
 #include "Resource/RenderTargetTexture.h"
 #include "Vulkan/VulkanRenderer.h"
 
@@ -53,10 +54,10 @@ void Camera::Describe(ClassDescriptor& descriptor)
     descriptor.AddFloat("Far", p_far).setter = [this](void* data) { SetFar(*static_cast<float*>(data)); };
     descriptor.AddColor4("Clear Color", p_clearColor);
     descriptor.AddCubeMap("Skybox", m_skybox).setter = [this](void* data) { SetSkybox(*static_cast<SafePtr<CubeMap>*>(data)); };
-    descriptor.AddShader("Post process", m_postProcessShader).setter = 
+    descriptor.AddPostProcessShader("Post process", m_postProcessShader).setter = 
         [this](void* data)
         {
-            SetPostProcessShader(*static_cast<SafePtr<Shader>*>(data));
+            SetPostProcessShader(*static_cast<SafePtr<PostProcessShader>*>(data));
         };
     // descriptor.AddEnum("View mode", p_viewMode).setter = [this](void* data) { SetViewMode(*static_cast<ViewMode*>(data)); };
     //TODO: Add view mode
@@ -153,7 +154,7 @@ SafePtr<CubeMap> Camera::GetSkybox() const
     return m_skybox;
 }
 
-void Camera::SetPostProcessShader(const SafePtr<Shader>& shader)
+void Camera::SetPostProcessShader(const SafePtr<PostProcessShader>& shader)
 {
     m_postProcessShader = shader;
     if (!m_postProcessMaterial && shader)
@@ -173,11 +174,6 @@ void Camera::SetPostProcessShader(const SafePtr<Shader>& shader)
         m_postProcessMaterial->SetShader(shader);
         m_postProcessMaterial->SetAttribute("albedoSampler", m_renderTarget);
     }
-}
-
-SafePtr<Shader> Camera::GetPostProcessShader() const
-{
-    return m_postProcessMaterial->GetShader();
 }
 
 bool Camera::IsPostProcessActive() const

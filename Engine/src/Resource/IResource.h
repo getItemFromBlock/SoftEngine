@@ -26,6 +26,7 @@ enum class ResourceType
     Material,
     CubeMap,
     RenderTargetTexture,
+    PostProcessShader,
     Count
 };
 
@@ -43,26 +44,29 @@ inline const char* to_string(ResourceType e)
     case ResourceType::Shader: return "Shader";
     case ResourceType::Material: return "Material";
     case ResourceType::CubeMap: return "CubeMap";
+    case ResourceType::RenderTargetTexture: return "RenderTargetTexture";
+    case ResourceType::PostProcessShader: return "PostProcessShader";
     default: return "unknown";
     }
 }
 
 inline static std::unordered_map<std::string, ResourceType> extensionToResourceType =
 {
-    { "png", ResourceType::Texture },
-    { "jpeg", ResourceType::Texture },
-    { "tga", ResourceType::Texture },
-    { "bmp", ResourceType::Texture },
-    { "psd", ResourceType::Texture },
-    { "gif", ResourceType::Texture },
-    { "obj", ResourceType::Model },
-    { "mesh", ResourceType::Mesh },
-    { "vert", ResourceType::VertexShader },
-    { "frag", ResourceType::FragmentShader },
-    { "comp", ResourceType::ComputeShader },
-    { "shader", ResourceType::Shader },
-    { "mat", ResourceType::Material },
-    { "hdr", ResourceType::CubeMap }
+    {"png", ResourceType::Texture},
+    {"jpeg", ResourceType::Texture},
+    {"tga", ResourceType::Texture},
+    {"bmp", ResourceType::Texture},
+    {"psd", ResourceType::Texture},
+    {"gif", ResourceType::Texture},
+    {"obj", ResourceType::Model},
+    {"mesh", ResourceType::Mesh},
+    {"vert", ResourceType::VertexShader},
+    {"frag", ResourceType::FragmentShader},
+    {"comp", ResourceType::ComputeShader},
+    {"shader", ResourceType::Shader},
+    {"mat", ResourceType::Material},
+    {"hdr", ResourceType::CubeMap},
+    {"pshader", ResourceType::PostProcessShader, }
 };
 
 #define DECLARE_RESOURCE_TYPE_PARENT(T, U) \
@@ -89,8 +93,10 @@ public:
     virtual bool SendToGPU(VulkanRenderer* renderer) = 0;
     virtual void Unload() = 0;
 
-    virtual void Describe(ClassDescriptor& descriptor) override {}
-    
+    virtual void Describe(ClassDescriptor& descriptor) override
+    {
+    }
+
     virtual ResourceType GetResourceType() const = 0;
 
     Core::UUID GetUUID() const { return p_uuid; }
@@ -101,25 +107,27 @@ public:
     bool IsLoaded() const { return p_isLoaded; }
     bool IsLoading() const { return p_isLoading; }
     bool SentToGPU() const { return p_sendToGPU; }
-    
+
     void SetLoaded()
     {
         p_isLoading = false;
         p_isLoaded = true;
         EOnLoaded.Invoke();
     }
+
     void SetSentToGPU()
     {
         p_sendToGPU = true;
         EOnSentToGPU.Invoke();
     }
-    
+
 public:
     OnceEvent EOnLoaded;
     OnceEvent EOnSentToGPU;
-protected:    
+
+protected:
     friend class ResourceManager;
-    
+
     std::filesystem::path p_path;
     Core::UUID p_uuid;
 

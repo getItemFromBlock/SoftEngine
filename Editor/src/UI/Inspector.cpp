@@ -14,6 +14,7 @@
 #include "Scene/Scene.h"
 
 #include "Resource/Mesh.h"
+#include "Resource/PostProcessShader.h"
 
 Inspector::Inspector(Engine* engine, ImGuiHandler* handler) : EditorWindow(handler)
 {
@@ -246,6 +247,34 @@ std::optional<SafePtr<Shader>> Inspector::DisplayResourcePopup<Shader>()
     return result;
 }
 
+template <>
+std::optional<SafePtr<PostProcessShader>> Inspector::DisplayResourcePopup<PostProcessShader>()
+{
+    std::optional<SafePtr<PostProcessShader>> result;
+    if (ImGui::BeginPopup("Resource Popup"))
+    {
+        auto resourceManager = Engine::Get()->GetResourceManager();
+        auto shaders = resourceManager->GetAll<PostProcessShader>();
+        if (ImGui::MenuItem("None"))
+        {
+            result = nullptr;
+            ImGui::CloseCurrentPopup();
+        }
+        for (auto& shader : shaders)
+        {
+            ImGui::PushID(shader->GetUUID());
+            if (ImGui::MenuItem(shader->GetName().c_str()))
+            {
+                result = resourceManager->Load<PostProcessShader>(shader->GetPath());
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndPopup();
+    }
+    return result;
+}
+
 template <typename T>
 bool DisplayWithType(const std::string& name, T* value)
 {
@@ -459,6 +488,11 @@ void Inspector::ShowProperty(const Property& property)
     case PropertyType::Shader:
         {
             RenderShaderProperty(property, id);
+            break;
+        }
+    case PropertyType::PostProcessShader:
+        {
+            RenderPostProcessShaderProperty(property, id);
             break;
         }
     default:
@@ -731,6 +765,22 @@ void Inspector::RenderShaderProperty(const Property& property, const std::string
     }
 }
 
+void Inspector::RenderPostProcessShaderProperty(const Property& property, const std::string& id)
+{
+    SafePtr<PostProcessShader> ppshader = *static_cast<SafePtr<PostProcessShader>*>(property.data);
+    std::string name = ppshader ? ppshader->GetName() : "None";
+    if (ImGui::Button(name.c_str()))
+    {
+        ImGui::OpenPopup("Resource Popup");
+    }
+    auto result = DisplayResourcePopup<PostProcessShader>();
+    if (result.has_value())
+    {
+        SafePtr<PostProcessShader> newValue = result.value();
+        UpdateProperty(property, &newValue);
+    }
+}
+
 void Inspector::RenderListProperty(const Property& property, const std::string& id)
 {
     size_t listSize = GetListSize(property);
@@ -953,6 +1003,8 @@ void Inspector::RemoveListElement(const Property& property, size_t index)
                 list->erase(list->begin() + index);
             break;
         }
+    default:
+        PrintError("Type not handled for RemoveListElement");
     }
 
     if (property.onModified)
@@ -999,6 +1051,8 @@ void Inspector::AddListElement(const Property& property)
     case PropertyType::Material:
         static_cast<std::vector<SafePtr<Material>>*>(property.data)->emplace_back();
         break;
+    default:
+        PrintError("Type not handled for AddListElement");
     }
 
     if (property.onModified)

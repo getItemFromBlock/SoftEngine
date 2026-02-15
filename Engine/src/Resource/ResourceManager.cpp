@@ -11,6 +11,7 @@
 #include "Shader.h"
 #include "Model.h"
 #include "Mesh.h"
+#include "PostProcessShader.h"
 #include "VertexShader.h"
 
 #include "Render/Vulkan/VulkanRenderer.h"
@@ -96,6 +97,8 @@ std::shared_ptr<IResource> ResourceManager::CreateResourceFromPath(const std::fi
         return std::make_shared<Material>(path);
     case ResourceType::CubeMap:
         return std::make_shared<CubeMap>(path);
+    case ResourceType::PostProcessShader:
+        return std::make_shared<PostProcessShader>(path);
     default:
         PrintError("Extension %s not handled", extension.c_str());
         return nullptr;
@@ -293,7 +296,7 @@ void ResourceManager::ReadCache()
     while (stream >> uuid >> std::quoted(pathString))
     {
         std::shared_ptr<IResource> resource = CreateResourceFromPath(pathString);
-        if (!resource)
+        if (!resource || !resource->Exists())
             continue;
         resource->p_uuid = uuid;
         AddResource(uuid, resource, GetHash(pathString));

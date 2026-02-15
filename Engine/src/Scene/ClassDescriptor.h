@@ -7,6 +7,7 @@
 
 #include "Utils/Type.h"
 
+class PostProcessShader;
 class Shader;
 class Material;
 class Mesh;
@@ -31,6 +32,7 @@ enum class PropertyType
     Mesh,
     Material,
     Shader,
+    PostProcessShader,
     ParticleSystem
 };
 
@@ -132,7 +134,8 @@ struct ClassDescriptor
     Property& AddTexture(const char* name, SafePtr<Texture>& value);
     Property& AddCubeMap(const char* name, SafePtr<CubeMap>& value);
     Property& AddMesh(const char* name, SafePtr<Mesh>& value);
-    Property& AddShader(const char* name, SafePtr<Shader>& safe);
+    Property& AddShader(const char* name, SafePtr<Shader>& value);
+    Property& AddPostProcessShader(const char* name, SafePtr<PostProcessShader>& value);
 };
 
 class IDescribe

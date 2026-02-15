@@ -1,5 +1,5 @@
  ------------- Shader ------------- 
-[vert] : postProcess.vert
-[frag] : postProcess.frag
+[vert] : inverted.vert
+[frag] : inverted.frag
 [depthTest] : false
  ============= Shader ============= 

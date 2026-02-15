@@ -11,6 +11,7 @@
 #include "Resource/Mesh.h"
 #include "Resource/Model.h"
 #include "Resource/CubeMap.h"
+#include "Resource/PostProcessShader.h"
 
 #include "Scene/GameObject.h"
 
@@ -56,7 +57,7 @@ void Editor::Initialize()
     resourceManager->Load<Model>(RESOURCE_PATH"/models/Suzanne.obj");
     resourceManager->Load<Model>(RESOURCE_PATH"/models/Plane.obj");
     resourceManager->Load<CubeMap>(RESOURCE_PATH"/envMap/wooden_studio_09_4k.hdr");
-    resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PostProcess/postProcess.shader");
+    resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/inverted.pshader");
     // model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Sponza/sponza.obj");
     model = resourceManager->Load<Model>(RESOURCE_PATH"models/Sphere.obj");
     

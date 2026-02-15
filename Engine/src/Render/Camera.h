@@ -7,6 +7,7 @@
 #include "Vulkan/VulkanDepthBuffer.h"
 #include "Vulkan/VulkanTexture.h"
 
+class PostProcessShader;
 class Shader;
 class RenderTargetTexture;
 class CubeMap;
@@ -55,8 +56,7 @@ public:
     void SetSkybox(const SafePtr<CubeMap>& skybox);
     SafePtr<CubeMap> GetSkybox() const;
     
-    void SetPostProcessShader(const SafePtr<Shader>& shader);
-    SafePtr<Shader> GetPostProcessShader() const;
+    void SetPostProcessShader(const SafePtr<PostProcessShader>& shader);
     bool IsPostProcessActive() const;
     
     void InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height);
@@ -95,7 +95,7 @@ protected:
     // Post process
     SafePtr<Mesh> m_quad;
     SafePtr<Material> m_postProcessMaterial;
-    SafePtr<Shader> m_postProcessShader;
+    SafePtr<PostProcessShader> m_postProcessShader;
     SafePtr<RenderTargetTexture> m_postProcessRenderTarget;
     
     Vec2i p_requestedSize;

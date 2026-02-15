@@ -35,6 +35,7 @@ private:
     static void RenderMeshProperty(const Property& property, const std::string& id);
     static void RenderMaterialProperty(const Property& property, const std::string& id);
     static void RenderShaderProperty(const Property& property, const std::string& id);
+    static void RenderPostProcessShaderProperty(const Property& property, const std::string& id);
     static void RenderListProperty(const Property& property, const std::string& id);
     #pragma endregion 
     
