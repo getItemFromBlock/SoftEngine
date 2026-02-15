@@ -57,6 +57,7 @@ public:
     
     void SetPostProcessShader(const SafePtr<Shader>& shader);
     SafePtr<Shader> GetPostProcessShader() const;
+    bool IsPostProcessActive() const;
     
     void InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height);
     void ResizeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height);

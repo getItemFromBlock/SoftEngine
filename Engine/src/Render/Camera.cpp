@@ -180,6 +180,11 @@ SafePtr<Shader> Camera::GetPostProcessShader() const
     return m_postProcessMaterial->GetShader();
 }
 
+bool Camera::IsPostProcessActive() const
+{
+    return m_postProcessShader.valid();
+}
+
 void Camera::InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height)
 {
     p_renderTargetSize = Vec2i(static_cast<int32_t>(width), static_cast<int32_t>(height));
@@ -235,7 +240,7 @@ void Camera::CleanupRenderTarget()
 
 SafePtr<RenderTargetTexture> Camera::GetRenderTarget() const
 {
-    return m_renderTarget;
+    return IsPostProcessActive() ? m_postProcessRenderTarget : m_renderTarget;
 }
 
 void Camera::Begin()

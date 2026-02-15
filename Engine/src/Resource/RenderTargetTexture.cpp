@@ -55,6 +55,8 @@ void RenderTargetTexture::CreateRenderTarget(VulkanRenderer* renderer, uint32_t 
     
     p_isLoaded = true;
     p_sendToGPU = true;
+    EOnLoaded.Invoke();
+    EOnSentToGPU.Invoke();
 }
 
 void RenderTargetTexture::Resize(VulkanRenderer* renderer, uint32_t width, uint32_t height)
