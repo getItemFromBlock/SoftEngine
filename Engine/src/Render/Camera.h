@@ -12,10 +12,18 @@ class Shader;
 class RenderTargetTexture;
 class CubeMap;
 
-enum class ViewMode
+struct ViewMode
 {
-    Perspective,
-    Orthographic
+    enum class Type
+    {
+        Perspective,
+        Orthographic
+    };
+
+    static const char* to_cstr()
+    {
+        return "Perspective\0Orthographic";
+    }
 };
 
 class Camera : public IDescribe
@@ -47,6 +55,9 @@ public:
 
     void SetClearColor(const Vec4f& color);
     Vec4f GetClearColor() const;
+    
+    ViewMode::Type GetViewMode() const { return p_viewMode; }
+    void SetViewMode(ViewMode::Type viewMode) { p_viewMode = viewMode; }
 
     virtual TransformComponent* GetTransform() const;
 
@@ -84,7 +95,7 @@ protected:
 
     Vec4f p_clearColor = Vec4f(70.f / 255.f, 70.f / 255.f, 70.f / 255.f, 1.00f);
 
-    ViewMode p_viewMode = ViewMode::Perspective;
+    ViewMode::Type p_viewMode = ViewMode::Type::Perspective;
     
     Frustum p_frustum;
     

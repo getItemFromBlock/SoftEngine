@@ -39,12 +39,13 @@ Mat4 Camera::GetProjectionMatrix() const
 
 Mat4 Camera::GetOrthographicMatrix() const
 {
-    return Mat4::CreateOrthographicMatrix(-10.f, 10.f, -10.f, 10.f, p_near, p_far);
+    Mat4 orthographicMatrix = Mat4::CreateOrthographicMatrix(-10.f, 10.f, 10.f, -10.f, p_far, p_near);
+    return orthographicMatrix;
 }
 
 Mat4 Camera::GetViewProjectionMatrix() const
 {
-    return GetProjectionMatrix() * GetViewMatrix();
+    return (p_viewMode == ViewMode::Type::Perspective ? GetProjectionMatrix() : GetOrthographicMatrix()) * GetViewMatrix();
 }
 
 void Camera::Describe(ClassDescriptor& descriptor)
@@ -59,8 +60,11 @@ void Camera::Describe(ClassDescriptor& descriptor)
         {
             SetPostProcessShader(*static_cast<SafePtr<PostProcessShader>*>(data));
         };
-    // descriptor.AddEnum("View mode", p_viewMode).setter = [this](void* data) { SetViewMode(*static_cast<ViewMode*>(data)); };
-    //TODO: Add view mode
+    descriptor.AddEnum("View mode", reinterpret_cast<int32_t *>(&p_viewMode), ViewMode::to_cstr()).setter = [this](void* data)
+    {
+        p_viewMode = *static_cast<ViewMode::Type*>(data);
+        SetViewMode(p_viewMode);
+    };
 }
 
 float Camera::GetFOV() const
