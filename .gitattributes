@@ -38,70 +38,70 @@
 
 
 # 3D models
-*.3dm                   lfs
-*.3ds                   lfs
-*.blend                 lfs
-*.blend1                lfs
-*.c4d                   lfs
-*.collada               lfs
-*.dae                   lfs
-*.dxf                   lfs
-*.FBX                   lfs
-*.fbx                   lfs
-*.jas                   lfs
-*.lws                   lfs
-*.lxo                   lfs
-*.ma                    lfs
-*.max                   lfs
-*.mb                    lfs
-*.obj                   lfs
-*.ply                   lfs
-*.skp                   lfs
-*.stl                   lfs
-*.ztl                   lfs
+*.3dm        binary           lfs
+*.3ds        binary           lfs
+*.blend      binary           lfs
+*.blend1     binary           lfs
+*.c4d        binary           lfs
+*.collada    binary           lfs
+*.dae        binary           lfs
+*.dxf        binary           lfs
+*.FBX        binary           lfs
+*.fbx        binary           lfs
+*.jas        binary           lfs
+*.lws        binary           lfs
+*.lxo        binary           lfs
+*.ma         binary           lfs
+*.max        binary           lfs
+*.mb         binary           lfs
+*.obj                         lfs
+*.ply        binary           lfs
+*.skp        binary           lfs
+*.stl        binary           lfs
+*.ztl        binary           lfs
 
 # Audio
-*.aif                   lfs
-*.aiff                  lfs
-*.it                    lfs
-*.mod                   lfs
-*.mp3                   lfs
-*.ogg                   lfs
-*.s3m                   lfs
-*.wav                   lfs
-*.xm                    lfs
+*.aif         binary          lfs
+*.aiff        binary          lfs
+*.it          binary          lfs
+*.mod         binary          lfs
+*.mp3         binary          lfs
+*.ogg         binary          lfs
+*.s3m         binary          lfs
+*.wav         binary          lfs
+*.xm          binary          lfs
 
 # Video
-*.asf                   lfs
-*.avi                   lfs
-*.flv                   lfs
-*.mov                   lfs
-*.mp4                   lfs
-*.mpeg                  lfs
-*.mpg                   lfs
-*.ogv                   lfs
-*.wmv                   lfs
+*.asf         binary          lfs
+*.avi         binary          lfs
+*.flv         binary          lfs
+*.mov         binary          lfs
+*.mp4         binary          lfs
+*.mpeg        binary          lfs
+*.mpg         binary          lfs
+*.ogv         binary          lfs
+*.wmv         binary          lfs
 
 # Images
-*.bmp                   lfs
-*.exr                   lfs
-*.gif                   lfs
-*.hdr                   lfs
-*.iff                   lfs
-*.jpeg                  lfs
-*.jpg                   lfs
-*.pict                  lfs
-*.png                   lfs
-*.psd                   lfs
-*.tga                   lfs
-*.tif                   lfs
-*.tiff                  lfs
-*.webp                  lfs
+*.bmp         binary          lfs
+*.exr         binary          lfs
+*.gif         binary          lfs
+*.hdr         binary          lfs
+*.iff         binary          lfs
+*.jpeg        binary          lfs
+*.jpg         binary          lfs
+*.pict        binary          lfs
+*.png         binary          lfs
+*.psd         binary          lfs
+*.tga         binary          lfs
+*.tif         binary          lfs
+*.tiff        binary          lfs
+*.webp        binary          lfs
 
 # Compressed Archive
-*.7z                    lfs
-*.bz2                   lfs
-*.gz                    lfs
-*.rar                   lfs
-*.tar                   lfs
-*.zip                   lfs
+*.7z          binary          lfs
+*.bz2         binary          lfs
+*.gz          binary          lfs
+*.rar         binary          lfs
+*.tar         binary          lfs
+*.zip         binary          lfs
