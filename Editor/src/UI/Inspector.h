@@ -39,6 +39,8 @@ private:
     static void RenderCubeMapProperty(const Property& property, const std::string& id);
     static void RenderMeshProperty(const Property& property, const std::string& id);
     static void RenderMaterialProperty(const Property& property, const std::string& id);
+    static void RenderShaderProperty(const Property& property, const std::string& id);
+    static void RenderPostProcessShaderProperty(const Property& property, const std::string& id);
     static void RenderListProperty(const Property& property, const std::string& id);
     #pragma endregion 
     
@@ -48,7 +50,7 @@ private:
     static void AddListElement(const Property& property);
 
     template <typename T>
-    static SafePtr<T> DisplayResourcePopup();
+    static std::optional<SafePtr<T>> DisplayResourcePopup();
 
     template<typename T>
     const ClassDescriptor& GetDescriptor(const Core::UUID& uuid, SafePtr<T> descriptorContainer)

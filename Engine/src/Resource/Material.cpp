@@ -284,6 +284,10 @@ void Material::SendAllValues(VulkanRenderer* renderer)
         {
             Uniform uniform = m_shader->GetUniform(attrib);
             SafePtr<Texture> texture = m_attributes.samplerAttributes.at(attrib).value;
+            if (!texture)
+            {
+                texture = Engine::Get()->GetResourceManager()->GetBlankTexture();
+            }
             VulkanMaterial* rhiMat = m_handle.get();
             rhiMat->SetTextureForFrame(renderer->GetFrameIndex(), uniform.set, uniform.binding, texture.getPtr());
         
@@ -300,6 +304,10 @@ void Material::SendAllValues(VulkanRenderer* renderer)
         {
             Uniform uniform = m_shader->GetUniform(attrib);
             SafePtr<CubeMap> cubeMap = m_attributes.sampler3DAttributes.at(attrib).value;
+            if (!cubeMap)
+            {
+                cubeMap = Engine::Get()->GetResourceManager()->GetBlankCubeMap();
+            }
             VulkanMaterial* rhiMat = m_handle.get();
             rhiMat->SetCubemapForFrame(renderer->GetFrameIndex(), uniform.set, uniform.binding, cubeMap.getPtr());
         
@@ -455,7 +463,7 @@ void Material::OnShaderChanged()
             break;
         case UniformType::SamplerCube:
             {
-                auto defaultCubeMap = Engine::Get()->GetResourceManager()->GetDefaultCubeMap();
+                auto defaultCubeMap = Engine::Get()->GetResourceManager()->GetBlankCubeMap();
                 m_attributes.sampler3DAttributes[uniform.name] =
                     m_temporaryAttributes.sampler3DAttributes.contains(uniform.name)
                         ? m_temporaryAttributes.sampler3DAttributes[uniform.name].value

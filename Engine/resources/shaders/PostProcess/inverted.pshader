@@ -1,0 +1,5 @@
+ ------------- Shader ------------- 
+[vert] : inverted.vert
+[frag] : inverted.frag
+[depthTest] : false
+ ============= Shader ============= 

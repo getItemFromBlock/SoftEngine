@@ -58,6 +58,7 @@ struct MaterialAttributes
         vec4Attributes.clear();
         samplerAttributes.clear();
         sampler3DAttributes.clear();
+        matrixAttributes.clear();
     }
 };
 

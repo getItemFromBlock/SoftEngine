@@ -33,12 +33,14 @@ void MeshComponent::OnUpdate(float deltaTime)
         return;
     Mat4 VP = cameraData.VP;
     auto lightManager = GetGameObject()->GetScene()->GetLightManager();
+    auto camera = GetGameObject()->GetScene()->GetEditorCamera();
 
     for (auto& material : m_materials)
     {
         if (!material)
             continue;
         lightManager->SendLights(material.getPtr());
+        material->SetAttribute("debugCubemap", camera->GetSkybox());
         material->SetAttribute("viewProj", VP);
         material->SetAttribute("camPos", cameraData.position);
     }

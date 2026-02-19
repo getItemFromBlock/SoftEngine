@@ -7,6 +7,8 @@
 #include "Vulkan/VulkanDepthBuffer.h"
 #include "Vulkan/VulkanTexture.h"
 
+class PostProcessShader;
+class Shader;
 class RenderTargetTexture;
 class CubeMap;
 
@@ -16,16 +18,18 @@ enum class ViewMode
     Orthographic
 };
 
-class Camera
+class Camera : public IDescribe
 {
 public:
     Camera();
-    virtual ~Camera();
+    ~Camera() override;
 
     Mat4 GetViewMatrix() const;
     Mat4 GetProjectionMatrix() const;
     Mat4 GetOrthographicMatrix() const;
     Mat4 GetViewProjectionMatrix() const;
+    
+    void Describe(ClassDescriptor& descriptor) override;
 
     float GetFOV() const;
     void SetFOV(float fov);
@@ -49,25 +53,29 @@ public:
     void UpdateFrustum();
     const Frustum& GetFrustum() const;
 
-    void SetSkybox(SafePtr<CubeMap> skybox);
+    void SetSkybox(const SafePtr<CubeMap>& skybox);
     SafePtr<CubeMap> GetSkybox() const;
+    
+    void SetPostProcessShader(const SafePtr<PostProcessShader>& shader);
+    bool IsPostProcessActive() const;
     
     void InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height);
     void ResizeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height);
     void CleanupRenderTarget();
 
     SafePtr<RenderTargetTexture> GetRenderTarget() const;
-    bool IsUsingRenderTarget() const;
     
-    void BeginRenderTarget();
-    void EndRenderTarget();
+    void Begin();
+    void End();
+
+    void UpdateResizeRenderTarget(VulkanRenderer* renderer);
+    void BeginRenderTarget(RenderTargetTexture* rtt);
+    void EndRenderTarget(RenderTargetTexture* rtt);
     
     void RenderSkybox(VulkanRenderer* renderer) const;
+    void RenderPostProcess(VulkanRenderer* renderer);
 
     Event<Vec2i> OnRenderTargetResized;
-private:
-    std::shared_ptr<TransformComponent> m_transform;
-    bool m_firstFrame = true;
 
 protected:
     float p_fov = 70.f;
@@ -80,10 +88,21 @@ protected:
     
     Frustum p_frustum;
     
+    // Skybox
     SafePtr<CubeMap> m_skybox;
+    SafePtr<Material> m_skyboxMaterial;
+    
+    // Post process
+    SafePtr<Mesh> m_quad;
+    SafePtr<Material> m_postProcessMaterial;
+    SafePtr<PostProcessShader> m_postProcessShader;
+    SafePtr<RenderTargetTexture> m_postProcessRenderTarget;
     
     Vec2i p_requestedSize;
     Vec2i p_renderTargetSize;
     SafePtr<RenderTargetTexture> m_renderTarget;
-    bool m_useRenderTarget = false;
+
+private:
+    std::shared_ptr<TransformComponent> m_transform;
+    bool m_firstFrame = true;
 };

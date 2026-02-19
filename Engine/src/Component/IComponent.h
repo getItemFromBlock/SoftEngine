@@ -22,7 +22,7 @@
 class VulkanRenderer;
 class GameObject;
 
-class IComponent
+class IComponent : public IDescribe
 {
 public:
     IComponent() = default;
@@ -33,7 +33,7 @@ public:
     virtual ~IComponent();
     
     virtual const char* GetTypeName() const { return "IComponent"; }
-    virtual void Describe(ClassDescriptor& d) {}
+    virtual void Describe(ClassDescriptor& d) override {}
 
     virtual void OnCreate() {}
     virtual void OnStart() {}

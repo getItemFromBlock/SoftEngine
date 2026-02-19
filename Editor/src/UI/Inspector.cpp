@@ -14,6 +14,7 @@
 #include "Scene/Scene.h"
 
 #include "Resource/Mesh.h"
+#include "Resource/PostProcessShader.h"
 
 Inspector::Inspector(Engine* engine, ImGuiHandler* handler) : EditorWindow(handler)
 {
@@ -72,7 +73,8 @@ void Inspector::OnRender()
                 object->RemoveComponent(deletedID);
             }
         
-            ImGui::Separator();
+            ImGui::NewLine();
+            ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2);
             ImGui::NewLine();
             ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Add Component").x) * 0.5f);
             if (ImGui::Button("Add Component"))
@@ -103,13 +105,18 @@ void Inspector::SetSelectedObject(const Core::UUID& uuid)
 }
 
 template <>
-SafePtr<Material> Inspector::DisplayResourcePopup<Material>()
+std::optional<SafePtr<Material>> Inspector::DisplayResourcePopup<Material>()
 {
-    SafePtr<Material> result;
+    std::optional<SafePtr<Material>> result;
     if (ImGui::BeginPopup("Resource Popup"))
     {
         auto resourceManager = Engine::Get()->GetResourceManager();
         auto materials = resourceManager->GetAll<Material>();
+        if (ImGui::MenuItem("None"))
+        {
+            result = nullptr;
+            ImGui::CloseCurrentPopup();
+        }
         for (auto& material : materials)
         {
             ImGui::PushID(material->GetUUID());
@@ -126,13 +133,18 @@ SafePtr<Material> Inspector::DisplayResourcePopup<Material>()
 }
 
 template <>
-SafePtr<Mesh> Inspector::DisplayResourcePopup<Mesh>()
+std::optional<SafePtr<Mesh>> Inspector::DisplayResourcePopup<Mesh>()
 {
-    SafePtr<Mesh> result;
+    std::optional<SafePtr<Mesh>> result;
     if (ImGui::BeginPopup("Resource Popup"))
     {
         auto resourceManager = Engine::Get()->GetResourceManager();
         auto meshes = resourceManager->GetAll<Mesh>();
+        if (ImGui::MenuItem("None"))
+        {
+            result = nullptr;
+            ImGui::CloseCurrentPopup();
+        }
         for (auto& mesh : meshes)
         {
             ImGui::PushID(mesh->GetUUID());
@@ -149,13 +161,18 @@ SafePtr<Mesh> Inspector::DisplayResourcePopup<Mesh>()
 }
 
 template <>
-SafePtr<Texture> Inspector::DisplayResourcePopup<Texture>()
+std::optional<SafePtr<Texture>> Inspector::DisplayResourcePopup<Texture>()
 {
-    SafePtr<Texture> result;
+    std::optional<SafePtr<Texture>> result;
     if (ImGui::BeginPopup("Resource Popup"))
     {
         auto resourceManager = Engine::Get()->GetResourceManager();
         auto textures = resourceManager->GetAll<Texture>();
+        if (ImGui::MenuItem("None"))
+        {
+            result = nullptr;
+            ImGui::CloseCurrentPopup();
+        }
         for (auto& texture : textures)
         {
             ImGui::PushID(texture->GetUUID());
@@ -175,19 +192,80 @@ SafePtr<Texture> Inspector::DisplayResourcePopup<Texture>()
 }
 
 template <>
-SafePtr<CubeMap> Inspector::DisplayResourcePopup<CubeMap>()
+std::optional<SafePtr<CubeMap>> Inspector::DisplayResourcePopup<CubeMap>()
 {
-    SafePtr<CubeMap> result;
+    std::optional<SafePtr<CubeMap>> result;
     if (ImGui::BeginPopup("Resource Popup"))
     {
         auto resourceManager = Engine::Get()->GetResourceManager();
         auto cubeMaps = resourceManager->GetAll<CubeMap>();
+        if (ImGui::MenuItem("None"))
+        {
+            result = nullptr;
+            ImGui::CloseCurrentPopup();
+        }
         for (auto& cubeMap : cubeMaps)
         {
             ImGui::PushID(cubeMap->GetUUID());
             if (ImGui::MenuItem(cubeMap->GetName().c_str()))
             {
                 result = resourceManager->Load<CubeMap>(cubeMap->GetPath());
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndPopup();
+    }
+    return result;
+}
+
+template <>
+std::optional<SafePtr<Shader>> Inspector::DisplayResourcePopup<Shader>()
+{
+    std::optional<SafePtr<Shader>> result;
+    if (ImGui::BeginPopup("Resource Popup"))
+    {
+        auto resourceManager = Engine::Get()->GetResourceManager();
+        auto shaders = resourceManager->GetAll<Shader>();
+        if (ImGui::MenuItem("None"))
+        {
+            result = nullptr;
+            ImGui::CloseCurrentPopup();
+        }
+        for (auto& shader : shaders)
+        {
+            ImGui::PushID(shader->GetUUID());
+            if (ImGui::MenuItem(shader->GetName().c_str()))
+            {
+                result = resourceManager->Load<Shader>(shader->GetPath());
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndPopup();
+    }
+    return result;
+}
+
+template <>
+std::optional<SafePtr<PostProcessShader>> Inspector::DisplayResourcePopup<PostProcessShader>()
+{
+    std::optional<SafePtr<PostProcessShader>> result;
+    if (ImGui::BeginPopup("Resource Popup"))
+    {
+        auto resourceManager = Engine::Get()->GetResourceManager();
+        auto shaders = resourceManager->GetAll<PostProcessShader>();
+        if (ImGui::MenuItem("None"))
+        {
+            result = nullptr;
+            ImGui::CloseCurrentPopup();
+        }
+        for (auto& shader : shaders)
+        {
+            ImGui::PushID(shader->GetUUID());
+            if (ImGui::MenuItem(shader->GetName().c_str()))
+            {
+                result = resourceManager->Load<PostProcessShader>(shader->GetPath());
                 ImGui::CloseCurrentPopup();
             }
             ImGui::PopID();
@@ -287,11 +365,27 @@ void Inspector::ShowDescriptor(const ClassDescriptor& descriptor)
                 {
                     ImGui::TableNextRow();
                     ImGui::TableSetColumnIndex(0);
-                    ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal);
-                    ImGui::TableSetColumnIndex(1);
-                    ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal);
-
+    
+                    // Draw full-width separator using draw list
+                    ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+                    ImDrawList* drawList = ImGui::GetWindowDrawList();
+                    float tableWidth = ImGui::GetContentRegionAvail().x + ImGui::GetStyle().ItemSpacing.x;
+                    ImVec2 tableStart = ImVec2(ImGui::GetCursorScreenPos().x - ImGui::GetStyle().ItemSpacing.x, cursorPos.y);
+    
+                    // Get table bounds properly
+                    ImGuiTable* table = ImGui::GetCurrentTable();
+                    if (table)
+                    {
+                        float x1 = table->OuterRect.Min.x;
+                        float x2 = table->OuterRect.Max.x;
+                        float y = cursorPos.y;
+        
+                        drawList->AddLine(ImVec2(x1, y), ImVec2(x2, y), ImGui::GetColorU32(ImGuiCol_Separator));
+                        ImGui::Dummy(ImVec2(0, 1)); // Add vertical spacing
+                    }
+    
                     ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
                     ImGui::PushID(property.name.c_str());
                     RenderListProperty(property, "##" + property.name);
                     ImGui::PopID();
@@ -414,6 +508,16 @@ void Inspector::ShowProperty(const Property& property)
     case PropertyType::Material:
         {
             RenderMaterialProperty(property, id);
+            break;
+        }
+    case PropertyType::Shader:
+        {
+            RenderShaderProperty(property, id);
+            break;
+        }
+    case PropertyType::PostProcessShader:
+        {
+            RenderPostProcessShaderProperty(property, id);
             break;
         }
     default:
@@ -671,8 +775,11 @@ void Inspector::RenderTextureProperty(const Property& property, const std::strin
     {
         ImGui::OpenPopup("Resource Popup");
     }
-    if (SafePtr<Texture> newValue = DisplayResourcePopup<Texture>())
+    
+    auto result = DisplayResourcePopup<Texture>();
+    if (result.has_value())
     {
+        SafePtr<Texture> newValue = result.value();
         UpdateProperty(property, &newValue);
     }
     ImGui::PopStyleVar();
@@ -686,8 +793,10 @@ void Inspector::RenderCubeMapProperty(const Property& property, const std::strin
     {
         ImGui::OpenPopup("Resource Popup");
     }
-    if (SafePtr<CubeMap> newValue = DisplayResourcePopup<CubeMap>())
+    auto result = DisplayResourcePopup<CubeMap>();
+    if (result.has_value())
     {
+        SafePtr<CubeMap> newValue = result.value();
         UpdateProperty(property, &newValue);
     }
 }
@@ -700,8 +809,10 @@ void Inspector::RenderMeshProperty(const Property& property, const std::string& 
     {
         ImGui::OpenPopup("Resource Popup");
     }
-    if (SafePtr<Mesh> newValue = DisplayResourcePopup<Mesh>())
+    auto result = DisplayResourcePopup<Mesh>();
+    if (result.has_value())
     {
+        SafePtr<Mesh> newValue = result.value();
         UpdateProperty(property, &newValue);
     }
 }
@@ -714,8 +825,42 @@ void Inspector::RenderMaterialProperty(const Property& property, const std::stri
     {
         ImGui::OpenPopup("Resource Popup");
     }
-    if (SafePtr<Material> newValue = DisplayResourcePopup<Material>())
+    auto result = DisplayResourcePopup<Material>();
+    if (result.has_value())
     {
+        SafePtr<Material> newValue = result.value();
+        UpdateProperty(property, &newValue);
+    }
+}
+
+void Inspector::RenderShaderProperty(const Property& property, const std::string& id)
+{
+    SafePtr<Shader> shader = *static_cast<SafePtr<Shader>*>(property.data);
+    std::string name = shader ? shader->GetName() : "None";
+    if (ImGui::Button(name.c_str()))
+    {
+        ImGui::OpenPopup("Resource Popup");
+    }
+    auto result = DisplayResourcePopup<Shader>();
+    if (result.has_value())
+    {
+        SafePtr<Shader> newValue = result.value();
+        UpdateProperty(property, &newValue);
+    }
+}
+
+void Inspector::RenderPostProcessShaderProperty(const Property& property, const std::string& id)
+{
+    SafePtr<PostProcessShader> ppshader = *static_cast<SafePtr<PostProcessShader>*>(property.data);
+    std::string name = ppshader ? ppshader->GetName() : "None";
+    if (ImGui::Button(name.c_str()))
+    {
+        ImGui::OpenPopup("Resource Popup");
+    }
+    auto result = DisplayResourcePopup<PostProcessShader>();
+    if (result.has_value())
+    {
+        SafePtr<PostProcessShader> newValue = result.value();
         UpdateProperty(property, &newValue);
     }
 }
@@ -942,6 +1087,8 @@ void Inspector::RemoveListElement(const Property& property, size_t index)
                 list->erase(list->begin() + index);
             break;
         }
+    default:
+        PrintError("Type not handled for RemoveListElement");
     }
 
     if (property.onModified)
@@ -988,6 +1135,8 @@ void Inspector::AddListElement(const Property& property)
     case PropertyType::Material:
         static_cast<std::vector<SafePtr<Material>>*>(property.data)->emplace_back();
         break;
+    default:
+        PrintError("Type not handled for AddListElement");
     }
 
     if (property.onModified)

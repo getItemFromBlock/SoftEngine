@@ -11,20 +11,19 @@ SkyboxRenderer::~SkyboxRenderer()
 {
 }
 
-void SkyboxRenderer::RenderSkybox(VulkanRenderer* renderer, SafePtr<CubeMap> skybox, const Mat4& viewProjection) const
+void SkyboxRenderer::RenderSkybox(VulkanRenderer* renderer, const SafePtr<Material>& material, const Mat4& viewProjection) const
 {
-    if (!skybox.valid() || !m_material.valid() || !m_cubeMesh.valid())
+    if (!material.valid() || !m_cubeMesh.valid())
         return;
-    if (!skybox->SentToGPU() || !m_material->SentToGPU() || !m_cubeMesh->SentToGPU())
+    if (!material->SentToGPU() || !m_cubeMesh->SentToGPU())
         return;
-    m_material->SetAttribute("skybox", skybox);
-    m_material->SetAttribute("viewProj", viewProjection);
+    material->SetAttribute("viewProj", viewProjection);
     
-    if (!renderer->BindShader(m_material->GetShader().getPtr()))
+    if (!renderer->BindShader(material->GetShader().getPtr()))
         return;
-    if (!renderer->BindMaterial(m_material.getPtr()))
+    if (!renderer->BindMaterial(material.getPtr()))
         return;
-    m_material->SendAllValues(renderer);
+    material->SendAllValues(renderer);
     renderer->BindVertexBuffers(m_cubeMesh->GetVertexBuffer(), m_cubeMesh->GetIndexBuffer());
     uint32_t startIndex = m_cubeMesh->GetSubMeshes()[0].startIndex;
     uint32_t indexCount = m_cubeMesh->GetSubMeshes()[0].count;
@@ -36,8 +35,6 @@ void SkyboxRenderer::RenderSkybox(VulkanRenderer* renderer, SafePtr<CubeMap> sky
 void SkyboxRenderer::Initialize()
 {
     ResourceManager* resourceManager = Engine::Get()->GetResourceManager();
-    m_material = resourceManager->CreateMaterial("Skybox Material");
     SafePtr<Shader> shader = resourceManager->Load<Shader>(RESOURCE_PATH"shaders/Skybox/skybox.shader");
     m_cubeMesh = resourceManager->Load<Mesh>(RESOURCE_PATH"models/Skybox.obj/Skybox.mesh");
-    m_material->SetShader(shader);
 }

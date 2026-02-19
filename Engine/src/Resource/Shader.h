@@ -159,7 +159,7 @@ public:
     
     std::unique_ptr<ComputeDispatch> CreateDispatch(VulkanRenderer* renderer);
     
-private:
+protected:
     SafePtr<VertexShader> m_vertexShader;
     SafePtr<FragmentShader> m_fragmentShader;
     SafePtr<ComputeShader> m_computeShader;

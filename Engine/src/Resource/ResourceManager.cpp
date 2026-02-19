@@ -11,6 +11,7 @@
 #include "Shader.h"
 #include "Model.h"
 #include "Mesh.h"
+#include "PostProcessShader.h"
 #include "VertexShader.h"
 
 #include "Render/Vulkan/VulkanRenderer.h"
@@ -97,6 +98,8 @@ std::shared_ptr<IResource> ResourceManager::CreateResourceFromPath(const std::fi
         return std::make_shared<Material>(path);
     case ResourceType::CubeMap:
         return std::make_shared<CubeMap>(path);
+    case ResourceType::PostProcessShader:
+        return std::make_shared<PostProcessShader>(path);
     default:
         PrintError("Extension %s not handled", extension.c_str());
         return nullptr;
@@ -211,6 +214,13 @@ void ResourceManager::LoadDefaultCubeMap(const std::filesystem::path& cubeMapPat
     m_defaultCubeMap = cubeMap->GetUUID();
 }
 
+void ResourceManager::LoadBlankCubeMap(const std::filesystem::path& cubeMapPath)
+{
+    SafePtr<CubeMap> cubeMap = Load<CubeMap>(cubeMapPath, false);
+
+    m_blankCubeMap = cubeMap->GetUUID();
+}
+
 SafePtr<Material> ResourceManager::CreateMaterial(std::filesystem::path path)
 {
     if (path.extension() != ".mat")
@@ -255,6 +265,11 @@ std::shared_ptr<CubeMap> ResourceManager::GetDefaultCubeMap() const
     return GetResource<CubeMap>(m_defaultCubeMap);
 }
 
+std::shared_ptr<CubeMap> ResourceManager::GetBlankCubeMap() const
+{
+    return GetResource<CubeMap>(m_blankCubeMap);
+}
+
 std::filesystem::path ResourceManager::GetCacheDir()
 {
     return "Engine/cache/";
@@ -282,7 +297,7 @@ void ResourceManager::ReadCache()
     while (stream >> uuid >> std::quoted(pathString))
     {
         std::shared_ptr<IResource> resource = CreateResourceFromPath(pathString);
-        if (!resource)
+        if (!resource || !resource->Exists())
             continue;
         resource->p_uuid = uuid;
         AddResource(uuid, resource, GetHash(pathString));
