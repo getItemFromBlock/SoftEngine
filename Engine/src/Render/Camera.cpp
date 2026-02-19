@@ -7,6 +7,7 @@
 #include "Resource/PostProcessShader.h"
 #include "Resource/RenderTargetTexture.h"
 #include "Vulkan/VulkanRenderer.h"
+#include "Vulkan/VulkanUtils.h"
 
 #undef far
 #undef near
@@ -268,6 +269,15 @@ void Camera::BeginRenderTarget(RenderTargetTexture* rtt)
     
     VulkanRenderer* renderer = Engine::Get()->GetRenderer();
     VkCommandBuffer commandBuffer = renderer->GetCommandPool()->GetCommandBuffer(renderer->GetFrameIndex());
+
+    if (m_renderTarget->GetDepthBuffer()->NeedsTransition())
+    {
+        VulkanUtils::TransitionImageLayout(renderer->GetCommandPool(), renderer->GetDevice()->GetGraphicsQueue(),
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            renderer->GetDevice(), m_renderTarget->GetDepthBuffer()->GetImage());
+        m_renderTarget->GetDepthBuffer()->ValidateTransition();
+    }
     
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
