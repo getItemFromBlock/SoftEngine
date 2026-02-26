@@ -83,6 +83,9 @@ public:
 
     void Restart();
     
+    // Pwease dwo not caww at wuntiwe, i am a sweepy method OwO
+    void InitializeFromMesh(SafePtr<Mesh> inputMesh, float density);
+
     SafePtr<Material> GetMaterial() const { return m_material; }
     SafePtr<Mesh> GetMesh() const { return m_mesh; }
 private:
@@ -108,4 +111,7 @@ private:
 
     Seed m_seed;
     BodySettings m_particleSettings;
+
+    std::vector<SBParticleData> m_particles;
+    std::vector<ConnectionData> m_connections;
 };

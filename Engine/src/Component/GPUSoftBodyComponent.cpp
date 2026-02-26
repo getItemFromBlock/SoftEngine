@@ -250,13 +250,12 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
 
     if (m_particleBuffer)
         m_particleBuffer->Cleanup();
+    
+    if (m_particles.size() == 0)
+        InitializeParticleData(m_particles, m_connections);
 
-    std::vector<SBParticleData> particles;
-    std::vector<ConnectionData> connections;
-    InitializeParticleData(particles, connections);
-
-    VkDeviceSize PBufSize = sizeof(SBParticleData) * particles.size();
-    VkDeviceSize CBufSize = sizeof(ConnectionData) * connections.size();
+    VkDeviceSize PBufSize = sizeof(SBParticleData) * m_particles.size();
+    VkDeviceSize CBufSize = sizeof(ConnectionData) * m_connections.size();
     PBufSizeAligned = align(PBufSize, 0x40);
     PBufSizeAligned = std::max(0x40llu, PBufSize);
     CBufSizeAligned = align(CBufSize, 0x40);
@@ -273,9 +272,9 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-    stagingBuffer->CopyData(particles.data(), PBufSize);
+    stagingBuffer->CopyData(m_particles.data(), PBufSize);
     if (CBufSize)
-        stagingBuffer->CopyData(connections.data(), CBufSize, PBufSizeAligned);
+        stagingBuffer->CopyData(m_connections.data(), CBufSize, PBufSizeAligned);
 
     VkCommandBufferAllocateInfo alloc{};
     alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -321,6 +320,9 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
     m_initialUploadComplete = true;
     m_particleBuffer = std::move(particleBuffer);
     stagingBuffer->Cleanup();
+
+    m_particles.clear();
+    m_connections.clear();
 }
 
 void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &particles, std::vector<ConnectionData> &connections)
@@ -455,4 +457,54 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &p
 void GPUSoftBodyComponent::ApplySettings()
 {
     m_needsRecreation = true;
+}
+
+void GPUSoftBodyComponent::InitializeFromMesh(SafePtr<Mesh> inputMesh, float density)
+{
+    int itConnectionOffset = 0;
+
+    BoundingBox BBox = inputMesh.getPtr()->m_boundingBox;
+    Vertex* vertices = reinterpret_cast<Vertex*>(inputMesh->m_vertices.data());
+
+    // Place point inside mesh
+    for (float currY = BBox.min.y; currY <= BBox.max.y; currY += density)
+    {
+        for (float currZ = BBox.min.z; currZ <= BBox.max.z; currZ += density)
+        {
+            for (float currX = BBox.min.x; currX <= BBox.max.x; currX += density)
+            {
+
+                Vec3f pos = { currX, currY, currZ };
+
+                bool shouldDiscard = false;
+                for (int i = 0; i < inputMesh->m_vertices.size() / 3; i++)
+                {
+                    Vec3f a = vertices[i * 3    ].position;
+                    Vec3f b = vertices[i * 3 + 1].position;
+                    Vec3f c = vertices[i * 3 + 2].position;
+
+                    Vec3f n = (b - a).Cross(c - a);
+
+                    Vec3f offset = pos - a;
+
+                    if (n.Dot(offset) > 0)
+                    {
+                        shouldDiscard = true;
+                        break;
+                    }
+                }
+
+                if (shouldDiscard)
+                    continue;
+
+                SBParticleData data;
+
+                data.position = pos;
+                data.velocity = { 0 , 0 , 0 };
+                m_particles.push_back(data);
+            }
+        }
+    }
+
+    // Generate connection
 }
