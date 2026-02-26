@@ -84,7 +84,7 @@ public:
     void Restart();
     
     // Pwease dwo not caww at wuntiwe, i am a sweepy method OwO
-    void InitializeFromMesh(SafePtr<Mesh> inputMesh, float density);
+    void InitializeFromMesh(SafePtr<Mesh> inputMesh, float density, float maxDistToConnect);
 
     SafePtr<Material> GetMaterial() const { return m_material; }
     SafePtr<Mesh> GetMesh() const { return m_mesh; }

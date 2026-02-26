@@ -459,19 +459,21 @@ void GPUSoftBodyComponent::ApplySettings()
     m_needsRecreation = true;
 }
 
-void GPUSoftBodyComponent::InitializeFromMesh(SafePtr<Mesh> inputMesh, float density)
+void GPUSoftBodyComponent::InitializeFromMesh(SafePtr<Mesh> inputMesh, float density, float maxDistToConnect)
 {
     int itConnectionOffset = 0;
 
     BoundingBox BBox = inputMesh.getPtr()->m_boundingBox;
     Vertex* vertices = reinterpret_cast<Vertex*>(inputMesh->m_vertices.data());
 
+    float invDensity = 1 / density;
+
     // Place point inside mesh
-    for (float currY = BBox.min.y; currY <= BBox.max.y; currY += density)
+    for (float currY = BBox.min.y; currY <= BBox.max.y; currY += invDensity)
     {
-        for (float currZ = BBox.min.z; currZ <= BBox.max.z; currZ += density)
+        for (float currZ = BBox.min.z; currZ <= BBox.max.z; currZ += invDensity)
         {
-            for (float currX = BBox.min.x; currX <= BBox.max.x; currX += density)
+            for (float currX = BBox.min.x; currX <= BBox.max.x; currX += invDensity)
             {
 
                 Vec3f pos = { currX, currY, currZ };
@@ -506,5 +508,30 @@ void GPUSoftBodyComponent::InitializeFromMesh(SafePtr<Mesh> inputMesh, float den
         }
     }
 
+
     // Generate connection
+    for (int i = 0; i < m_particles.size(); i++)
+    {
+        m_particles[i].connectionsOffset = m_connections.size();
+
+        for (int j = 0; i < m_particles.size(); j++)
+        {
+            if (i == j) continue;
+
+            float dist = m_particles[j].position.Distance(m_particles[i].position);
+
+            if (dist < maxDistToConnect)
+            {
+                ConnectionData connectionData;
+
+                connectionData.initialLength = dist;
+                connectionData.particleID = j;
+
+                m_connections.push_back(connectionData);
+
+            }
+        }
+
+        m_particles[i].connectionsCount = m_connections.size() - m_particles[i].connectionsOffset;
+    }
 }
