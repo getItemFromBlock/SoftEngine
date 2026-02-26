@@ -68,6 +68,7 @@ void VulkanDepthBuffer::Cleanup()
 
     m_depthFormat = VK_FORMAT_UNDEFINED;
     m_device = nullptr;
+    m_needsTransition = true;
 }
 
 VkFormat VulkanDepthBuffer::FindDepthFormat(VulkanDevice* device)

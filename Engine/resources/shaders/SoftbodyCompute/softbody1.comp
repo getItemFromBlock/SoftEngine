@@ -1,0 +1,33 @@
+#version 450
+
+layout(local_size_x = 64) in;
+
+struct ParticleData {
+    vec3 position;
+	uint connectionsOffset;
+    vec3 velocity;
+	uint connectionsCount;
+};
+
+layout(set = 0, binding = 0) buffer Particles {
+    ParticleData particles[];
+};
+
+layout(push_constant) uniform Push {
+    float deltaTime;
+    uint  particleCount;
+} pc;
+
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= pc.particleCount)
+        return;
+	
+    vec3 vel = particles[id].velocity;
+	vec3 pos = particles[id].position;
+    
+	pos += vel * pc.deltaTime;
+
+    particles[id].position = pos;
+}

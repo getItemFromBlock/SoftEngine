@@ -10,34 +10,60 @@ class Inspector : public EditorWindow
 {
 public:
     Inspector(Engine* engine, ImGuiHandler* handler);
-    
+
     void OnRender() override;
     
     void SetSelectedObject(const Core::UUID& uuid);
 
-    void ShowProperty(const ClassDescriptor& descriptor);
+    static void ShowDescriptor(const ClassDescriptor& descriptor);
 private:
-    template <typename T>
-    void DisplayResourcePopup(const Property& property) const;
+    static void ShowProperty(const Property& property);
+    static void UpdateProperty(const Property& property, void* newValue);
     
-    void ShowMaterials(const Property& property);
-    void ShowMesh(const Property& property);
-    void ShowTransform(const Property& property);
-    void ShowParticleSystem(const Property& property);
-    void ShowTexture(const Property& property);
+    #pragma region Property Renderers
+    static void RenderButtonProperty(const Property& property, const std::string& id);
+    static void RenderBoolProperty(const Property& property, const std::string& id);
+    static void RenderIntProperty(const Property& property, const std::string& id);
+    static void RenderIVec2Property(const Property& property, const std::string& id);
+    static void RenderIVec3Property(const Property& property, const std::string& id);
+    static void RenderIVec4Property(const Property& property, const std::string& id);
+    static void RenderFloatProperty(const Property& property, const std::string& id);
+    static void RenderFVec2Property(const Property& property, const std::string& id);
+    static void RenderFVec3Property(const Property& property, const std::string& id);
+    static void RenderFVec4Property(const Property& property, const std::string& id);
+    static void RenderQuatProperty(const Property& property, const std::string& id);
+    static void RenderColor3Property(const Property& property, const std::string& id);
+    static void RenderColor4Property(const Property& property, const std::string& id);
+    static void RenderEnumProperty(const Property& property, const std::string& id);
+    static void RenderTextureProperty(const Property& property, const std::string& id);
+    static void RenderCubeMapProperty(const Property& property, const std::string& id);
+    static void RenderMeshProperty(const Property& property, const std::string& id);
+    static void RenderMaterialProperty(const Property& property, const std::string& id);
+    static void RenderShaderProperty(const Property& property, const std::string& id);
+    static void RenderPostProcessShaderProperty(const Property& property, const std::string& id);
+    static void RenderListProperty(const Property& property, const std::string& id);
+    #pragma endregion 
+    
+    static void* GetListElement(const Property& property, size_t index);
+    static size_t GetListSize(const Property& property);
+    static void RemoveListElement(const Property& property, size_t index);
+    static void AddListElement(const Property& property);
+
+    template <typename T>
+    static std::optional<SafePtr<T>> DisplayResourcePopup();
 
     template<typename T>
     const ClassDescriptor& GetDescriptor(const Core::UUID& uuid, SafePtr<T> descriptorContainer)
     {
-        // auto it = m_descriptors.find(uuid);
-        // if (it == m_descriptors.end())
-        // {
-            ClassDescriptor descriptor;
-            descriptorContainer->Describe(descriptor);
-            return m_descriptors[uuid] = descriptor;
-        // }
-        // return it->second;
+        ClassDescriptor descriptor;
+        descriptorContainer->Describe(descriptor);
+        return m_descriptors[uuid] = descriptor;
     }
+    
+    void DisplayAddComponentPopup() const;
+    
+    static void ShowParticleSystem(const Property& property);
+    
 private:
     SceneHolder* m_sceneHolder;
     

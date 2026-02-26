@@ -11,7 +11,8 @@
     T(const T&) = default;\
     T(T&&) noexcept = default;\
     virtual ~T() override = default;\
-    const char* GetTypeName() const override { return #T; } \
+    static const char* GetStaticTypeName() { return #T; } \
+    const char* GetTypeName() const override { return T::GetStaticTypeName(); } \
     using Super = P;
 
 
@@ -21,7 +22,7 @@
 class VulkanRenderer;
 class GameObject;
 
-class IComponent
+class IComponent : public IDescribe
 {
 public:
     IComponent() = default;
@@ -32,7 +33,7 @@ public:
     virtual ~IComponent();
     
     virtual const char* GetTypeName() const { return "IComponent"; }
-    virtual void Describe(ClassDescriptor& d) {}
+    virtual void Describe(ClassDescriptor& d) override {}
 
     virtual void OnCreate() {}
     virtual void OnStart() {}

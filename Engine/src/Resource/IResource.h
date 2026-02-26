@@ -8,6 +8,7 @@
 #include "Scene/ClassDescriptor.h"
 
 #include "Utils/Event.h"
+#include "Utils/File.h"
 
 class ResourceManager;
 class VulkanRenderer;
@@ -23,6 +24,9 @@ enum class ResourceType
     ComputeShader,
     Shader,
     Material,
+    CubeMap,
+    RenderTargetTexture,
+    PostProcessShader,
     Count
 };
 
@@ -39,25 +43,30 @@ inline const char* to_string(ResourceType e)
     case ResourceType::ComputeShader: return "ComputeShader";
     case ResourceType::Shader: return "Shader";
     case ResourceType::Material: return "Material";
+    case ResourceType::CubeMap: return "CubeMap";
+    case ResourceType::RenderTargetTexture: return "RenderTargetTexture";
+    case ResourceType::PostProcessShader: return "PostProcessShader";
     default: return "unknown";
     }
 }
 
 inline static std::unordered_map<std::string, ResourceType> extensionToResourceType =
 {
-    { "png", ResourceType::Texture },
-    { "jpeg", ResourceType::Texture },
-    { "tga", ResourceType::Texture },
-    { "bmp", ResourceType::Texture },
-    { "psd", ResourceType::Texture },
-    { "gif", ResourceType::Texture },
-    { "obj", ResourceType::Model },
-    { "mesh", ResourceType::Mesh },
-    { "vert", ResourceType::VertexShader },
-    { "frag", ResourceType::FragmentShader },
-    { "comp", ResourceType::ComputeShader },
-    { "shader", ResourceType::Shader },
-    { "mat", ResourceType::Material }
+    {"png", ResourceType::Texture},
+    {"jpeg", ResourceType::Texture},
+    {"tga", ResourceType::Texture},
+    {"bmp", ResourceType::Texture},
+    {"psd", ResourceType::Texture},
+    {"gif", ResourceType::Texture},
+    {"obj", ResourceType::Model},
+    {"mesh", ResourceType::Mesh},
+    {"vert", ResourceType::VertexShader},
+    {"frag", ResourceType::FragmentShader},
+    {"comp", ResourceType::ComputeShader},
+    {"shader", ResourceType::Shader},
+    {"mat", ResourceType::Material},
+    {"hdr", ResourceType::CubeMap},
+    {"pshader", ResourceType::PostProcessShader, }
 };
 
 #define DECLARE_RESOURCE_TYPE_PARENT(T, U) \
@@ -71,49 +80,54 @@ inline static std::unordered_map<std::string, ResourceType> extensionToResourceT
 
 #define DECLARE_RESOURCE_TYPE(T) DECLARE_RESOURCE_TYPE_PARENT(T, IResource)
 
-class IResource
+class IResource : public IDescribe
 {
 public:
     IResource(const std::filesystem::path& path);
     IResource(const IResource&) = delete;
     IResource(IResource&&) = delete;
     IResource& operator=(const IResource&) = delete;
-    virtual ~IResource() = default;
+    virtual ~IResource();
 
     virtual bool Load(ResourceManager* resourceManager) = 0;
     virtual bool SendToGPU(VulkanRenderer* renderer) = 0;
     virtual void Unload() = 0;
-    
-    virtual void Describe(ClassDescriptor& descriptor) {}
-    
+
+    virtual void Describe(ClassDescriptor& descriptor) override
+    {
+    }
+
     virtual ResourceType GetResourceType() const = 0;
 
     Core::UUID GetUUID() const { return p_uuid; }
     std::filesystem::path GetPath() const { return p_path; }
 
+    virtual bool Exists() const { return File::Exist(p_path); }
     virtual std::string GetName(bool extension = false) const;
     bool IsLoaded() const { return p_isLoaded; }
     bool IsLoading() const { return p_isLoading; }
     bool SentToGPU() const { return p_sendToGPU; }
-    
+
     void SetLoaded()
     {
         p_isLoading = false;
         p_isLoaded = true;
         EOnLoaded.Invoke();
     }
+
     void SetSentToGPU()
     {
         p_sendToGPU = true;
         EOnSentToGPU.Invoke();
     }
-    
+
 public:
     OnceEvent EOnLoaded;
     OnceEvent EOnSentToGPU;
-protected:    
+
+protected:
     friend class ResourceManager;
-    
+
     std::filesystem::path p_path;
     Core::UUID p_uuid;
 

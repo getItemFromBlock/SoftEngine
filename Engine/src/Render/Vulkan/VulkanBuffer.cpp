@@ -74,10 +74,10 @@ void VulkanBuffer::Cleanup()
     }
 }
 
-void VulkanBuffer::CopyData(const void* data, VkDeviceSize size)
+void VulkanBuffer::CopyData(const void* data, VkDeviceSize size, VkDeviceSize offset)
 {
     void* mappedData;
-    vkMapMemory(m_device->GetDevice(), m_bufferMemory, 0, size, 0, &mappedData);
+    vkMapMemory(m_device->GetDevice(), m_bufferMemory, offset, size, 0, &mappedData);
     memcpy(mappedData, data, static_cast<size_t>(size));
     vkUnmapMemory(m_device->GetDevice(), m_bufferMemory);
 }

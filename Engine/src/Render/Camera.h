@@ -4,26 +4,40 @@
 
 #include "Component/TransformComponent.h"
 #include "Physic/Frustum.h"
+#include "Vulkan/VulkanDepthBuffer.h"
+#include "Vulkan/VulkanTexture.h"
 
-enum class ViewMode
+class PostProcessShader;
+class Shader;
+class RenderTargetTexture;
+class CubeMap;
+
+struct ViewMode
 {
-    Perspective,
-    Orthographic
+    enum class Type
+    {
+        Perspective,
+        Orthographic
+    };
+
+    static const char* to_cstr()
+    {
+        return "Perspective\0Orthographic";
+    }
 };
 
-class Camera
+class Camera : public IDescribe
 {
 public:
     Camera();
-    Camera& operator=(const Camera& other);
-    Camera(const Camera&);
-    Camera(Camera&&) noexcept;
-    virtual ~Camera();
+    ~Camera() override;
 
     Mat4 GetViewMatrix() const;
     Mat4 GetProjectionMatrix() const;
     Mat4 GetOrthographicMatrix() const;
     Mat4 GetViewProjectionMatrix() const;
+    
+    void Describe(ClassDescriptor& descriptor) override;
 
     float GetFOV() const;
     void SetFOV(float fov);
@@ -33,31 +47,73 @@ public:
 
     float GetNear() const;
     void SetNear(float near);
+    
+    void SetRenderTargetSize(uint32_t width, uint32_t height);
+    Vec2i GetRenderTargetSize() const;
 
     float GetAspectRatio() const;
-    void SetAspectRatio(float aspectRatio);
 
     void SetClearColor(const Vec4f& color);
     Vec4f GetClearColor() const;
+    
+    ViewMode::Type GetViewMode() const { return p_viewMode; }
+    void SetViewMode(ViewMode::Type viewMode) { p_viewMode = viewMode; }
 
     virtual TransformComponent* GetTransform() const;
 
     void UpdateFrustum();
     const Frustum& GetFrustum() const;
 
-private:
-    std::shared_ptr<TransformComponent> m_transform;
+    void SetSkybox(const SafePtr<CubeMap>& skybox);
+    SafePtr<CubeMap> GetSkybox() const;
+    
+    void SetPostProcessShader(const SafePtr<PostProcessShader>& shader);
+    bool IsPostProcessActive() const;
+    
+    void InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height);
+    void ResizeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height);
+    void CleanupRenderTarget();
+
+    SafePtr<RenderTargetTexture> GetRenderTarget() const;
+    
+    void Begin();
+    void End();
+
+    void UpdateResizeRenderTarget(VulkanRenderer* renderer);
+    void BeginRenderTarget(RenderTargetTexture* rtt);
+    void EndRenderTarget(RenderTargetTexture* rtt);
+    
+    void RenderSkybox(VulkanRenderer* renderer) const;
+    void RenderPostProcess(VulkanRenderer* renderer);
+
+    Event<Vec2i> OnRenderTargetResized;
 
 protected:
     float p_fov = 70.f;
     float p_far = 1000.f;
     float p_near = 0.03f;
-    float p_aspectRatio = 4.f / 3.f;
-    Vec2i p_framebufferSize;
 
     Vec4f p_clearColor = Vec4f(70.f / 255.f, 70.f / 255.f, 70.f / 255.f, 1.00f);
 
-    ViewMode p_viewMode = ViewMode::Perspective;
+    ViewMode::Type p_viewMode = ViewMode::Type::Perspective;
     
     Frustum p_frustum;
+    
+    // Skybox
+    SafePtr<CubeMap> m_skybox;
+    SafePtr<Material> m_skyboxMaterial;
+    
+    // Post process
+    SafePtr<Mesh> m_quad;
+    SafePtr<Material> m_postProcessMaterial;
+    SafePtr<PostProcessShader> m_postProcessShader;
+    SafePtr<RenderTargetTexture> m_postProcessRenderTarget;
+    
+    Vec2i p_requestedSize;
+    Vec2i p_renderTargetSize;
+    SafePtr<RenderTargetTexture> m_renderTarget;
+
+private:
+    std::shared_ptr<TransformComponent> m_transform;
+    bool m_firstFrame = true;
 };

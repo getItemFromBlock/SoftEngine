@@ -3,7 +3,26 @@
 
 void TransformComponent::Describe(ClassDescriptor& d)
 {
-    d.AddProperty("", PropertyType::Transform, this);
+    Property position;
+    position.name = "Position";
+    position.data = &m_localPosition;
+    position.type = PropertyType::Vec3f;
+    position.setter = [this](void* data) { SetLocalPosition(*static_cast<Vec3f*>(data)); };
+    d.AddProperty(position);
+
+    Property rotation;
+    rotation.name = "Rotation";
+    rotation.data = &m_localRotation;
+    rotation.type = PropertyType::Quat;
+    rotation.setter = [this](void* data) { SetLocalRotation(*static_cast<Quat*>(data)); };
+    d.AddProperty(rotation);
+    
+    Property scale;
+    scale.name = "Scale";
+    scale.data = &m_localScale;
+    scale.type = PropertyType::Vec3f;
+    scale.setter = [this](void* data) { SetLocalScale(*static_cast<Vec3f*>(data)); };
+    d.AddProperty(scale);
 }
 
 void TransformComponent::OnUpdate(float deltaTime)

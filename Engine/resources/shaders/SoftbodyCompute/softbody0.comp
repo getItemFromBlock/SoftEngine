@@ -1,0 +1,69 @@
+#version 450
+
+layout(local_size_x = 64) in;
+
+struct ParticleData {
+    vec3 position;
+	uint connectionsOffset;
+    vec3 velocity;
+	uint connectionsCount;
+};
+
+struct ConnectionData
+{
+    uint particleID;
+    float initialLength;
+};
+
+layout(set = 0, binding = 0) buffer Particles {
+    ParticleData particles[];
+};
+
+layout(set = 0, binding = 1) buffer Connections {
+    ConnectionData connections[];
+};
+
+layout(push_constant) uniform Push {
+	vec3 gravity;
+    float deltaTime;
+	float damping;
+	float strength;
+    uint  particleCount;
+} pc;
+
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= pc.particleCount)
+        return;
+	
+    vec3 vel = particles[id].velocity;
+	vec3 pos = particles[id].position;
+    
+	vel -= pc.gravity * pc.deltaTime;
+	
+	const uint cCount = particles[id].connectionsCount;
+	const uint cOff = particles[id].connectionsOffset;
+	
+	if (cCount == 0)
+	{
+		particles[id].velocity = vec3(0);
+		return;
+	}
+	
+    for (uint i = 0; i < cCount; i++)
+	{
+		ConnectionData c = connections[cOff + i];
+		vec3 dif = particles[c.particleID].position - pos;
+		float f = length(dif) - c.initialLength;
+		vel += normalize(dif) * (f * pc.deltaTime * pc.strength);
+	}
+	
+	vel = vel * max(1 - pc.damping * pc.deltaTime, 0.05);
+	
+	float l = length(vel);
+	if (l > 10.)
+		vel = normalize(vel) * 10.;
+
+    particles[id].velocity = vel;
+}

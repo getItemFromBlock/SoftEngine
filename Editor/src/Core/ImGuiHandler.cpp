@@ -7,6 +7,7 @@
 
 #include "Render/Vulkan/VulkanTexture.h"
 #include "Render/Vulkan/VulkanRenderer.h"
+#include "Resource/CubeMap.h"
 
 // Validation callback (like in the example)
 static void check_vk_result(VkResult err)
@@ -138,6 +139,24 @@ void ImGuiHandler::EndFrame()
         
         ImGui_ImplVulkan_RenderDrawData(draw_data, commandBuffer);
     }
+}
+
+void ImGuiHandler::UpdateTextureID(const Texture* texture)
+{
+    auto it = m_textureIDs.find(texture->GetUUID());
+    if (it != m_textureIDs.end())
+    {
+        ImGui_ImplVulkan_RemoveTexture(it->second);
+        m_textureIDs.erase(it);
+    }
+    
+    auto buffer = texture->GetBuffer();
+    VkDescriptorSet ID = ImGui_ImplVulkan_AddTexture(
+        buffer->GetSampler(),
+        buffer->GetImageView(),
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    );
+    m_textureIDs[texture->GetUUID()] = ID;
 }
 
 ImTextureRef ImGuiHandler::GetTextureID(Texture* texture)

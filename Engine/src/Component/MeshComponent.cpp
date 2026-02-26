@@ -12,7 +12,13 @@
 void MeshComponent::Describe(ClassDescriptor& d)
 {
     d.AddProperty("Mesh", PropertyType::Mesh, &m_mesh);
-    d.AddProperty("Materials", PropertyType::Materials, &m_materials);
+    
+    Property property;
+    property.data = &m_materials;
+    property.type = PropertyType::Material;
+    property.name = "Materials";
+    property.isList = true;
+    d.AddProperty(property);
 }
 
 void MeshComponent::OnUpdate(float deltaTime)
@@ -26,10 +32,17 @@ void MeshComponent::OnUpdate(float deltaTime)
     if (!m_visible)
         return;
     Mat4 VP = cameraData.VP;
+    auto lightManager = GetGameObject()->GetScene()->GetLightManager();
+    auto camera = GetGameObject()->GetScene()->GetEditorCamera();
 
     for (auto& material : m_materials)
     {
+        if (!material)
+            continue;
+        lightManager->SendLights(material.getPtr());
+        material->SetAttribute("debugCubemap", camera->GetSkybox());
         material->SetAttribute("viewProj", VP);
+        material->SetAttribute("camPos", cameraData.position);
     }
 }
 
@@ -82,3 +95,17 @@ void MeshComponent::AddMaterial(const SafePtr<Material>& material)
 {
     m_materials.push_back(material);
 }
+
+void MeshComponent::RemoveMaterial(const SafePtr<Material>& material)
+{
+    m_materials.erase(std::ranges::find_if(m_materials, [material](const SafePtr<Material>& mat)
+    {
+        return mat.getPtr() == material.getPtr();
+    }));
+}
+
+std::vector<SafePtr<Material>> MeshComponent::GetMaterials() const
+{
+    return m_materials;
+}
+

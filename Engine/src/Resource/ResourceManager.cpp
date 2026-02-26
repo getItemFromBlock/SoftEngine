@@ -4,12 +4,14 @@
 #include <iomanip>
 
 #include "ComputeShader.h"
+#include "CubeMap.h"
 #include "FragmentShader.h"
 #include "Material.h"
 #include "Texture.h"
 #include "Shader.h"
 #include "Model.h"
 #include "Mesh.h"
+#include "PostProcessShader.h"
 #include "VertexShader.h"
 
 #include "Render/Vulkan/VulkanRenderer.h"
@@ -45,6 +47,7 @@ void ResourceManager::AddResource(const Core::UUID& uuid, const std::shared_ptr<
 {
     m_resources[uuid] = resource;
     m_hashToUUID[hash] = uuid;
+    m_tempDebug[uuid] = resource->GetPath();
 }
 
 void ResourceManager::RemoveResource(Core::UUID uuid)
@@ -52,6 +55,7 @@ void ResourceManager::RemoveResource(Core::UUID uuid)
     auto it = m_resources.find(uuid);
     if (it != m_resources.end())
     {
+        it->second->Unload();
         m_resources.erase(it);
     }
 }
@@ -76,26 +80,32 @@ std::shared_ptr<IResource> ResourceManager::CreateResourceFromPath(const std::fi
 
     switch (it->second)
     {
-        case ResourceType::Texture:
-            return std::make_shared<Texture>(path);
-        case ResourceType::Mesh:
-            return std::make_shared<Mesh>(path);
-        case ResourceType::Model:
-            return std::make_shared<Model>(path);
-        case ResourceType::FragmentShader:
-            return std::make_shared<FragmentShader>(path);
-        case ResourceType::VertexShader:
-            return std::make_shared<VertexShader>(path);
-        case ResourceType::ComputeShader:
-            return std::make_shared<ComputeShader>(path);
-        case ResourceType::Shader:
-            return std::make_shared<Shader>(path);
-        case ResourceType::Material:
-            return std::make_shared<Material>(path);
-        default:
-            return nullptr;
+    case ResourceType::Texture:
+        return std::make_shared<Texture>(path);
+    case ResourceType::Mesh:
+        return std::make_shared<Mesh>(path);
+    case ResourceType::Model:
+        return std::make_shared<Model>(path);
+    case ResourceType::FragmentShader:
+        return std::make_shared<FragmentShader>(path);
+    case ResourceType::VertexShader:
+        return std::make_shared<VertexShader>(path);
+    case ResourceType::ComputeShader:
+        return std::make_shared<ComputeShader>(path);
+    case ResourceType::Shader:
+        return std::make_shared<Shader>(path);
+    case ResourceType::Material:
+        return std::make_shared<Material>(path);
+    case ResourceType::CubeMap:
+        return std::make_shared<CubeMap>(path);
+    case ResourceType::PostProcessShader:
+        return std::make_shared<PostProcessShader>(path);
+    default:
+        PrintError("Extension %s not handled", extension.c_str());
+        return nullptr;
     }
 }
+
 void ResourceManager::UpdateResourceToSend()
 {
     std::scoped_lock lock(m_mutex);
@@ -122,6 +132,7 @@ void ResourceManager::UpdateResourceToSend()
         }
     }
 }
+
 void ResourceManager::AddResourceToSend(Core::UUID uuid)
 {
     if (m_renderer->MultiThreadSendToGPU())
@@ -145,10 +156,12 @@ void ResourceManager::AddResourceToSend(Core::UUID uuid)
         m_resourceToSend.push(uuid);
     }
 }
+
 void ResourceManager::AddResourceToSend(const IResource* resource)
 {
     AddResourceToSend(resource->GetUUID());
 }
+
 void ResourceManager::Clear()
 {
     for (auto& resource : m_resources | std::views::values)
@@ -189,9 +202,23 @@ void ResourceManager::LoadDefaultMaterial(const std::filesystem::path& materialP
     SafePtr<Material> material = CreateMaterial(materialPath);
 
     m_defaultMaterial = material->GetUUID();
-    
+
     material->SetAttribute("color", Vec4f::One());
     material->SetAttribute("albedoSampler", GetBlankTexture());
+}
+
+void ResourceManager::LoadDefaultCubeMap(const std::filesystem::path& cubeMapPath)
+{
+    SafePtr<CubeMap> cubeMap = Load<CubeMap>(cubeMapPath, false);
+
+    m_defaultCubeMap = cubeMap->GetUUID();
+}
+
+void ResourceManager::LoadBlankCubeMap(const std::filesystem::path& cubeMapPath)
+{
+    SafePtr<CubeMap> cubeMap = Load<CubeMap>(cubeMapPath, false);
+
+    m_blankCubeMap = cubeMap->GetUUID();
 }
 
 SafePtr<Material> ResourceManager::CreateMaterial(std::filesystem::path path)
@@ -202,12 +229,12 @@ SafePtr<Material> ResourceManager::CreateMaterial(std::filesystem::path path)
     }
     std::shared_ptr<Material> material = std::make_shared<Material>(path);
     std::shared_ptr<Shader> shader = GetDefaultShader();
-    
+
     material->SetLoaded();
     material->SetSentToGPU();
-    
+
     AddResource(material);
-    
+
     material->SetShader(shader);
 
     return material;
@@ -233,6 +260,16 @@ std::shared_ptr<Material> ResourceManager::GetDefaultMaterial() const
     return GetResource<Material>(m_defaultMaterial);
 }
 
+std::shared_ptr<CubeMap> ResourceManager::GetDefaultCubeMap() const
+{
+    return GetResource<CubeMap>(m_defaultCubeMap);
+}
+
+std::shared_ptr<CubeMap> ResourceManager::GetBlankCubeMap() const
+{
+    return GetResource<CubeMap>(m_blankCubeMap);
+}
+
 std::filesystem::path ResourceManager::GetCacheDir()
 {
     return "Engine/cache/";
@@ -251,7 +288,7 @@ void ResourceManager::ReadCache()
 
     if (!stream.is_open())
     {
-        return; 
+        return;
     }
 
     uint64_t uuid = 0;
@@ -260,8 +297,9 @@ void ResourceManager::ReadCache()
     while (stream >> uuid >> std::quoted(pathString))
     {
         std::shared_ptr<IResource> resource = CreateResourceFromPath(pathString);
-        if (resource)
-            resource->p_uuid = uuid;
+        if (!resource || !resource->Exists())
+            continue;
+        resource->p_uuid = uuid;
         AddResource(uuid, resource, GetHash(pathString));
     }
 }
@@ -269,20 +307,25 @@ void ResourceManager::ReadCache()
 void ResourceManager::CreateCache()
 {
     std::filesystem::path cachePath = GetCacheDir() / "resources.cache";
-    std::ofstream stream(cachePath);
 
-    if (!stream.is_open())
+    std::stringstream stream;
+    for (auto& [uuid, resource] : m_resources)
+    {
+        if (!resource || !resource->Exists())
+            continue;
+        stream << uuid << " " << std::quoted(resource->GetPath().generic_string()) << "\n";
+    }
+
+    std::ofstream fileStream(cachePath);
+
+    if (!fileStream.is_open())
     {
         PrintError("Failed to create cache at %s", cachePath.generic_string().c_str());
         return;
     }
 
-    for (const auto& resource : m_resources | std::views::values)
-    {
-        if (!resource)
-            continue;
-        stream << resource->GetUUID() << " " << std::quoted(resource->GetPath().generic_string()) << "\n";
-    }
+    fileStream << stream.str();
+    fileStream.close();
 }
 
 void ResourceManager::CreateCacheDir()

@@ -25,6 +25,7 @@
 #include "VulkanShaderBuffer.h"
 #include "VulkanTexture.h"
 #include "VulkanVertexBuffer.h"
+#include "VulkanUtils.h"
 #include "Core/Engine.h"
 
 #include "Debug/Log.h"
@@ -106,7 +107,7 @@ bool VulkanRenderer::Initialize(Window* window)
             return false;
         }
         m_syncObjects->ResizeRenderFinishedSemaphores(m_swapChain->GetImageCount());
-
+        
         m_initialized = true;
 
         window->EResizeEvent.Bind([this](Vec2i)
@@ -339,6 +340,20 @@ void VulkanRenderer::DrawInstanced(VulkanIndexBuffer* indexBuffer, VulkanVertexB
     p_triangleCount += (indexBuffer->GetIndexCount() / 3) * instanceCount;
 }
 
+void VulkanRenderer::DrawInstanced(VulkanIndexBuffer *indexBuffer, VulkanVertexBuffer *vertexShader, uint32_t instanceCount)
+{
+    VkCommandBuffer commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
+
+    VkBuffer vertexBuffers[] = { vertexShader->GetBuffer() };
+    VkDeviceSize offsets[] = { 0 };
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+    vkCmdBindIndexBuffer(commandBuffer, indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+    vkCmdDrawIndexed(commandBuffer, indexBuffer->GetIndexCount(), static_cast<uint32_t>(instanceCount), 0, 0, 0);
+    p_triangleCount += (indexBuffer->GetIndexCount() / 3) * instanceCount;
+}
+
 std::string VulkanRenderer::CompileShader(ShaderType type, const std::string& code)
 {
     shaderc_shader_kind kind;
@@ -366,7 +381,7 @@ std::string VulkanRenderer::CompileShader(ShaderType type, const std::string& co
 
     if (module.GetCompilationStatus() != shaderc_compilation_status_success)
     {
-        PrintError("Shader compilation failed: %s", module.GetErrorMessage().c_str());;
+        PrintError("Shader compilation failed: %s", module.GetErrorMessage().c_str());
         return {};
     }
 
@@ -488,21 +503,21 @@ bool VulkanRenderer::BindMaterial(Material* material)
     if (!material->Bind(this))
         return false;
 
-    auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
-    // Set viewport and scissor dynamically
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(m_swapChain->GetExtent().width);
-    viewport.height = static_cast<float>(m_swapChain->GetExtent().height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent = m_swapChain->GetExtent();
-    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+    // auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
+    // // Set viewport and scissor dynamically
+    // VkViewport viewport{};
+    // viewport.x = 0.0f;
+    // viewport.y = 0.0f;
+    // viewport.width = static_cast<float>(m_swapChain->GetExtent().width);
+    // viewport.height = static_cast<float>(m_swapChain->GetExtent().height);
+    // viewport.minDepth = 0.0f;
+    // viewport.maxDepth = 1.0f;
+    // vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+    //
+    // VkRect2D scissor{};
+    // scissor.offset = {0, 0};
+    // scissor.extent = m_swapChain->GetExtent();
+    // vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
     return true;
 }
@@ -514,8 +529,22 @@ std::unique_ptr<VulkanTexture> VulkanRenderer::CreateTexture(const ImageLoader::
     return texture;
 }
 
+std::unique_ptr<VulkanTexture> VulkanRenderer::CreateCubeMap(const ImageLoader::HDRImage& image)
+{
+    std::unique_ptr<VulkanTexture> texture = std::make_unique<VulkanTexture>();
+    texture->CreateCubemapFromHDR(image, m_device.get(), m_commandPool.get(), m_device->GetGraphicsQueue());
+    return texture;
+}
+
+std::unique_ptr<VulkanTexture> VulkanRenderer::CreateCubeMapWithMips(int resolution, int mipLevels)
+{
+    std::unique_ptr<VulkanTexture> texture = std::make_unique<VulkanTexture>();
+    texture->CreateCubemapWithMips(resolution, mipLevels, m_device.get(), m_commandPool.get(), m_device->GetGraphicsQueue());
+    return texture;
+}
+
 std::unique_ptr<VulkanVertexBuffer> VulkanRenderer::CreateVertexBuffer(const float* data, uint32_t size,
-                                                                    uint32_t floatPerVertex)
+                                                                       uint32_t floatPerVertex)
 {
     std::unique_ptr<VulkanVertexBuffer> vertexBuffer = std::make_unique<VulkanVertexBuffer>();
 
@@ -625,6 +654,15 @@ void VulkanRenderer::ClearColor() const
     clearValues[0].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
     clearValues[1].depthStencil = {.depth = 1.0f, .stencil = 0};
 
+    if (m_depthBuffer->NeedsTransition())
+    {
+        VulkanUtils::TransitionImageLayout(m_commandPool.get(), m_device->GetGraphicsQueue(),
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            m_device.get(), m_depthBuffer->GetImage());
+        m_depthBuffer->ValidateTransition();
+    }
+
     m_renderPass->Begin(commandBuffer, 
                        m_swapChain->GetImageViews()[imageIndex], 
                        m_depthBuffer->GetImageView(), 
@@ -653,6 +691,8 @@ void VulkanRenderer::RecreateSwapChain()
     // Cleanup old swap chain resources
     m_swapChain->Cleanup();
     m_depthBuffer->Cleanup();
+    
+    // Engine::Get()->GetSceneHolder()->GetCurrentScene()->GetEditorCamera()->SetRenderTargetSize(windowSize.x, windowSize.y);
 
     // Recreate swap chain
     if (!m_swapChain->Initialize(m_device.get(), m_context->GetSurface(), m_window))

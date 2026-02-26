@@ -22,8 +22,6 @@ public:
     void Cleanup();
 
     VkDescriptorSet GetDescriptorSet(uint32_t index) const;
-    
-    void UpdateDescriptorSets(uint32_t frameIndex, uint32_t index, const Uniforms& uniforms, const UniformBuffers& uniformBuffers, Texture* defaultTexture) const;
 
 private:
     VulkanDevice* m_device = nullptr;

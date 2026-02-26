@@ -11,6 +11,7 @@
 #include "VulkanRenderer.h"
 #include "VulkanTexture.h"
 #include "Resource/Texture.h"
+#include "Resource/CubeMap.h"
 #include "Debug/Log.h"
 
 VulkanMaterial::VulkanMaterial(VulkanPipeline* pipeline)
@@ -58,13 +59,15 @@ bool VulkanMaterial::Initialize(uint32_t maxFramesInFlight, Texture* defaultText
         {
             for (const auto& uniform : uniforms)
             {
-                if (uniform.type == UniformType::NestedStruct || 
+                if (uniform.type == UniformType::NestedStruct ||
                     uniform.type == UniformType::StorageBuffer)
                 {
                     UBOBinding key = {uniform.set, uniform.binding};
 
                     auto ubo = std::make_unique<VulkanUniformBuffer>();
-                    auto type = uniform.type == UniformType::StorageBuffer ? VK_BUFFER_USAGE_STORAGE_BUFFER_BIT : VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+                    auto type = uniform.type == UniformType::StorageBuffer
+                                    ? VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+                                    : VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
                     if (!ubo->Initialize(m_device, uniform.size, m_maxFramesInFlight, type))
                     {
                         PrintError("Failed to initialize uniform buffer for set %u binding %u",
@@ -101,7 +104,6 @@ bool VulkanMaterial::Initialize(uint32_t maxFramesInFlight, Texture* defaultText
         {
             for (const auto& [set, uniforms] : m_uniformsBySet)
             {
-                // Reserve to avoid reallocation (stable addresses for p*Info pointers)
                 size_t uniformCount = uniforms.size();
                 std::vector<VkWriteDescriptorSet> writes;
                 writes.reserve(uniformCount);
@@ -119,74 +121,89 @@ bool VulkanMaterial::Initialize(uint32_t maxFramesInFlight, Texture* defaultText
                     write.dstArrayElement = 0;
                     write.descriptorCount = 1;
 
-                    if (uniform.type == UniformType::NestedStruct)
+                    switch (uniform.type)
                     {
-                        // Uniform buffer
-                        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-
-                        UBOBinding key = {uniform.set, uniform.binding};
-                        auto* ubo = m_uniformBuffers[key].get();
-                        if (!ubo)
+                    case UniformType::NestedStruct:
                         {
-                            PrintError("Uniform buffer missing for set %u binding %u", uniform.set, uniform.binding);
-                            Cleanup();
-                            return false;
+                            // Uniform buffer
+                            write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+                            UBOBinding key = {uniform.set, uniform.binding};
+                            auto* ubo = m_uniformBuffers[key].get();
+                            if (!ubo)
+                            {
+                                PrintError("Uniform buffer missing for set %u binding %u", uniform.set,
+                                           uniform.binding);
+                                Cleanup();
+                                return false;
+                            }
+
+                            bufferInfos.emplace_back();
+                            VkDescriptorBufferInfo& bufferInfo = bufferInfos.back();
+                            bufferInfo.buffer = ubo->GetBuffer(frameIdx);
+                            bufferInfo.offset = 0;
+                            bufferInfo.range = uniform.size;
+
+                            write.pBufferInfo = &bufferInfo;
                         }
-
-                        bufferInfos.emplace_back();
-                        VkDescriptorBufferInfo& bufferInfo = bufferInfos.back();
-                        bufferInfo.buffer = ubo->GetBuffer(frameIdx);
-                        bufferInfo.offset = 0;
-                        bufferInfo.range = uniform.size;
-
-                        write.pBufferInfo = &bufferInfo;
-                    }
-                    else if (uniform.type == UniformType::Sampler2D ||
-                             uniform.type == UniformType::SamplerCube)
-                    {
-                        // Texture sampler
-                        write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-
-                        imageInfos.emplace_back();
-                        VkDescriptorImageInfo& imageInfo = imageInfos.back();
-                        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-                        // Use default texture initially
-                        if (defaultTexture)
+                        break;
+                    case UniformType::Sampler2D:
+                    case UniformType::SamplerCube:
                         {
-                            auto* vulkanTexture = defaultTexture->GetBuffer();
-                            imageInfo.imageView = vulkanTexture->GetImageView();
-                            imageInfo.sampler = vulkanTexture->GetSampler();
+                            // Texture sampler
+                            write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+                            imageInfos.emplace_back();
+                            VkDescriptorImageInfo& imageInfo = imageInfos.back();
+                            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+                            // Use default texture initially
+                            if (defaultTexture)
+                            {
+                                auto* vulkanTexture = defaultTexture->GetBuffer();
+                                imageInfo.imageView = vulkanTexture->GetImageView();
+                                imageInfo.sampler = vulkanTexture->GetSampler();
+                            }
+                            else
+                            {
+                                imageInfo.imageView = VK_NULL_HANDLE;
+                                imageInfo.sampler = VK_NULL_HANDLE;
+                            }
+
+                            write.pImageInfo = &imageInfo;
                         }
-                        else
+                        break;
+                    case UniformType::ImageCube:
                         {
-                            imageInfo.imageView = VK_NULL_HANDLE;
-                            imageInfo.sampler = VK_NULL_HANDLE;
+                            continue;
                         }
-
-                        write.pImageInfo = &imageInfo;
-                    }
-                    else if (uniform.type == UniformType::StorageBuffer)
-                    {
-                        // Storage buffer
-                        write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-
-                        UBOBinding key = {uniform.set, uniform.binding};
-                        auto* ubo = m_uniformBuffers[key].get();
-                        if (!ubo)
+                        break;
+                    case UniformType::StorageBuffer:
                         {
-                            PrintError("Storage buffer missing for set %u binding %u", uniform.set, uniform.binding);
-                            Cleanup();
-                            return false;
+                            // Storage buffer
+                            write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+
+                            UBOBinding key = {uniform.set, uniform.binding};
+                            auto* ubo = m_uniformBuffers[key].get();
+                            if (!ubo)
+                            {
+                                PrintError("Storage buffer missing for set %u binding %u", uniform.set,
+                                           uniform.binding);
+                                Cleanup();
+                                return false;
+                            }
+
+                            bufferInfos.emplace_back();
+                            VkDescriptorBufferInfo& bufferInfo = bufferInfos.back();
+                            bufferInfo.buffer = ubo->GetBuffer(frameIdx);
+                            bufferInfo.offset = 0;
+                            bufferInfo.range = uniform.size;
+
+                            write.pBufferInfo = &bufferInfo;
                         }
-
-                        bufferInfos.emplace_back();
-                        VkDescriptorBufferInfo& bufferInfo = bufferInfos.back();
-                        bufferInfo.buffer = ubo->GetBuffer(frameIdx);
-                        bufferInfo.offset = 0;
-                        bufferInfo.range = uniform.size;
-
-                        write.pBufferInfo = &bufferInfo;
+                        break;
+                    default:
+                        PrintError("Type not handled");
                     }
 
                     writes.push_back(write);
@@ -196,9 +213,9 @@ bool VulkanMaterial::Initialize(uint32_t maxFramesInFlight, Texture* defaultText
                 if (!writes.empty())
                 {
                     vkUpdateDescriptorSets(m_device->GetDevice(),
-                                          static_cast<uint32_t>(writes.size()),
-                                          writes.data(),
-                                          0, nullptr);
+                                           static_cast<uint32_t>(writes.size()),
+                                           writes.data(),
+                                           0, nullptr);
                 }
             }
         }
@@ -258,7 +275,7 @@ void VulkanMaterial::SetUniformData(uint32_t set, uint32_t binding, const void* 
 }
 
 void VulkanMaterial::SetTexture(uint32_t set, uint32_t binding, Texture* texture, VulkanRenderer* renderer)
-{    
+{
     for (uint32_t frameIndex = 0; frameIndex < renderer->GetMaxFramesInFlight(); ++frameIndex)
     {
         SetTextureForFrame(frameIndex, set, binding, texture);
@@ -274,7 +291,7 @@ void VulkanMaterial::SetTextureForFrame(uint32_t frameIndex, uint32_t set, uint3
     }
 
     auto* vulkanTexture = texture->GetBuffer();
-        
+
     if (!vulkanTexture)
     {
         PrintError("Invalid texture");
@@ -296,6 +313,153 @@ void VulkanMaterial::SetTextureForFrame(uint32_t frameIndex, uint32_t set, uint3
     write.pImageInfo = &imageInfo;
 
     vkUpdateDescriptorSets(m_device->GetDevice(), 1, &write, 0, nullptr);
+}
+
+void VulkanMaterial::SetCubemap(uint32_t set, uint32_t binding, CubeMap* cubemapTexture, VulkanRenderer* renderer) const
+{
+    for (uint32_t frameIndex = 0; frameIndex < renderer->GetMaxFramesInFlight(); ++frameIndex)
+    {
+        SetCubemapForFrame(frameIndex, set, binding, cubemapTexture);
+    }
+}
+
+void VulkanMaterial::SetCubemapForFrame(uint32_t frameIndex, uint32_t set, uint32_t binding,
+                                        CubeMap* cubemapTexture) const
+{
+    if (!cubemapTexture || set >= m_descriptorSets.size())
+    {
+        PrintError("Invalid cubemap texture or set index");
+        return;
+    }
+
+    auto* vulkanTexture = cubemapTexture->GetBuffer();
+
+    if (!vulkanTexture)
+    {
+        PrintError("Invalid cubemap texture");
+        return;
+    }
+
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = vulkanTexture->GetImageView();
+    imageInfo.sampler = vulkanTexture->GetSampler();
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = m_descriptorSets[set]->GetDescriptorSet(frameIndex);
+    write.dstBinding = binding;
+    write.dstArrayElement = 0;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    write.descriptorCount = 1;
+    write.pImageInfo = &imageInfo;
+
+    vkUpdateDescriptorSets(m_device->GetDevice(), 1, &write, 0, nullptr);
+}
+
+void VulkanMaterial::SetCombinedImageSampler(uint32_t set, uint32_t binding,
+                                             VkImageView imageView,
+                                             VkSampler sampler,
+                                             VulkanRenderer* renderer)
+{
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = imageView;
+    imageInfo.sampler = sampler;
+
+    VkWriteDescriptorSet descriptorWrite{};
+    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrite.dstSet = m_descriptorSets[renderer->GetFrameIndex()]->GetDescriptorSet(set); // Use 'set' parameter
+    descriptorWrite.dstBinding = binding;
+    descriptorWrite.dstArrayElement = 0;
+    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorWrite.descriptorCount = 1;
+    descriptorWrite.pImageInfo = &imageInfo;
+
+    vkUpdateDescriptorSets(renderer->GetDevice()->GetDevice(),
+                           1, &descriptorWrite,
+                           0, nullptr);
+}
+
+void VulkanMaterial::SetTextureCube(uint32_t set, uint32_t binding, VkImageView cubemapView, VkSampler sampler,
+                                    VulkanRenderer* renderer)
+{
+    if (cubemapView == VK_NULL_HANDLE || set >= m_descriptorSets.size())
+    {
+        PrintError("Invalid cubemap view or set index");
+        return;
+    }
+
+    for (uint32_t frameIndex = 0; frameIndex < m_maxFramesInFlight; ++frameIndex)
+    {
+        VkDescriptorImageInfo imageInfo{};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = cubemapView;
+        imageInfo.sampler = sampler;
+
+        VkWriteDescriptorSet write{};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = m_descriptorSets[set]->GetDescriptorSet(frameIndex);
+        write.dstBinding = binding;
+        write.dstArrayElement = 0;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        write.descriptorCount = 1;
+        write.pImageInfo = &imageInfo;
+
+        vkUpdateDescriptorSets(m_device->GetDevice(), 1, &write, 0, nullptr);
+    }
+}
+
+void VulkanMaterial::SetStorageImageCube(uint32_t set, uint32_t binding, VkImageView cubemapMipView,
+                                         VulkanRenderer* renderer)
+{
+    if (cubemapMipView == VK_NULL_HANDLE || set >= m_descriptorSets.size())
+    {
+        PrintError("Invalid cubemap mip view or set index");
+        return;
+    }
+
+    for (uint32_t frameIndex = 0; frameIndex < m_maxFramesInFlight; ++frameIndex)
+    {
+        VkDescriptorImageInfo imageInfo{};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        imageInfo.imageView = cubemapMipView;
+        imageInfo.sampler = VK_NULL_HANDLE; // Storage images don't use samplers
+
+        VkWriteDescriptorSet write{};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = m_descriptorSets[set]->GetDescriptorSet(frameIndex);
+        write.dstBinding = binding;
+        write.dstArrayElement = 0;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        write.descriptorCount = 1;
+        write.pImageInfo = &imageInfo;
+
+        vkUpdateDescriptorSets(m_device->GetDevice(), 1, &write, 0, nullptr);
+    }
+}
+
+void VulkanMaterial::SetStorageImage(uint32_t set, uint32_t binding,
+                                     VkImageView imageView,
+                                     VulkanRenderer* renderer)
+{
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imageInfo.imageView = imageView;
+    imageInfo.sampler = VK_NULL_HANDLE;
+
+    VkWriteDescriptorSet descriptorWrite{};
+    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrite.dstSet = m_descriptorSets[renderer->GetFrameIndex()]->GetDescriptorSet(set); // Use 'set' parameter
+    descriptorWrite.dstBinding = binding;
+    descriptorWrite.dstArrayElement = 0;
+    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    descriptorWrite.descriptorCount = 1;
+    descriptorWrite.pImageInfo = &imageInfo;
+
+    vkUpdateDescriptorSets(renderer->GetDevice()->GetDevice(),
+                           1, &descriptorWrite,
+                           0, nullptr);
 }
 
 void VulkanMaterial::Bind(VulkanRenderer* renderer)
@@ -344,7 +508,7 @@ void VulkanMaterial::SetStorageBuffer(
     VkDescriptorBufferInfo info{};
     info.buffer = buffer;
     info.offset = offset;
-    info.range  = range;
+    info.range = range;
 
     VkWriteDescriptorSet write{};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -368,17 +532,11 @@ void VulkanMaterial::BindForCompute(VkCommandBuffer commandBuffer, uint32_t fram
         sets.push_back(descriptorSet->GetDescriptorSet(frameIndex));
     }
 
-    vkCmdBindDescriptorSets(commandBuffer,
-                            VK_PIPELINE_BIND_POINT_COMPUTE,
-                            m_pipeline->GetPipelineLayout(),
-                            0,
-                            static_cast<uint32_t>(sets.size()),
-                            sets.data(),
-                            0,
-                            nullptr);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline->GetPipelineLayout(), 
+        0, static_cast<uint32_t>(sets.size()), sets.data(), 0, nullptr);
 }
 
-void VulkanMaterial::DispatchCompute(VulkanRenderer* renderer, uint32_t groupCountX, 
+void VulkanMaterial::DispatchCompute(VulkanRenderer* renderer, uint32_t groupCountX,
                                      uint32_t groupCountY, uint32_t groupCountZ)
 {
     VkCommandBuffer cmdBuf = renderer->GetCommandBuffer();
@@ -389,7 +547,7 @@ void VulkanMaterial::DispatchCompute(VulkanRenderer* renderer, uint32_t groupCou
     vkCmdDispatch(cmdBuf, groupCountX, groupCountY, groupCountZ);
 }
 
-void VulkanMaterial::SetPushConstants(VulkanRenderer* renderer, const void* data, 
+void VulkanMaterial::SetPushConstants(VulkanRenderer* renderer, const void* data,
                                       uint32_t size, uint32_t offset)
 {
     VkCommandBuffer cmdBuf = renderer->GetCommandBuffer();

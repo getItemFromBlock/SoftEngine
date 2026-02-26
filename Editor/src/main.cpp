@@ -40,7 +40,7 @@ int main(int argc, char** argv, char** envp)
 {
 #if defined(_MSC_VER) && !defined(NDEBUG)
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-    // _CrtSetBreakAlloc(3248);
+    // _CrtSetBreakAlloc(19614);
 #endif
 
     //TODO: ClassDescriptor added to class or at least to a manager, that do for all loaded resources (for memory management), 

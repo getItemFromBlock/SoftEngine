@@ -9,9 +9,10 @@
 #include "Scene/GameObject.h"
 #include "Scene/Scene.h"
 
-Hierarchy::Hierarchy(Engine* engine, ImGuiHandler* handler): EditorWindow(engine, handler)
+Hierarchy::Hierarchy(Engine* engine, ImGuiHandler* handler): EditorWindow(handler)
 {
     m_sceneHolder = engine->GetSceneHolder();
+    EOnObjectRightClicked.Bind(std::bind(&Hierarchy::SetRightClickedObject, this, std::placeholders::_1));
 }
 
 static std::unordered_map<Core::UUID, bool> openMap;
@@ -90,6 +91,10 @@ void Hierarchy::DisplayObject(GameObject* object, uint64_t& index, bool display)
         }
         EOnObjectSelected.Invoke(object->GetUUID());
     }
+    if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+    {
+        EOnObjectRightClicked.Invoke(object->GetUUID());
+    }
     
     if (display)
         display = openMap[object->GetUUID()];
@@ -128,6 +133,39 @@ void Hierarchy::DisplayObject(GameObject* object, uint64_t& index, bool display)
     ImGui::PopID();
 }
 
+void Hierarchy::DisplayRightClickMenu()
+{
+    if (m_openRightClick)
+    {
+        ImGui::OpenPopup("Right Click");
+        m_openRightClick = false;
+    }
+    if (ImGui::BeginPopup("Right Click"))
+    {
+        GameObject* gameObject = m_rightClickedObject == UUID_INVALID ? nullptr : m_sceneHolder->GetCurrentScene()->GetGameObject(m_rightClickedObject).getPtr();
+        Scene* scene = gameObject ? gameObject->GetScene() : Engine::Get()->GetSceneHolder()->GetCurrentScene();
+        if (ImGui::MenuItem("Create Empty"))
+        {
+            scene->CreateGameObject(gameObject);
+            m_rightClickedObject = UUID_INVALID;
+            ImGui::CloseCurrentPopup();
+        }
+        if (gameObject && ImGui::MenuItem("Delete"))
+        {
+            scene->DestroyGameObject(gameObject);
+            m_rightClickedObject = UUID_INVALID;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+}
+
+void Hierarchy::SetRightClickedObject(const Core::UUID& uuid)
+{
+    m_rightClickedObject = uuid;
+    m_openRightClick = true;
+}
+
 
 void Hierarchy::OnRender()
 {
@@ -138,6 +176,13 @@ void Hierarchy::OnRender()
     {
         uint64_t index = 0;
         DisplayObject(scene->GetRootObject().getPtr(), index);
+        if (!m_openRightClick && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ImGui::IsWindowHovered())
+        {
+            m_rightClickedObject = UUID_INVALID;
+            m_openRightClick = true;
+        }
+        DisplayRightClickMenu();
     }
     ImGui::End();
 }
+

@@ -21,12 +21,49 @@ public:
     
     SafePtr(const std::weak_ptr<T>& ptr) : weak(ptr) {}
     
+    // Templated conversion constructor for derived-to-base conversion
+    template<typename U>
+    SafePtr(const SafePtr<U>& other) requires (std::is_convertible_v<U*, T*>) : weak(other.weak) {}
+    
+    template<typename U>
+    SafePtr(const std::shared_ptr<U>& ptr) requires (std::is_convertible_v<U*, T*>) : weak(ptr) {}
+    
+    template<typename U>
+    SafePtr(const std::weak_ptr<U>& ptr) requires (std::is_convertible_v<U*, T*>) : weak(ptr) {}
+    
+    ~SafePtr()
+    {
+        weak.reset();
+    }
+    
     SafePtr& operator=(const std::shared_ptr<T>& ptr) {
         weak = ptr;
         return *this;
     }
     
     SafePtr& operator=(const std::weak_ptr<T>& ptr) {
+        weak = ptr;
+        return *this;
+    }
+    
+    // Templated assignment operators for derived-to-base conversion
+    template<typename U>
+    SafePtr& operator=(const SafePtr<U>& other) requires (std::is_convertible_v<U*, T*>)
+    {
+        weak = other.weak;
+        return *this;
+    }
+    
+    template<typename U>
+    SafePtr& operator=(const std::shared_ptr<U>& ptr) requires (std::is_convertible_v<U*, T*>)
+    {
+        weak = ptr;
+        return *this;
+    }
+    
+    template<typename U>
+    SafePtr& operator=(const std::weak_ptr<U>& ptr) requires (std::is_convertible_v<U*, T*>)
+    {
         weak = ptr;
         return *this;
     }
@@ -78,4 +115,8 @@ public:
     long use_count() const {
         return weak.use_count();
     }
+    
+    // Allow other SafePtr instantiations to access private members
+    template<typename U>
+    friend class SafePtr;
 };

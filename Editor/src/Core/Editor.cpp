@@ -1,15 +1,20 @@
 ﻿#include "Editor.h"
+#include "Core/Engine.h"
 
 #include "Component/MeshComponent.h"
-#include "Component/ParticleSystemComponent.h"
+#include "Component/GPUSoftBodyComponent.h"
 #include "Component/TestComponent.h"
 #include "Component/TransformComponent.h"
-#include "Core/Engine.h"
-#include "Resource/ComputeShader.h"
+#include "Component/LightComponent.h"
 
+#include "Resource/ComputeShader.h"
 #include "Resource/Mesh.h"
 #include "Resource/Model.h"
+#include "Resource/CubeMap.h"
+#include "Resource/PostProcessShader.h"
+
 #include "Scene/GameObject.h"
+
 #include "Utils/Color.h"
 
 Editor::Editor()
@@ -48,17 +53,23 @@ void Editor::Initialize()
     
     auto resourceManager = m_engine->GetResourceManager();
     auto currentScene = m_engine->GetSceneHolder()->GetCurrentScene();
+    
     auto model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Cube.obj");
     resourceManager->Load<Model>(RESOURCE_PATH"/models/Suzanne.obj");
     resourceManager->Load<Model>(RESOURCE_PATH"/models/Plane.obj");
-    model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Sponza/sponza.obj");
+    resourceManager->Load<CubeMap>(RESOURCE_PATH"/envMap/wooden_studio_09_4k.hdr");
+    resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/inverted.pshader");
+    // model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Sponza/sponza.obj");
+    model = resourceManager->Load<Model>(RESOURCE_PATH"models/Sphere.obj");
+    
     model->EOnLoaded.Bind([model, this, currentScene]()
     {
         auto go = Model::CreateGameObject(model.getPtr(), currentScene);
+        go->GetTransform()->SetLocalPosition(Vec3f(4, 0, 0));
     });
     
-    // auto go = currentScene->CreateGameObject();
-    // go->AddComponent<ParticleSystemComponent>();
+    auto go = currentScene->CreateGameObject();
+    go->AddComponent<GPUSoftBodyComponent>();
 }
 
 void Editor::Run()
@@ -79,6 +90,7 @@ void Editor::Run()
         m_imguiHandler->EndFrame();
         
         m_engine->EndFrame();
+        //std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 }
 

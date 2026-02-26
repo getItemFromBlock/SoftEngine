@@ -3,13 +3,14 @@
 #include "Hierarchy.h"
 #include "Inspector.h"
 #include "ResourcesWindow.h"
+#include "ViewportWindow.h"
+#include "Core/Engine.h"
 
 void EditorWindowManager::Initialize(Engine* engine, ImGuiHandler* handler)
 {
     auto hierarchy = std::make_unique<Hierarchy>(engine, handler);
     auto inspector = std::make_unique<Inspector>(engine, handler);
 
-    Hierarchy* hierarchyPtr = hierarchy.get();
     Inspector* inspectorPtr = inspector.get();
     
     hierarchy->EOnObjectSelected.Bind([inspectorPtr](const Core::UUID& uuid)
@@ -19,7 +20,8 @@ void EditorWindowManager::Initialize(Engine* engine, ImGuiHandler* handler)
     
     m_windows.push_back(std::move(hierarchy));
     m_windows.push_back(std::move(inspector));
-    m_windows.push_back(std::make_unique<ResourcesWindow>(engine, handler));
+    m_windows.push_back(std::make_unique<ResourcesWindow>(handler));
+    m_windows.push_back(std::make_unique<ViewportWindow>(handler, engine->GetSceneHolder()->GetCurrentScene()->GetEditorCamera()));
 }
 
 void EditorWindowManager::RenderMainDock()
@@ -57,7 +59,7 @@ void EditorWindowManager::RenderMainDock()
 
 void EditorWindowManager::Render() const
 {
-    // RenderMainDock();
+    RenderMainDock();
     for (auto& window : m_windows)
         window->OnRender();
 }

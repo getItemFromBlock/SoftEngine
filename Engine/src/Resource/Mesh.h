@@ -19,10 +19,16 @@ struct Vertex
     Vec2f texCoord;
     Vec3f normal;
     Vec3f tangent;
+};
 
-    static VkVertexInputBindingDescription GetBindingDescription();
-
-    static std::array<VkVertexInputAttributeDescription, 4> GetAttributeDescriptions();
+struct WeightedVertex
+{
+    Vec3f position;
+    Vec2f texCoord;
+    Vec3f normal;
+    Vec3f tangent;
+    Vec4i indices;
+    Vec4f weights;
 };
 
 struct SubMesh
@@ -36,9 +42,13 @@ class Mesh : public IResource
 public:
     DECLARE_RESOURCE_TYPE(Mesh)
 
-    bool Load(ResourceManager* resourceManager) override;
-    bool SendToGPU(VulkanRenderer* renderer) override;
+    bool Load(ResourceManager *resourceManager) override;
+    bool SendToGPU(VulkanRenderer *renderer) override;
+    // verticeData is a pointer to a list of Vertex or WeightedVertex structs, with no padding in-between
+    void CreateFrom(float *verticeData, uint32_t verticeCount, uint32_t *indices, uint32_t indiceCount, bool isWeighted = false);
     void Unload() override;
+    
+    bool Exists() const override;
 
     VulkanVertexBuffer* GetVertexBuffer() const { return m_vertexBuffer.get(); }
     VulkanIndexBuffer* GetIndexBuffer() const { return m_indexBuffer.get(); }
@@ -60,4 +70,5 @@ private:
     std::unique_ptr<VulkanIndexBuffer> m_indexBuffer;
     
     BoundingBox m_boundingBox;
+    bool m_isWeighted = false;
 };

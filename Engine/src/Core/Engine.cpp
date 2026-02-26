@@ -9,14 +9,19 @@
 
 #include "Resource/Mesh.h"
 #include "Resource/Model.h"
+#include "Resource/ComputeShader.h"
 #include "Resource/ResourceManager.h"
 
 #include "Scene/Scene.h"
+#include "Scene/GameObject.h"
 
 #include "Component/MeshComponent.h"
 #include "Component/TestComponent.h"
 #include "Component/TransformComponent.h"
-#include "Scene/GameObject.h"
+#include "Component/LightComponent.h"
+#include "Component/ParticleSystemComponent.h"
+
+
 #include "Utils/Color.h"
 
 Engine* Engine::Create()
@@ -26,6 +31,7 @@ Engine* Engine::Create()
     s_instance = std::make_unique<Engine>();
     return s_instance.get();
 }
+
 
 bool Engine::Initialize(EngineDesc desc)
 {
@@ -49,17 +55,30 @@ bool Engine::Initialize(EngineDesc desc)
 
     m_resourceManager = std::make_unique<ResourceManager>();
     m_resourceManager->Initialize(m_renderer.get());
-    m_resourceManager->LoadDefaultTexture(RESOURCE_PATH"/textures/debug.jpeg");
-    m_resourceManager->LoadBlankTexture(RESOURCE_PATH"/textures/blank.png");
-    m_resourceManager->LoadDefaultShader(RESOURCE_PATH"/shaders/Unlit/unlit.shader");
-    m_resourceManager->LoadDefaultMaterial(RESOURCE_PATH"/shaders/unlit.mat");
     
+    // Create default resources
+    {
+        m_resourceManager->LoadDefaultTexture(RESOURCE_PATH"/textures/debug.jpeg");
+        m_resourceManager->LoadBlankTexture(RESOURCE_PATH"/textures/blank.png");
+        m_resourceManager->LoadDefaultCubeMap(RESOURCE_PATH"/envMap/clearNight.hdr");
+        m_resourceManager->LoadBlankCubeMap(RESOURCE_PATH"/envMap/blank.hdr");
+        m_resourceManager->LoadDefaultShader(RESOURCE_PATH"/shaders/PBR/PBR.shader");
+        m_resourceManager->LoadDefaultMaterial(RESOURCE_PATH"/materials/pbr.mat");
+
+        SafePtr<Shader> unlit = m_resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/Unlit/Unlit.shader");
+        SafePtr<Material> mat = m_resourceManager->CreateMaterial(RESOURCE_PATH"/materials/unlit.mat");
+        mat->SetShader(unlit);
+    }
+
     m_renderer->GetLineRenderer()->Initialize(m_renderer.get());
+    m_renderer->GetSkyboxRenderer()->Initialize();
     
     m_componentRegister = std::make_unique<ComponentRegister>();
     m_componentRegister->RegisterComponent<TransformComponent>();
     m_componentRegister->RegisterComponent<MeshComponent>();
     m_componentRegister->RegisterComponent<TestComponent>();
+    m_componentRegister->RegisterComponent<LightComponent>();
+    m_componentRegister->RegisterComponent<ParticleSystemComponent>();
     
     m_sceneHolder = std::make_unique<SceneHolder>();
     m_sceneHolder->Initialize();
@@ -88,18 +107,7 @@ void Engine::Update()
 
 void Engine::Render()
 {        
-    m_renderer->ClearColor();
-    
-    m_renderer->AddLine(Vec3f(0, 0, 0), Vec3f::Right(), Vec4f(1, 0, 0, 1));
-    m_renderer->AddLine(Vec3f(0, 0, 0), Vec3f::Up(), Vec4f(0, 1, 0, 1));
-    m_renderer->AddLine(Vec3f(0, 0, 0), Vec3f::Forward(), Vec4f(0, 0, 1, 1));
-
     m_sceneHolder->Render(m_renderer.get());
-    
-    auto currentScene = m_sceneHolder->GetCurrentScene();
-    auto cameraData = currentScene->GetCameraData();
-    
-    m_renderer->GetLineRenderer()->Render(m_renderer.get(), cameraData.VP);
 }
 
 void Engine::EndFrame()

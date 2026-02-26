@@ -8,6 +8,7 @@
 
 #include "Render/Camera.h"
 #include "ComponentHandler.h"
+#include "LightManager.h"
 
 #include "Utils/Type.h"
 
@@ -23,6 +24,7 @@ struct CameraData
     Vec3f up;
     Vec3f right;
     Frustum frustum;
+    Vec3f position;
 };
 
 using GameObjectList = std::unordered_map<Core::UUID, std::shared_ptr<GameObject>>;
@@ -38,14 +40,15 @@ public:
     void OnRender(VulkanRenderer* renderer);
     void OnUpdate(float deltaTime);
 
+    #pragma region GameObject
     const GameObjectList& GetGameObjects() const { return m_gameObjects; }
     SafePtr<GameObject> CreateGameObject(GameObject* parent = nullptr);
     SafePtr<GameObject> GetGameObject(Core::UUID UUID) const;
     SafePtr<GameObject> GetRootObject() const;
     void DestroyGameObject(GameObject* gameObject);
-    
     void SetParent(GameObject* object, GameObject* parent);
     void RemoveChild(GameObject* object, GameObject* child);
+    #pragma endregion
 
     #pragma region Component
     template<typename T>
@@ -60,6 +63,8 @@ public:
 
     template<typename T>
     SafePtr<T> AddComponent(GameObject* gameObject);
+    SafePtr<IComponent> AddComponent(GameObject* gameObject, ComponentID id);
+    SafePtr<IComponent> AddComponent(ComponentID id, std::shared_ptr<IComponent> component);
 
     template<typename T>
     void RemoveComponent(GameObject* gameObject);
@@ -68,7 +73,9 @@ public:
     void RemoveAllComponents(GameObject* gameObject);
 #pragma endregion 
     CameraData GetCameraData() const { return m_editorCameraData; }
+    Camera* GetEditorCamera() const { return m_editorCamera.get(); }
     
+    LightManager* GetLightManager() const { return m_lightManager.get(); }
 private:
     void UpdateCamera(float deltaTime) const;
 private:
@@ -78,6 +85,7 @@ private:
     GameObjectList m_gameObjects;
     std::unordered_map<ComponentID, std::vector<std::shared_ptr<IComponent>>> m_components;
     
+    std::unique_ptr<LightManager> m_lightManager;
     std::unique_ptr<Camera> m_editorCamera;
     CameraData m_editorCameraData;
     
@@ -134,11 +142,8 @@ SafePtr<T> Scene::AddComponent(GameObject* gameObject)
 {
     static_assert(std::is_base_of_v<IComponent, T>, "T must inherit from IComponent");
     auto component = std::make_shared<T>(gameObject);
-
-    std::scoped_lock lock(m_componentsMutex);
-    m_components[ComponentRegister::GetComponentID<T>()].push_back(component);
-    component->OnCreate();
     
+    AddComponent(ComponentRegister::GetComponentID<T>(), component);
     return component;
 }
 

@@ -15,6 +15,8 @@ public:
     static Editor* Create();
     static Editor* Get() { return s_instance.get(); }
     
+    ImGuiHandler* GetImGuiHandler() const { return m_imguiHandler.get(); }
+    
     void Initialize();
     void Run();
     void OnRender();
