@@ -126,6 +126,12 @@ Vec4f Camera::GetClearColor() const
     return p_clearColor;
 }
 
+void Camera::SetViewMode(ViewMode::Type viewMode)
+{
+    p_viewMode = viewMode;
+    GetTransform()->SetDirty();
+}
+
 TransformComponent* Camera::GetTransform() const
 {
     return m_transform.get();

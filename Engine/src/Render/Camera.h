@@ -57,7 +57,7 @@ public:
     Vec4f GetClearColor() const;
     
     ViewMode::Type GetViewMode() const { return p_viewMode; }
-    void SetViewMode(ViewMode::Type viewMode) { p_viewMode = viewMode; }
+    void SetViewMode(ViewMode::Type viewMode);
 
     virtual TransformComponent* GetTransform() const;
 
