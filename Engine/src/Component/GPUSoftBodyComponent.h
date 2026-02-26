@@ -80,8 +80,6 @@ public:
 
     void ApplySettings();
     BodySettings& GetSettings() { return m_particleSettings; }
-
-    void Restart();
     
     SafePtr<Material> GetMaterial() const { return m_material; }
     SafePtr<Mesh> GetMesh() const { return m_mesh; }
@@ -103,6 +101,9 @@ private:
 
     SafePtr<Mesh> m_mesh;
     SafePtr<Material> m_material;
+
+    std::vector<SBParticleData> m_particles;
+    std::vector<ConnectionData> m_connections;
 
     bool m_initialUploadComplete = false;
     bool m_needsRecreation = false;

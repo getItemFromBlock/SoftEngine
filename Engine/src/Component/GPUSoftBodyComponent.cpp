@@ -83,12 +83,6 @@ void GPUSoftBodyComponent::OnCreate()
         });
     
     CreateParticleBuffers();
-
-    std::vector<WeightedVertex> vertices;
-    std::vector<uint32_t> indices;
-    CreateSkinnedMesh(vertices, indices);
-
-    m_mesh->CreateFrom(reinterpret_cast<float*>(vertices.data()), vertices.size() * sizeof(WeightedVertex) / sizeof(float), indices.data(), indices.size(), true);
 }
 
 void GPUSoftBodyComponent::OnUpdate(float deltaTime)
@@ -238,15 +232,6 @@ void GPUSoftBodyComponent::OnDestroy()
     if (m_particleBuffer) m_particleBuffer->Cleanup();
 }
 
-void GPUSoftBodyComponent::Restart()
-{
-    // TODO reset buffers ? hmleh
-    /*
-    Play();
-    m_currentTime = 0.f;
-    */
-}
-
 void GPUSoftBodyComponent::CreateParticleBuffers()
 {
     auto renderer = Engine::Get()->GetRenderer();
@@ -257,12 +242,11 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
     if (m_particleBuffer)
         m_particleBuffer->Cleanup();
 
-    std::vector<SBParticleData> particles;
-    std::vector<ConnectionData> connections;
-    InitializeParticleData(particles, connections);
+    if (m_particles.empty())
+        InitializeParticleData(m_particles, m_connections);
 
-    VkDeviceSize PBufSize = sizeof(SBParticleData) * particles.size();
-    VkDeviceSize CBufSize = sizeof(ConnectionData) * connections.size();
+    VkDeviceSize PBufSize = sizeof(SBParticleData) * m_particles.size();
+    VkDeviceSize CBufSize = sizeof(ConnectionData) * m_connections.size();
     PBufSizeAligned = align(PBufSize, 0x40);
     PBufSizeAligned = std::max(0x40llu, PBufSize);
     CBufSizeAligned = align(CBufSize, 0x40);
@@ -279,9 +263,9 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-    stagingBuffer->CopyData(particles.data(), PBufSize);
+    stagingBuffer->CopyData(m_particles.data(), PBufSize);
     if (CBufSize)
-        stagingBuffer->CopyData(connections.data(), CBufSize, PBufSizeAligned);
+        stagingBuffer->CopyData(m_connections.data(), CBufSize, PBufSizeAligned);
 
     VkCommandBufferAllocateInfo alloc{};
     alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -327,27 +311,79 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
     m_initialUploadComplete = true;
     m_particleBuffer = std::move(particleBuffer);
     stagingBuffer->Cleanup();
+
+    std::vector<WeightedVertex> vertices;
+    std::vector<uint32_t> indices;
+    CreateSkinnedMesh(vertices, indices);
+
+    m_mesh->CreateFrom(reinterpret_cast<float*>(vertices.data()), vertices.size() * sizeof(WeightedVertex) / sizeof(float), indices.data(), indices.size(), true);
+    
+    m_particles.clear();
+    m_connections.clear();
 }
+
+const uint32_t _cubeSwizzlesValues[] =
+{
+    2, 1, 0,
+    0, 2, 1,
+    0, 1, 2,
+    2, 1, 0,
+    0, 2, 1,
+    0, 1, 2
+};
 
 void GPUSoftBodyComponent::CreateSkinnedMesh(std::vector<WeightedVertex> &vertices, std::vector<uint32_t> &indices)
 {
-    switch (m_particleSettings.shape.type)
+    if (m_particleSettings.shape.type == BodySettings::Shape::Type::Cube)
     {
-    case BodySettings::Shape::Type::Cube:
-        for (uint32_t i = 0; i < 6; i++)
+        for (int32_t i = 0; i < 6; i++)
         {
-            for (uint32_t j = 0; j < m_particleSettings.general.surfacePoints.x-1; j++)
+            for (int32_t j = 0; j < m_particleSettings.general.surfacePoints.x; j++)
             {
-                for (uint32_t k = 0; k < m_particleSettings.general.surfacePoints.y-1; k++)
+                for (int32_t k = 0; k < m_particleSettings.general.surfacePoints.y; k++)
                 {
-                    Vec2f posA = Vec2f( j / (m_particleSettings.general.surfacePoints.x - 1),
-                                        k / (m_particleSettings.general.surfacePoints.y - 1));
+                                        
+                    Vec3f pos = Vec3f(   j / (m_particleSettings.general.surfacePoints.x - 1),
+                                         k / (m_particleSettings.general.surfacePoints.y - 1),
+                                         i < 3 ? -1 : 1);
+                    const uint32_t *ptr = _cubeSwizzlesValues + (i*3);
+                    pos = Vec3f(pos[ptr[0]], pos[ptr[1]], pos[ptr[2]]);
+                    WeightedVertex v;
+                    v.position = pos;
+                    v.normal = Vec3f(0);
+                    v.normal[i % 3] = i < 3 ? -1 : 1;
+                    v.tangent = Vec3f(i % 3 == 0, i % 3 == 1, i % 3 == 2);
+                    if (i >= 3) v.tangent = Vec3f(1) - v.tangent;
+
+                    std::array<uint32_t, 4> closests = std::array<uint32_t, 4>();
+                    uint32_t count = 0;
+                    for (uint32_t l = 0; l < m_particles.size(); l++)
+                    {
+                        
+                    }
+
+                    vertices.push_back(v);
                 }
             }
         }
-    default:
-        ASSERT("Hmleh");
-        break;
+
+        for (int32_t i = 0; i < 6; i++)
+        {
+            const int32_t offset = m_particleSettings.general.surfacePoints.x * m_particleSettings.general.surfacePoints.y * i;
+            for (int32_t j = 0; j < m_particleSettings.general.surfacePoints.x-1; j++)
+            {
+                for (int32_t k = 0; k < m_particleSettings.general.surfacePoints.y-1; k++)
+                {
+                    indices.push_back(offset + k * m_particleSettings.general.surfacePoints.x + j);
+                    indices.push_back(offset + k * m_particleSettings.general.surfacePoints.x + j + 1);
+                    indices.push_back(offset + (k + 1) * m_particleSettings.general.surfacePoints.x + j);
+
+                    indices.push_back(offset + (k + 1) * m_particleSettings.general.surfacePoints.x + j);
+                    indices.push_back(offset + k * m_particleSettings.general.surfacePoints.x + j + 1);
+                    indices.push_back(offset + (k + 1) * m_particleSettings.general.surfacePoints.x + j + 1);
+                }
+            }
+        }
     }
 }
 
