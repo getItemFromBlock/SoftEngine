@@ -87,6 +87,7 @@ public:
     SafePtr<Mesh> GetMesh() const { return m_mesh; }
 private:
     void CreateParticleBuffers();
+    void CreateSkinnedMesh(std::vector<WeightedVertex> &vertices, std::vector<uint32_t> &indices);
     void InitializeParticleData(std::vector<SBParticleData> &particles, std::vector<ConnectionData> &connections);
 
 private:

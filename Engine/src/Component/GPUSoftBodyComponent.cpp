@@ -13,7 +13,7 @@
 // Aligns an integer to the next nearest memory aligned value. Alignement MUST be a power of two!
 uint64_t align(uint64_t value, uint64_t alignement)
 {
-    assert(((alignement-1) & alignement) == 0);
+    ASSERT(((alignement-1) & alignement) == 0);
     return (value + alignement - 1) & ~(alignement - 1);
 }
 
@@ -70,7 +70,7 @@ void GPUSoftBodyComponent::OnCreate()
     
     m_material->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
 
-    m_mesh = resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cube.obj/Cube.mesh");
+    m_mesh = std::make_shared<Mesh>("internal");
 
     computeShader0->EOnSentToGPU.Bind([this, computeShader0, renderer]()
         {
@@ -83,6 +83,12 @@ void GPUSoftBodyComponent::OnCreate()
         });
     
     CreateParticleBuffers();
+
+    std::vector<WeightedVertex> vertices;
+    std::vector<uint32_t> indices;
+    CreateSkinnedMesh(vertices, indices);
+
+    m_mesh->CreateFrom(reinterpret_cast<float*>(vertices.data()), vertices.size() * sizeof(WeightedVertex) / sizeof(float), indices.data(), indices.size(), true);
 }
 
 void GPUSoftBodyComponent::OnUpdate(float deltaTime)
@@ -321,6 +327,28 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
     m_initialUploadComplete = true;
     m_particleBuffer = std::move(particleBuffer);
     stagingBuffer->Cleanup();
+}
+
+void GPUSoftBodyComponent::CreateSkinnedMesh(std::vector<WeightedVertex> &vertices, std::vector<uint32_t> &indices)
+{
+    switch (m_particleSettings.shape.type)
+    {
+    case BodySettings::Shape::Type::Cube:
+        for (uint32_t i = 0; i < 6; i++)
+        {
+            for (uint32_t j = 0; j < m_particleSettings.general.surfacePoints.x-1; j++)
+            {
+                for (uint32_t k = 0; k < m_particleSettings.general.surfacePoints.y-1; k++)
+                {
+                    Vec2f posA = Vec2f( j / (m_particleSettings.general.surfacePoints.x - 1),
+                                        k / (m_particleSettings.general.surfacePoints.y - 1));
+                }
+            }
+        }
+    default:
+        ASSERT("Hmleh");
+        break;
+    }
 }
 
 void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &particles, std::vector<ConnectionData> &connections)
