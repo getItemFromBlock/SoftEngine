@@ -82,7 +82,7 @@ void GPUSoftBodyComponent::OnCreate()
             m_simulationCompute1 = computeShader1->CreateDispatch(renderer);
         });
     
-    InitializeFromMesh(resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cylinder.obj/Cylinder.mesh"), 10, 0.5);
+    InitializeFromMesh(resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cylinder.obj/Cylinder.mesh"), 5, 0.5);
 
     CreateParticleBuffers();
 }
@@ -123,7 +123,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
         uint32_t  particleCount;
     } push0;
 
-    push0.gravity = GetGameObject()->GetTransform()->GetWorldRotation().GetInverse() * Vec3f(0, 0, 0);
+    push0.gravity = GetGameObject()->GetTransform()->GetWorldRotation().GetInverse() * Vec3f(0, 9.81f, 0);
     push0.deltaTime = std::min(deltaTime, 1/60.0f);
     push0.damping = m_particleSettings.general.damping;
     push0.strength = m_particleSettings.general.strength;
@@ -519,6 +519,7 @@ void GPUSoftBodyComponent::InitializeFromMesh(SafePtr<Mesh> inputMesh, float den
     for (int i = 0; i < m_particles.size(); i++)
     {
         m_particles[i].connectionsOffset = m_connections.size();
+        if (m_particles[i].position.y <= BBox.min.y + 0.1f) continue;
 
         for (int j = 0; j < m_particles.size(); j++)
         {
