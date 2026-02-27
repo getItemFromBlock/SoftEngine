@@ -93,6 +93,8 @@ private:
     void InitializeParticleData(std::vector<SBParticleData> &particles, std::vector<ConnectionData> &connections);
 
 private:
+    bool m_loadedFromMesh = false;
+
     std::unique_ptr<ComputeDispatch> m_simulationCompute0;
     std::unique_ptr<ComputeDispatch> m_simulationCompute1;
 

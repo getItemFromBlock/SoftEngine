@@ -94,6 +94,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
     
     if (m_needsRecreation)
     {
+        if (m_loadedFromMesh) InitializeFromMesh(Engine::Get()->GetResourceManager()->Load<Mesh>(RESOURCE_PATH"/models/Cylinder.obj/Cylinder.mesh"), 5, 0.5);
         CreateParticleBuffers();
         m_needsRecreation = false;
         return;
@@ -463,6 +464,7 @@ void GPUSoftBodyComponent::ApplySettings()
 
 void GPUSoftBodyComponent::InitializeFromMesh(SafePtr<Mesh> inputMesh, float density, float maxDistToConnect)
 {
+    m_loadedFromMesh = true;
     int itConnectionOffset = 0;
 
     BoundingBox BBox = inputMesh.getPtr()->m_boundingBox;
