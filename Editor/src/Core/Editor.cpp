@@ -68,8 +68,12 @@ void Editor::Initialize()
         go->GetTransform()->SetLocalPosition(Vec3f(4, 0, 0));
     });
     
-    auto go = currentScene->CreateGameObject();
-    go->AddComponent<GPUSoftBodyComponent>();
+    model = resourceManager->Load<Model>(RESOURCE_PATH"models/Cylinder.obj");
+    model->EOnLoaded.Bind([model, this, currentScene]()
+    {
+        auto go = currentScene->CreateGameObject();
+        go->AddComponent<GPUSoftBodyComponent>();
+    });
 }
 
 void Editor::Run()

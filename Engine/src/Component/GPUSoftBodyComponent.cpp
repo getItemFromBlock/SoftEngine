@@ -82,6 +82,8 @@ void GPUSoftBodyComponent::OnCreate()
             m_simulationCompute1 = computeShader1->CreateDispatch(renderer);
         });
     
+    InitializeFromMesh(resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cylinder.obj/Cylinder.mesh"), 10, 0.5);
+
     CreateParticleBuffers();
 }
 
@@ -121,7 +123,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
         uint32_t  particleCount;
     } push0;
 
-    push0.gravity = GetGameObject()->GetTransform()->GetWorldRotation().GetInverse() * Vec3f(0, 9.81f, 0);
+    push0.gravity = GetGameObject()->GetTransform()->GetWorldRotation().GetInverse() * Vec3f(0, 0, 0);
     push0.deltaTime = std::min(deltaTime, 1/60.0f);
     push0.damping = m_particleSettings.general.damping;
     push0.strength = m_particleSettings.general.strength;
@@ -464,6 +466,11 @@ void GPUSoftBodyComponent::InitializeFromMesh(SafePtr<Mesh> inputMesh, float den
     int itConnectionOffset = 0;
 
     BoundingBox BBox = inputMesh.getPtr()->m_boundingBox;
+
+    const int vertexSize = sizeof(Vertex) / sizeof(float);
+
+    int pointCount = inputMesh->m_vertices.size() / vertexSize;
+
     Vertex* vertices = reinterpret_cast<Vertex*>(inputMesh->m_vertices.data());
 
     float invDensity = 1 / density;
@@ -479,7 +486,7 @@ void GPUSoftBodyComponent::InitializeFromMesh(SafePtr<Mesh> inputMesh, float den
                 Vec3f pos = { currX, currY, currZ };
 
                 bool shouldDiscard = false;
-                for (int i = 0; i < inputMesh->m_vertices.size() / 3; i++)
+                for (int i = 0; i < pointCount / 3; i++)
                 {
                     Vec3f a = vertices[i * 3    ].position;
                     Vec3f b = vertices[i * 3 + 1].position;
@@ -495,7 +502,7 @@ void GPUSoftBodyComponent::InitializeFromMesh(SafePtr<Mesh> inputMesh, float den
                         break;
                     }
                 }
-
+                
                 if (shouldDiscard)
                     continue;
 
@@ -508,19 +515,18 @@ void GPUSoftBodyComponent::InitializeFromMesh(SafePtr<Mesh> inputMesh, float den
         }
     }
 
-
     // Generate connection
     for (int i = 0; i < m_particles.size(); i++)
     {
         m_particles[i].connectionsOffset = m_connections.size();
 
-        for (int j = 0; i < m_particles.size(); j++)
+        for (int j = 0; j < m_particles.size(); j++)
         {
             if (i == j) continue;
 
             float dist = m_particles[j].position.Distance(m_particles[i].position);
 
-            if (dist < maxDistToConnect)
+            if (dist <= maxDistToConnect)
             {
                 ConnectionData connectionData;
 
@@ -528,10 +534,11 @@ void GPUSoftBodyComponent::InitializeFromMesh(SafePtr<Mesh> inputMesh, float den
                 connectionData.particleID = j;
 
                 m_connections.push_back(connectionData);
-
             }
         }
 
         m_particles[i].connectionsCount = m_connections.size() - m_particles[i].connectionsOffset;
     }
+
+    totalParticleCount = m_particles.size();
 }
