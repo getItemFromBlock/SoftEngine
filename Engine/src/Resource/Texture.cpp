@@ -1,5 +1,6 @@
 #include "Texture.h"
 
+#include "Core/Engine.h"
 #include "Debug/Log.h"
 #include "Loader/ImageLoader.h"
 #include "Render/Vulkan/VulkanRenderer.h"
@@ -34,12 +35,25 @@ void Texture::Unload()
     }
 }
 
-void Texture::CreateFromBuffer(const VulkanTexture& texture)
+void Texture::Describe(ClassDescriptor& descriptor)
+{
+    auto resourceManager = Engine::Get()->GetResourceManager();
+    SafePtr<Texture> self = resourceManager->GetResource<Texture>(p_uuid);
+    auto prop = descriptor.AddTexture("Texture", self);
+    prop.readOnly = true;
+}
+
+void Texture::CreateFromBuffer(const GBufferAttachment& attachment, VkSampler sampler, uint32_t width, uint32_t height)
 {
     m_buffer.reset();
-    m_buffer = std::unique_ptr<VulkanTexture>(new VulkanTexture(texture));
+    if (!m_buffer)
+        m_buffer = std::make_unique<VulkanTexture>();
     
-    p_isLoading = false;
+    m_buffer->CreateFromGBuffer(attachment, sampler, width, height);
+
     p_isLoaded = true;
+    EOnLoaded.Invoke();
+    
     p_sendToGPU = true;
+    EOnSentToGPU.Invoke();
 }

@@ -90,7 +90,15 @@ public:
     bool Bind(VulkanRenderer* renderer);
 
     MaterialAttributes GetAttributes() const { return m_attributes; }
+    float GetFloatAttribute(const std::string& name) const;
+    int GetIntAttribute(const std::string& name) const;
+    Vec2f GetVec2Attribute(const std::string& name) const;
+    Vec3f GetVec3Attribute(const std::string& name) const;
+    Vec4f GetVec4Attribute(const std::string& name) const;
+
     VulkanMaterial* GetHandle() const { return m_handle.get(); }
+
+    SafePtr<Texture> GetTexture(const std::string& name) const;
 
 private:
     void OnShaderChanged();

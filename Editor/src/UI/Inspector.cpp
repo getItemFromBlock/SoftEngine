@@ -771,9 +771,13 @@ void Inspector::RenderTextureProperty(const Property& property, const std::strin
         textureID = Editor::Get()->GetImGuiHandler()->GetTextureID(texture.getPtr());
     }
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2.f, 2.f));
-    if (ImGui::ImageButton(id.c_str(), textureID, ImVec2(64, 64)))
+    if (!property.readOnly && ImGui::ImageButton(id.c_str(), textureID, ImVec2(64, 64)))
     {
         ImGui::OpenPopup("Resource Popup");
+    }
+    else if (property.readOnly)
+    {
+        ImGui::Image(textureID, ImVec2(64, 64));
     }
     
     auto result = DisplayResourcePopup<Texture>();

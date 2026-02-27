@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include "Component/TransformComponent.h"
+#include "Core/Engine.h"
 
 #include "Resource/Mesh.h"
 
@@ -65,6 +66,7 @@ void RenderQueue::SubmitMeshRenderer(GameObject* gameObject, Mesh* mesh,
         cmd.material = material.getPtr();
         cmd.shader = material->GetShader().getPtr();
         cmd.modelMatrix = model;
+        cmd.albedoTexture = material->GetTexture("albedoSampler");
         cmd.GenerateSortKey();
             
         Submit(cmd);
@@ -133,6 +135,46 @@ void RenderQueue::Execute(VulkanRenderer* renderer)
         renderer->DrawVertexSubMesh(cmd.mesh->GetIndexBuffer(), 
                                     cmd.startIndex, 
                                     cmd.indexCount);
+    }
+}
+
+void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMaterial)
+{
+    if (!gBufferMaterial || !gBufferMaterial->GetShader())
+        return;
+
+    // Bind the G-Buffer shader once for the entire pass
+    if (!renderer->BindShader(gBufferMaterial->GetShader().getPtr()))
+        return;
+
+    Texture* lastAlbedo = nullptr;
+
+    
+    gBufferMaterial->SetAttribute("viewProj", Engine::Get()->GetSceneHolder()->GetCurrentScene()->GetCameraData().VP);
+    for (auto& cmd : m_commands)
+    {
+        // Swap albedo texture only when it actually changes
+        if (cmd.albedoTexture.getPtr() != lastAlbedo)
+        {
+            gBufferMaterial->SetAttribute("albedoSampler", cmd.albedoTexture);
+            lastAlbedo = cmd.albedoTexture.getPtr();
+        }
+        Vec4f color = cmd.material->GetVec4Attribute("color");
+        gBufferMaterial->SetAttribute("color", color);
+
+        gBufferMaterial->SendAllValues(renderer);
+
+        if (!renderer->BindMaterial(gBufferMaterial))
+            continue;
+
+        if (cmd.mesh != nullptr)
+            renderer->BindVertexBuffers(cmd.mesh->GetVertexBuffer(), cmd.mesh->GetIndexBuffer());
+
+        PushConstant pushConstant = gBufferMaterial->GetShader()->GetPushConstants()[ShaderType::Vertex];
+        renderer->SendPushConstants(&cmd.modelMatrix, sizeof(Mat4),
+                                    gBufferMaterial->GetShader().getPtr(), pushConstant);
+
+        renderer->DrawVertexSubMesh(cmd.mesh->GetIndexBuffer(), cmd.startIndex, cmd.indexCount);
     }
 }
 

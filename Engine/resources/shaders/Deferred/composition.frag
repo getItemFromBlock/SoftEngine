@@ -10,9 +10,9 @@ layout(location = 0) out vec4 outColor;
 
 void main()
 {
-    vec3 worldPos = texture(gPosition, fragUV).rgb;
-    vec3 normal   = texture(gNormal,   fragUV).rgb * 2.0 - 1.0; // unpack [0,1]→[-1,1]
-    vec3 albedo   = texture(gAlbedo,   fragUV).rgb;
+    vec3 worldPos = texture(gPosition, vUV).rgb;
+    vec3 normal   = texture(gNormal,   vUV).rgb * 2.0 - 1.0; // unpack [0,1]→[-1,1]
+    vec3 albedo   = texture(gAlbedo,   vUV).rgb;
 
-    outColor = vec4(albedo, 1.0);
+    outColor = vec4(normal, 1.0);
 }

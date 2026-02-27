@@ -12,7 +12,9 @@ public:
     virtual bool SendToGPU(VulkanRenderer* renderer) override;
     virtual void Unload() override;
     
-    void CreateFromBuffer(const VulkanTexture& texture);
+    void Describe(ClassDescriptor& descriptor) override;
+    
+    void CreateFromBuffer(const GBufferAttachment& attachment, VkSampler sampler, uint32_t width, uint32_t height);
     
     VulkanTexture* GetBuffer() const { return m_buffer.get(); }
 protected:

@@ -70,7 +70,6 @@ void Material::Describe(ClassDescriptor& descriptor)
             SetAttribute(prop.name, *cubeMap);
         };
     }
-    
 }
 
 void Material::SetShader(const SafePtr<Shader>& shader)
@@ -152,7 +151,7 @@ void Material::SetAttribute(const std::string& name, const SafePtr<Texture>& tex
     if (m_attributes.samplerAttributes.contains(name))
     {
         m_attributes.samplerAttributes[name] = texture;
-        
+
         if (!texture || !m_shader)
             return;
         m_shader->EOnSentToGPU.Bind([this, texture, name]()
@@ -176,7 +175,7 @@ void Material::SetAttribute(const std::string& name, const SafePtr<CubeMap>& cub
     if (m_attributes.sampler3DAttributes.contains(name))
     {
         m_attributes.sampler3DAttributes[name] = cubeMap;
-        
+
         if (!cubeMap || !m_shader)
             return;
         m_shader->EOnSentToGPU.Bind([this, cubeMap, name]()
@@ -219,7 +218,8 @@ void Material::SendAllValues(VulkanRenderer* renderer)
 
     std::map<std::pair<uint32_t, uint32_t>, UniformBuffer> uniformBuffers;
 
-    auto AppendData = [&](const std::string& uniformName, const std::string& memberName, const void* valuePtr, size_t size)
+    auto AppendData = [&](const std::string& uniformName, const std::string& memberName, const void* valuePtr,
+                          size_t size)
     {
         Uniform uniform = m_shader->GetUniform(uniformName);
         auto key = std::make_pair(uniform.set, uniform.binding);
@@ -276,10 +276,10 @@ void Material::SendAllValues(VulkanRenderer* renderer)
     {
         AppendData(attrib.second.uniformName, attrib.first, &attrib.second.value, sizeof(Mat4));
     }
-    for (auto it = m_attributesToSync.begin(); it != m_attributesToSync.end(); )
+    for (auto it = m_attributesToSync.begin(); it != m_attributesToSync.end();)
     {
         const auto& [attrib, frameProcessed] = *it;
-    
+
         if (m_attributes.samplerAttributes.contains(attrib))
         {
             Uniform uniform = m_shader->GetUniform(attrib);
@@ -290,7 +290,7 @@ void Material::SendAllValues(VulkanRenderer* renderer)
             }
             VulkanMaterial* rhiMat = m_handle.get();
             rhiMat->SetTextureForFrame(renderer->GetFrameIndex(), uniform.set, uniform.binding, texture.getPtr());
-        
+
             if (frameProcessed >= renderer->GetMaxFramesInFlight())
             {
                 it = m_attributesToSync.erase(it);
@@ -310,7 +310,7 @@ void Material::SendAllValues(VulkanRenderer* renderer)
             }
             VulkanMaterial* rhiMat = m_handle.get();
             rhiMat->SetCubemapForFrame(renderer->GetFrameIndex(), uniform.set, uniform.binding, cubeMap.getPtr());
-        
+
             if (frameProcessed >= renderer->GetMaxFramesInFlight())
             {
                 it = m_attributesToSync.erase(it);
@@ -343,6 +343,63 @@ bool Material::Bind(VulkanRenderer* renderer)
         return false;
     m_handle->Bind(renderer);
     return true;
+}
+
+float Material::GetFloatAttribute(const std::string& name) const
+{
+    auto it = m_attributes.floatAttributes.find(name); 
+    if (it != m_attributes.floatAttributes.end())
+    {
+        return it->second.value;
+    }
+    return 0.f;
+}
+
+int Material::GetIntAttribute(const std::string& name) const
+{
+    auto it = m_attributes.intAttributes.find(name); 
+    if (it != m_attributes.intAttributes.end())
+    {
+        return it->second.value;
+    }
+    return 0;
+}
+
+Vec2f Material::GetVec2Attribute(const std::string& name) const
+{
+    auto it = m_attributes.vec2Attributes.find(name); 
+    if (it != m_attributes.vec2Attributes.end())
+    {
+        return it->second.value;
+    }
+    return Vec2f::Zero();
+}
+
+Vec3f Material::GetVec3Attribute(const std::string& name) const
+{
+    auto it = m_attributes.vec3Attributes.find(name); 
+    if (it != m_attributes.vec3Attributes.end())
+    {
+        return it->second.value;
+    }
+    return Vec3f::Zero();
+}
+
+Vec4f Material::GetVec4Attribute(const std::string& name) const
+{
+    auto it = m_attributes.vec4Attributes.find(name); 
+    if (it != m_attributes.vec4Attributes.end())
+    {
+        return it->second.value;
+    }
+    return Vec4f::Zero();
+}
+
+SafePtr<Texture> Material::GetTexture(const std::string& name) const
+{
+    if (!m_handle)
+        return {};
+    return m_attributes.samplerAttributes.at(name).value;
 }
 
 void Material::OnShaderChanged()
@@ -491,7 +548,8 @@ void Material::SendTexture(Texture* texture, const Uniform& uniform) const
     VulkanRenderer* renderer = Engine::Get()->GetRenderer();
     VulkanMaterial* rhiMat = m_handle.get();
     rhiMat->SetTexture(uniform.set, uniform.binding, texture, renderer);
-    PrintLog("Send Texture %s to material %s", texture->GetPath().filename().generic_string().c_str(), GetPath().generic_string().c_str());
+    PrintLog("Send Texture %s to material %s", texture->GetPath().filename().generic_string().c_str(),
+             GetPath().generic_string().c_str());
 }
 
 void Material::SendCubeMap(CubeMap* cubeMap, const Uniform& uniform) const
@@ -499,5 +557,6 @@ void Material::SendCubeMap(CubeMap* cubeMap, const Uniform& uniform) const
     VulkanRenderer* renderer = Engine::Get()->GetRenderer();
     VulkanMaterial* rhiMat = m_handle.get();
     rhiMat->SetCubemap(uniform.set, uniform.binding, cubeMap, renderer);
-    PrintLog("Send Texture %s to material %s", cubeMap->GetPath().filename().generic_string().c_str(), GetPath().generic_string().c_str());
+    PrintLog("Send Texture %s to material %s", cubeMap->GetPath().filename().generic_string().c_str(),
+             GetPath().generic_string().c_str());
 }

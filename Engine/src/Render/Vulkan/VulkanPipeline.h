@@ -74,6 +74,7 @@ private:
     uint32_t m_maxFramesInFlight = 0;
 
     std::vector<std::unique_ptr<VulkanDescriptorSetLayout>> m_descriptorSetLayouts;
+    VkDescriptorSetLayout m_emptyDescriptorSetLayout = VK_NULL_HANDLE;
 
     std::unordered_map<uint32_t, std::vector<Uniform>> m_uniformsBySet;
     std::unordered_map<UBOBinding, uint32_t> m_uniformBufferSizes;

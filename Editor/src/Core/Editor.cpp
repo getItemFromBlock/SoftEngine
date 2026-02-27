@@ -65,11 +65,11 @@ void Editor::Initialize()
     model->EOnLoaded.Bind([model, this, currentScene]()
     {
         auto go = Model::CreateGameObject(model.getPtr(), currentScene);
-        go->GetTransform()->SetLocalPosition(Vec3f(4, 0, 0));
+        go->GetTransform()->SetLocalPosition(Vec3f(0, 0, 0));
     });
     
-    auto go = currentScene->CreateGameObject();
-    go->AddComponent<GPUSoftBodyComponent>();
+    // auto go = currentScene->CreateGameObject();
+    // go->AddComponent<GPUSoftBodyComponent>();
 }
 
 void Editor::Run()

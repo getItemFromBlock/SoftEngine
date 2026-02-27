@@ -24,6 +24,7 @@ Scene::Scene()
 
         m_editorCameraData.frustum = m_editorCamera->GetFrustum();
         m_editorCameraData.VP = m_editorCamera->GetViewProjectionMatrix();
+        m_editorCameraData.view = m_editorCamera->GetViewMatrix();
         m_editorCameraData.forward = m_editorCamera->GetTransform()->GetForward();
         m_editorCameraData.right = m_editorCamera->GetTransform()->GetRight();
         m_editorCameraData.up = m_editorCamera->GetTransform()->GetUp();
@@ -43,27 +44,48 @@ Scene::~Scene()
 void Scene::OnRender(VulkanRenderer* renderer)
 {
     m_editorCamera->Begin();
-    m_editorCamera->BeginForwardPass();
-    m_editorCamera->RenderSkybox(renderer);
-    std::scoped_lock lock(m_componentsMutex);
-    
-    for (const std::vector<std::shared_ptr<IComponent>>& componentList : m_components | std::views::values)
+
     {
-        for (const std::shared_ptr<IComponent>& component : componentList)
+        std::scoped_lock lock(m_componentsMutex);
+        for (const std::vector<std::shared_ptr<IComponent>>& componentList : m_components | std::views::values)
         {
-            if (component->IsEnable())
-                component->OnRender(renderer);
+            for (const std::shared_ptr<IComponent>& component : componentList)
+            {
+                if (component->IsEnable())
+                    component->OnRender(renderer);
+            }
         }
     }
+
+    RenderQueueManager* renderQueueManager = renderer->GetRenderQueueManager();
+    RenderQueue* opaqueQueue = renderQueueManager->GetOpaqueQueue();
+    opaqueQueue->Sort();
+    opaqueQueue->ExecuteGBuffer(renderer, m_editorCamera->GetGBufferMaterial().getPtr());
+    opaqueQueue->Clear();
+
+    m_editorCamera->EndGeometry();
+
+    // ── Forward pass: skybox + transparent objects drawn on top ──────────────
+    m_editorCamera->BeginForwardPass();
+    m_editorCamera->RenderSkybox(renderer);
+
+    RenderQueue* transparentQueue = renderQueueManager->GetTransparentQueue();
+    transparentQueue->Sort();
+    transparentQueue->Execute(renderer);
+    transparentQueue->Clear();
+
+    auto lineRenderer = renderer->GetLineRenderer();
+    renderer->AddLine(Vec3f::Zero(), Vec3f::Right(), {Vec3f::Right(), 1});
+    renderer->AddLine(Vec3f::Zero(), Vec3f::Up(), {Vec3f::Up(), 1});
+    renderer->AddLine(Vec3f::Zero(), Vec3f::Forward(), {Vec3f::Forward() * -1, 1});
     
-    auto renderQueueManager = renderer->GetRenderQueueManager();
-    renderQueueManager->SortAll();
-    renderQueueManager->ExecuteAll(renderer);
-    renderQueueManager->ClearAll();
-    renderer->GetLineRenderer()->Render(renderer, m_editorCameraData.VP);
+    lineRenderer->Render(renderer, m_editorCameraData.VP);
+
     m_editorCamera->EndForwardPass();
+
+    // Post-process blit (if active)
     m_editorCamera->End();
-    
+
     renderer->ClearColor();
 }
 

@@ -159,6 +159,7 @@ public:
     
     std::unique_ptr<ComputeDispatch> CreateDispatch(VulkanRenderer* renderer);
     
+    std::vector<VkFormat> GetAttachments() const { return m_attachments; }
 protected:
     SafePtr<VertexShader> m_vertexShader;
     SafePtr<FragmentShader> m_fragmentShader;
@@ -167,6 +168,8 @@ protected:
     PushConstants m_pushConstants;
     Uniforms m_uniforms;
     std::unique_ptr<VulkanPipeline> m_pipeline;
+    
+    std::vector<VkFormat> m_attachments;
     
     Topology m_topology = Topology::Triangle;
     bool m_depthTestEnabled = true;

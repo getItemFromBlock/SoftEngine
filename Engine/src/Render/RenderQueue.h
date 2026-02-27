@@ -24,6 +24,7 @@ struct RenderCommand
     
     Material* material;
     Shader* shader;
+    SafePtr<Texture> albedoTexture = {};
     
     Mat4 modelMatrix;
     
@@ -52,8 +53,9 @@ public:
     void SubmitInstancing(Mesh* mesh, Material* material, size_t instanceCount);
 
     void Sort();
-
+    
     void Execute(VulkanRenderer* renderer);
+    void ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMaterial);
 
     void Clear();
 

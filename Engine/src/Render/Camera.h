@@ -93,6 +93,8 @@ public:
     void RenderSkybox(VulkanRenderer* renderer) const;
     void RenderPostProcess(VulkanRenderer* renderer);
 
+    SafePtr<Material> GetGBufferMaterial() const { return m_gBufferMaterial; }
+public:
     Event<Vec2i> OnRenderTargetResized;
 private:
     void BeginGBufferPass(RenderTargetTexture* rtt);
@@ -126,11 +128,11 @@ protected:
     SafePtr<RenderTargetTexture> m_renderTarget;
 
     std::unique_ptr<VulkanGBuffer> m_gBuffer = nullptr;
+    SafePtr<Material> m_gBufferMaterial;
     SafePtr<Material> m_compositionMaterial;
     SafePtr<Texture> m_positionTexture;
     SafePtr<Texture> m_normalTexture;
     SafePtr<Texture> m_albedoTexture;
 private:
     std::shared_ptr<TransformComponent> m_transform;
-    bool m_firstFrame = true;
 };

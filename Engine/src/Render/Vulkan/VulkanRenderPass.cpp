@@ -88,7 +88,6 @@ void VulkanRenderPass::BeginGBuffer(VkCommandBuffer commandBuffer,
                                      VkImageView depthImageView,
                                      VkExtent2D extent)
 {
-    VulkanUtils::TransitionGBufferToColorAttachment(commandBuffer, *gBuffer);
     gBuffer->MarkUsed();
 
     VkClearValue clearBlack{};
@@ -136,7 +135,6 @@ void VulkanRenderPass::BeginGBuffer(VkCommandBuffer commandBuffer,
 void VulkanRenderPass::EndGBuffer(VkCommandBuffer commandBuffer, VulkanGBuffer* gBuffer)
 {
     vkCmdEndRendering(commandBuffer);
-    VulkanUtils::TransitionGBufferToShaderRead(commandBuffer, *gBuffer);
 }
 
 void VulkanRenderPass::BeginComposition(VkCommandBuffer commandBuffer,

@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <map>
 #include <set>
+#include <unordered_set>
+#include <shaderc/shaderc.hpp>
 
 #include "Debug/Log.h"
 

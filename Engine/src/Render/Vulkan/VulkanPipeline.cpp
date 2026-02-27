@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <iostream>
 #include <fstream>
+#include <map>
 #include <ranges>
 #include <stdexcept>
 
@@ -99,7 +100,7 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkExtent2D extent,
 
     try
     {
-        std::unordered_map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> layoutBindings;
+        std::map<uint32_t, std::vector<VkDescriptorSetLayoutBinding>> layoutBindings;
         for (const auto& uniform : uniforms | std::views::values)
         {
             VkDescriptorSetLayoutBinding layoutBinding{};
@@ -140,7 +141,9 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkExtent2D extent,
         }
 
         std::vector<VkDescriptorSetLayout> layouts;
-        for (const auto& layout : m_descriptorSetLayouts) layouts.push_back(layout->GetLayout());
+        layouts.reserve(m_descriptorSetLayouts.size());
+        for (const auto& layout : m_descriptorSetLayouts) 
+            layouts.push_back(layout->GetLayout());
 
         VkPipelineLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
         layoutInfo.setLayoutCount = static_cast<uint32_t>(layouts.size());
@@ -166,7 +169,6 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkExtent2D extent,
         return false;
     }
 }
-
 bool VulkanPipeline::InitializeGraphicsPipeline(const Shader* shader,
                                                 const VertexShader* vertexShader,
                                                 const FragmentShader* fragmentShader,
@@ -207,7 +209,7 @@ bool VulkanPipeline::InitializeGraphicsPipeline(const Shader* shader,
     VkPipelineDynamicStateCreateInfo dynamicState{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
     dynamicState.dynamicStateCount = static_cast<uint32_t>(std::size(dynamicStates));
     dynamicState.pDynamicStates = dynamicStates;
-    
+
     VkPipelineRasterizationStateCreateInfo rasterizer{VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
@@ -222,37 +224,45 @@ bool VulkanPipeline::InitializeGraphicsPipeline(const Shader* shader,
     depthStencil.depthWriteEnable = VK_TRUE;
     depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
 
-    VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | 
-                                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = VK_FALSE;
+    // Build the attachment format list — use shader-declared attachments or fall back to colorFormat
+    std::vector<VkFormat> attachmentFormats = shader->GetAttachments();
+    if (attachmentFormats.empty())
+        attachmentFormats.push_back(colorFormat);
+
+    // One identical blend state per attachment (satisfies independentBlend=false requirement)
+    VkPipelineColorBlendAttachmentState blendAttachment{};
+    blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                     VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    blendAttachment.blendEnable = VK_FALSE;
+
+    std::vector<VkPipelineColorBlendAttachmentState> blendAttachments(attachmentFormats.size(), blendAttachment);
 
     VkPipelineColorBlendStateCreateInfo colorBlending{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
-    colorBlending.attachmentCount = 1;
-    colorBlending.pAttachments = &colorBlendAttachment;
+    colorBlending.attachmentCount = static_cast<uint32_t>(blendAttachments.size());
+    colorBlending.pAttachments    = blendAttachments.data();
 
     VkPipelineRenderingCreateInfo pipelineRenderingInfo{};
-    pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-    pipelineRenderingInfo.colorAttachmentCount = 1;
-    pipelineRenderingInfo.pColorAttachmentFormats = &colorFormat;
-    pipelineRenderingInfo.depthAttachmentFormat = depthFormat;
+    pipelineRenderingInfo.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    pipelineRenderingInfo.colorAttachmentCount    = static_cast<uint32_t>(attachmentFormats.size());
+    pipelineRenderingInfo.pColorAttachmentFormats = attachmentFormats.data();
+    pipelineRenderingInfo.depthAttachmentFormat   = depthFormat;
     pipelineRenderingInfo.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
     VkGraphicsPipelineCreateInfo pipelineInfo{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
-    pipelineInfo.pNext = &pipelineRenderingInfo;
-    pipelineInfo.stageCount = 2;
-    pipelineInfo.pStages = shaderStages;
+    pipelineInfo.pNext             = &pipelineRenderingInfo;
+    pipelineInfo.stageCount        = 2;
+    pipelineInfo.pStages           = shaderStages;
     pipelineInfo.pVertexInputState = &vertexInputInfo;
     pipelineInfo.pInputAssemblyState = &inputAssembly;
-    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pViewportState    = &viewportState;
     pipelineInfo.pRasterizationState = &rasterizer;
     pipelineInfo.pMultisampleState = &multisampling;
     pipelineInfo.pDepthStencilState = &depthStencil;
-    pipelineInfo.pColorBlendState = &colorBlending;
-    pipelineInfo.pDynamicState = &dynamicState;
-    pipelineInfo.layout = m_pipelineLayout;
-    pipelineInfo.renderPass = VK_NULL_HANDLE;
-    pipelineInfo.subpass = 0;
+    pipelineInfo.pColorBlendState  = &colorBlending;
+    pipelineInfo.pDynamicState     = &dynamicState;
+    pipelineInfo.layout            = m_pipelineLayout;
+    pipelineInfo.renderPass        = VK_NULL_HANDLE;
+    pipelineInfo.subpass           = 0;
 
     VkResult result = vkCreateGraphicsPipelines(m_device->GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
     return result == VK_SUCCESS;
