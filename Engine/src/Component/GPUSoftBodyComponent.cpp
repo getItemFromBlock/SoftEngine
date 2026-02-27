@@ -222,7 +222,7 @@ void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
     if (!renderer->BindMaterial(m_material.getPtr()))
         return;
 
-    renderer->DrawInstanced(m_mesh->GetIndexBuffer(), m_mesh->GetVertexBuffer(), totalParticleCount);
+    renderer->DrawInstanced(m_mesh->GetIndexBuffer(), m_mesh->GetVertexBuffer(), 1);
 }
 
 void GPUSoftBodyComponent::OnDestroy()
@@ -316,7 +316,7 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
     std::vector<uint32_t> indices;
     CreateSkinnedMesh(vertices, indices);
 
-    m_mesh->CreateFrom(reinterpret_cast<float*>(vertices.data()), vertices.size() * sizeof(WeightedVertex) / sizeof(float), indices.data(), indices.size(), true);
+    m_mesh->CreateFrom(reinterpret_cast<float*>(vertices.data()), vertices.size(), indices.data(), indices.size(), true);
     
     m_particles.clear();
     m_connections.clear();
@@ -346,6 +346,8 @@ void GPUSoftBodyComponent::CreateSkinnedMesh(std::vector<WeightedVertex> &vertic
                     Vec3f pos = Vec3f(   j / (m_particleSettings.general.surfacePoints.x - 1),
                                          k / (m_particleSettings.general.surfacePoints.y - 1),
                                          i < 3 ? -1 : 1);
+                    pos.x = pos.x * 2 - 1;
+                    pos.y = pos.y * 2 - 1;
                     const uint32_t *ptr = _cubeSwizzlesValues + (i*3);
                     pos = Vec3f(pos[ptr[0]], pos[ptr[1]], pos[ptr[2]]);
                     WeightedVertex v;
@@ -355,12 +357,41 @@ void GPUSoftBodyComponent::CreateSkinnedMesh(std::vector<WeightedVertex> &vertic
                     v.tangent = Vec3f(i % 3 == 0, i % 3 == 1, i % 3 == 2);
                     if (i >= 3) v.tangent = Vec3f(1) - v.tangent;
 
-                    std::array<uint32_t, 4> closests = std::array<uint32_t, 4>();
+                    struct ParticleDist
+                    {
+                        uint32_t id;
+                        float dist;
+                    };
+
+                    std::array<ParticleDist, 3> closests = std::array<ParticleDist, 3>();
                     uint32_t count = 0;
                     for (uint32_t l = 0; l < m_particles.size(); l++)
                     {
-                        
+                        float d = m_particles[l].position.Distance(pos);
+                        if (count < closests.size())
+                        {
+                            ParticleDist p;
+                            p.id = l;
+                            p.dist = d;
+                            closests[count] = p;
+                            count++;
+                            continue;
+                        }
+                        for (uint32_t m = 0; m < count; m++)
+                        {
+                            if (d < closests[count].dist)
+                            {
+                                for (uint32_t n = 1; n < count-m; n++)
+                                {
+                                    closests[count-n] = closests[count-n-1];
+                                }
+                            }
+                            closests[m].id = l;
+                            closests[m].dist = d;
+                            break;
+                        }
                     }
+
 
                     vertices.push_back(v);
                 }

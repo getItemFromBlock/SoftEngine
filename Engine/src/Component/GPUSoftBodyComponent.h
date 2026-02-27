@@ -99,7 +99,7 @@ private:
     VkDeviceSize CBufSizeAligned;
     uint32_t totalParticleCount = 0;
 
-    SafePtr<Mesh> m_mesh;
+    std::shared_ptr<Mesh> m_mesh;
     SafePtr<Material> m_material;
 
     std::vector<SBParticleData> m_particles;
