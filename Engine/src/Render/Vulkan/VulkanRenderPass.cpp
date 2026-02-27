@@ -43,7 +43,7 @@ void VulkanRenderPass::Begin(VkCommandBuffer commandBuffer, VkImageView colorIma
     colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     colorAttachment.imageView = colorImageView;
     colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachment.clearValue = clearValues.empty() ? VkClearValue{{0.0f, 0.0f, 0.0f, 1.0f}} : clearValues[0];
 
@@ -51,7 +51,7 @@ void VulkanRenderPass::Begin(VkCommandBuffer commandBuffer, VkImageView colorIma
     depthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     depthAttachment.imageView = depthImageView;
     depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depthAttachment.clearValue = clearValues.size() > 1 ? clearValues[1] : VkClearValue{1.0f, 0};
 
@@ -145,7 +145,7 @@ void VulkanRenderPass::BeginComposition(VkCommandBuffer commandBuffer,
     colorAttachment.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     colorAttachment.imageView   = swapchainImageView;
     colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachment.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD;
     colorAttachment.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachment.clearValue  = {{0.0f, 0.0f, 0.0f, 1.0f}};
 

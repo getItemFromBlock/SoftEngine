@@ -174,7 +174,9 @@ bool Shader::Load(ResourceManager* resourceManager)
         }
     }
     if (parser.HasKey("depthTest"))
-        m_depthTestEnabled = parser["depthTest"].As<bool>();
+        m_depthTestEnabled = (parser["depthTest"].As<std::string>() == "true");
+    if (parser.HasKey("depthWrite"))
+        m_depthWriteEnabled = (parser["depthWrite"].As<std::string>() == "true");
     
     if (parser.HasKey("attachmentCount"))
     {

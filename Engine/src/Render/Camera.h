@@ -83,7 +83,7 @@ public:
     void EndGeometry();
     void End();
 
-    void BeginForwardPass();
+    void BeginForwardPass() const;
     void EndForwardPass();
 
     void UpdateResizeRenderTarget(VulkanRenderer* renderer);

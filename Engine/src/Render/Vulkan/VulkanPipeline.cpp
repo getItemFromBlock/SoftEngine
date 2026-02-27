@@ -221,8 +221,8 @@ bool VulkanPipeline::InitializeGraphicsPipeline(const Shader* shader,
 
     VkPipelineDepthStencilStateCreateInfo depthStencil{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
     depthStencil.depthTestEnable = shader->IsDepthTestEnabled();
-    depthStencil.depthWriteEnable = VK_TRUE;
-    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthWriteEnable = shader->IsDepthWriteEnabled();
+    depthStencil.depthCompareOp =  shader->IsDepthWriteEnabled() ? VK_COMPARE_OP_LESS : VK_COMPARE_OP_LESS_OR_EQUAL;
 
     // Build the attachment format list — use shader-declared attachments or fall back to colorFormat
     std::vector<VkFormat> attachmentFormats = shader->GetAttachments();

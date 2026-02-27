@@ -156,6 +156,7 @@ public:
     
     Topology GetTopology() const { return m_topology; }
     bool IsDepthTestEnabled() const { return m_depthTestEnabled; }
+    bool IsDepthWriteEnabled() const { return m_depthWriteEnabled; }
     
     std::unique_ptr<ComputeDispatch> CreateDispatch(VulkanRenderer* renderer);
     
@@ -173,6 +174,7 @@ protected:
     
     Topology m_topology = Topology::Triangle;
     bool m_depthTestEnabled = true;
+    bool m_depthWriteEnabled = true;
     
     bool m_graphic = true;
 };

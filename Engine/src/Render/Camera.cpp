@@ -327,7 +327,7 @@ void Camera::End()
     RenderPostProcess(Engine::Get()->GetRenderer());
 }
 
-void Camera::BeginForwardPass()
+void Camera::BeginForwardPass() const
 {
     BeginRenderTarget(m_renderTarget.getPtr());
 }
