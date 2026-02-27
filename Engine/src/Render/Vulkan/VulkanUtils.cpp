@@ -1,7 +1,11 @@
 #include "VulkanUtils.h"
 
+#include <array>
+
+#include "VulkanGBuffer.h"
+
 void VulkanUtils::TransitionImageLayout(VulkanCommandPool *_commandBuffer, VulkanQueue &graphicsQueue, VkImageLayout oldLayout,
-    VkImageLayout newLayout, VulkanDevice * m_device, VkImage image, uint32_t layerCount)
+                                        VkImageLayout newLayout, VulkanDevice * m_device, VkImage image, uint32_t layerCount)
 {
     VkCommandBuffer commandBuffer = m_device->BeginSingleTimeCommands(_commandBuffer);
 
@@ -76,4 +80,85 @@ void VulkanUtils::TransitionImageLayout(VulkanCommandPool *_commandBuffer, Vulka
         0, nullptr, 0, nullptr, 1, &barrier);
 
     m_device->EndSingleTimeCommands(_commandBuffer, graphicsQueue, commandBuffer);
+}
+
+void VulkanUtils::TransitionGBufferToColorAttachment(VkCommandBuffer commandBuffer, VulkanGBuffer& gBuffer)
+{
+    VkImageLayout srcLayout = gBuffer.IsFirstUse()
+                                  ? VK_IMAGE_LAYOUT_UNDEFINED
+                                  : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkImageSubresourceRange range{};
+    range.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+    range.baseMipLevel   = 0;
+    range.levelCount     = 1;
+    range.baseArrayLayer = 0;
+    range.layerCount     = 1;
+
+    auto makeBarrier = [&](VkImage image) -> VkImageMemoryBarrier
+    {
+        VkImageMemoryBarrier b{};
+        b.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        b.oldLayout           = srcLayout;
+        b.newLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        b.image               = image;
+        b.subresourceRange    = range;
+        b.srcAccessMask       = gBuffer.IsFirstUse() ? 0 : VK_ACCESS_SHADER_READ_BIT;
+        b.dstAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        return b;
+    };
+
+    std::array<VkImageMemoryBarrier, 3> barriers = {
+        makeBarrier(gBuffer.GetPosition().image),
+        makeBarrier(gBuffer.GetNormal().image),
+        makeBarrier(gBuffer.GetAlbedo().image),
+    };
+
+    vkCmdPipelineBarrier(commandBuffer,
+                         gBuffer.IsFirstUse() ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+                             : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         0,
+                         0, nullptr, 0, nullptr,
+                         static_cast<uint32_t>(barriers.size()), barriers.data());
+}
+
+void VulkanUtils::TransitionGBufferToShaderRead(VkCommandBuffer commandBuffer, VulkanGBuffer& gBuffer)
+{
+    VkImageSubresourceRange range{};
+    range.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+    range.baseMipLevel   = 0;
+    range.levelCount     = 1;
+    range.baseArrayLayer = 0;
+    range.layerCount     = 1;
+
+    auto makeBarrier = [&](VkImage image) -> VkImageMemoryBarrier
+    {
+        VkImageMemoryBarrier b{};
+        b.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        b.oldLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        b.newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        b.image               = image;
+        b.subresourceRange    = range;
+        b.srcAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        b.dstAccessMask       = VK_ACCESS_SHADER_READ_BIT;
+        return b;
+    };
+
+    std::array<VkImageMemoryBarrier, 3> barriers = {
+        makeBarrier(gBuffer.GetPosition().image),
+        makeBarrier(gBuffer.GetNormal().image),
+        makeBarrier(gBuffer.GetAlbedo().image),
+    };
+
+    vkCmdPipelineBarrier(commandBuffer,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                         0,
+                         0, nullptr, 0, nullptr,
+                         static_cast<uint32_t>(barriers.size()), barriers.data());
 }

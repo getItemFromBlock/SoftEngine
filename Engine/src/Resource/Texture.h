@@ -12,6 +12,8 @@ public:
     virtual bool SendToGPU(VulkanRenderer* renderer) override;
     virtual void Unload() override;
     
+    void CreateFromBuffer(const VulkanTexture& texture);
+    
     VulkanTexture* GetBuffer() const { return m_buffer.get(); }
 protected:
     ImageLoader::Image m_image = {};

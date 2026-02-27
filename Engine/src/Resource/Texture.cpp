@@ -33,3 +33,13 @@ void Texture::Unload()
         m_image = ImageLoader::Image();
     }
 }
+
+void Texture::CreateFromBuffer(const VulkanTexture& texture)
+{
+    m_buffer.reset();
+    m_buffer = std::unique_ptr<VulkanTexture>(new VulkanTexture(texture));
+    
+    p_isLoading = false;
+    p_isLoaded = true;
+    p_sendToGPU = true;
+}

@@ -43,6 +43,7 @@ Scene::~Scene()
 void Scene::OnRender(VulkanRenderer* renderer)
 {
     m_editorCamera->Begin();
+    m_editorCamera->BeginForwardPass();
     m_editorCamera->RenderSkybox(renderer);
     std::scoped_lock lock(m_componentsMutex);
     
@@ -60,6 +61,7 @@ void Scene::OnRender(VulkanRenderer* renderer)
     renderQueueManager->ExecuteAll(renderer);
     renderQueueManager->ClearAll();
     renderer->GetLineRenderer()->Render(renderer, m_editorCameraData.VP);
+    m_editorCamera->EndForwardPass();
     m_editorCamera->End();
     
     renderer->ClearColor();

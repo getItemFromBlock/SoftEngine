@@ -60,6 +60,7 @@ void ImGuiHandler::Initialize(Window* window, VulkanRenderer* renderer)
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    
 
     ImGui::StyleColorsDark();
 

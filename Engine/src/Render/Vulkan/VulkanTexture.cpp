@@ -6,6 +6,7 @@
 #include "VulkanBuffer.h"
 #include "VulkanUtils.h"
 #include "VulkanCommandPool.h"
+#include "VulkanGBuffer.h"
 
 #include "Debug/Log.h"
 #include "Resource/Loader/ImageLoader.h"
@@ -392,6 +393,17 @@ bool VulkanTexture::CreateCubemapWithMips(int resolution, int mipLevels,
     CreateCubemapSamplerWithMips(mipLevels);
 
     return true;
+}
+
+void VulkanTexture::CreateFromGBuffer(const GBufferAttachment& attachment, VkSampler sampler, uint32_t width, uint32_t height)
+{
+    m_image = attachment.image;
+    m_imageView = attachment.imageView;
+    m_imageMemory = attachment.memory;
+    m_format = attachment.format;
+    m_width = width;
+    m_height = height;
+    m_sampler = sampler;
 }
 
 VkImageView VulkanTexture::GetMipLevelView(int mipLevel) const

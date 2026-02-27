@@ -6,6 +6,8 @@
 #include <array>
 
 #include "VulkanDepthBuffer.h"
+#include "VulkanGBuffer.h"
+#include "VulkanUtils.h"
 #include "Debug/Log.h"
 
 VulkanRenderPass::~VulkanRenderPass()
@@ -79,4 +81,85 @@ VkFormat VulkanRenderPass::GetColorFormat() const
 VkFormat VulkanRenderPass::GetDepthFormat() const
 {
     return m_depthFormat;
+}
+
+void VulkanRenderPass::BeginGBuffer(VkCommandBuffer commandBuffer,
+                                     VulkanGBuffer* gBuffer,
+                                     VkImageView depthImageView,
+                                     VkExtent2D extent)
+{
+    VulkanUtils::TransitionGBufferToColorAttachment(commandBuffer, *gBuffer);
+    gBuffer->MarkUsed();
+
+    VkClearValue clearBlack{};
+    clearBlack.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+
+    auto makeColorAttach = [&](VkImageView view) -> VkRenderingAttachmentInfo
+    {
+        VkRenderingAttachmentInfo a{};
+        a.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        a.imageView   = view;
+        a.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        a.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        a.storeOp     = VK_ATTACHMENT_STORE_OP_STORE; // must keep — composition reads these
+        a.clearValue  = clearBlack;
+        return a;
+    };
+
+    std::array<VkRenderingAttachmentInfo, 3> colorAttachments = {
+        makeColorAttach(gBuffer->GetPosition().imageView),
+        makeColorAttach(gBuffer->GetNormal().imageView),
+        makeColorAttach(gBuffer->GetAlbedo().imageView),
+    };
+
+    VkRenderingAttachmentInfo depthAttachment{};
+    depthAttachment.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    depthAttachment.imageView   = depthImageView;
+    depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depthAttachment.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp     = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.clearValue  = {1.0f, 0};
+
+    VkRenderingInfo renderingInfo{};
+    renderingInfo.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    renderingInfo.renderArea.offset    = {0, 0};
+    renderingInfo.renderArea.extent    = extent;
+    renderingInfo.layerCount           = 1;
+    renderingInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size());
+    renderingInfo.pColorAttachments    = colorAttachments.data();
+    renderingInfo.pDepthAttachment     = &depthAttachment;
+    renderingInfo.pStencilAttachment   = nullptr;
+
+    vkCmdBeginRendering(commandBuffer, &renderingInfo);
+}
+
+void VulkanRenderPass::EndGBuffer(VkCommandBuffer commandBuffer, VulkanGBuffer* gBuffer)
+{
+    vkCmdEndRendering(commandBuffer);
+    VulkanUtils::TransitionGBufferToShaderRead(commandBuffer, *gBuffer);
+}
+
+void VulkanRenderPass::BeginComposition(VkCommandBuffer commandBuffer,
+                                         VkImageView swapchainImageView,
+                                         VkExtent2D extent)
+{
+    VkRenderingAttachmentInfo colorAttachment{};
+    colorAttachment.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    colorAttachment.imageView   = swapchainImageView;
+    colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachment.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.clearValue  = {{0.0f, 0.0f, 0.0f, 1.0f}};
+
+    VkRenderingInfo renderingInfo{};
+    renderingInfo.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    renderingInfo.renderArea.offset    = {0, 0};
+    renderingInfo.renderArea.extent    = extent;
+    renderingInfo.layerCount           = 1;
+    renderingInfo.colorAttachmentCount = 1;
+    renderingInfo.pColorAttachments    = &colorAttachment;
+    renderingInfo.pDepthAttachment     = nullptr; 
+    renderingInfo.pStencilAttachment   = nullptr;
+
+    vkCmdBeginRendering(commandBuffer, &renderingInfo);
 }

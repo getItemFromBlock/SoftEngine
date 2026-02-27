@@ -2,6 +2,8 @@
 #include "VulkanBuffer.h"
 #include "VulkanDevice.h"
 
+struct GBufferAttachment;
+
 namespace ImageLoader
 {
     struct HDRImage;
@@ -26,6 +28,8 @@ public:
     bool CreateCubemapFromHDR(const ImageLoader::HDRImage& hdr, VulkanDevice* device, VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);
     bool CreateCubemapWithMips(int resolution, int mipLevels, VulkanDevice* device, VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);
 
+    void CreateFromGBuffer(const GBufferAttachment& attachment, VkSampler sampler, uint32_t width, uint32_t height);
+    
     bool Create(VulkanDevice* device, uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage);
     void GenerateMipmaps(VulkanCommandPool* pool, VulkanQueue& queue) const;
     void Cleanup();
