@@ -20,7 +20,7 @@ struct BodySettings
         Vec3i particleAmount = Vec3i(11, 11, 11);
         int32_t solidLayers = 1;
         Vec2i boneCount = Vec2i(4, 4);
-        Vec2i surfacePoints = Vec2i(32, 32);
+        Vec2i surfacePoints = Vec2i(8, 8);
         Vec2f surfaceHeightBounds = Vec2f(-0.3f, 0.3f);
         float damping = 1.0f;
         float strength = 500.0f;
@@ -52,6 +52,8 @@ struct SBParticleData
     uint32_t connectionsOffset;
     Vec3f velocity;
     uint32_t connectionsCount;
+    Vec3f originalPos;
+    float unused;
 };
 
 struct ConnectionData
@@ -97,16 +99,19 @@ private:
     VkDeviceSize PBufSizeAligned;
     // Size of GPU buffer section reserved for particle connections, located right after particle data in memory
     VkDeviceSize CBufSizeAligned;
-    uint32_t totalParticleCount = 0;
+    uint32_t m_totalParticleCount = 0;
 
     std::shared_ptr<Mesh> m_mesh;
+    SafePtr<Mesh> m_billboardMesh;
     SafePtr<Material> m_material;
+    SafePtr<Material> m_billboardMaterial;
 
     std::vector<SBParticleData> m_particles;
     std::vector<ConnectionData> m_connections;
 
     bool m_initialUploadComplete = false;
     bool m_needsRecreation = false;
+    bool m_drawDebug = false;
 
     Seed m_seed;
     BodySettings m_particleSettings;
