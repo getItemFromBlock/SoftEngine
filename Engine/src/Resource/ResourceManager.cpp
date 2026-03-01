@@ -221,14 +221,16 @@ void ResourceManager::LoadBlankCubeMap(const std::filesystem::path& cubeMapPath)
     m_blankCubeMap = cubeMap->GetUUID();
 }
 
-SafePtr<Material> ResourceManager::CreateMaterial(std::filesystem::path path)
+SafePtr<Material> ResourceManager::CreateMaterial(std::filesystem::path path, SafePtr<Shader> shader)
 {
     if (path.extension() != ".mat")
     {
         path = std::filesystem::path(path.generic_string() + ".mat");
     }
     std::shared_ptr<Material> material = std::make_shared<Material>(path);
-    std::shared_ptr<Shader> shader = GetDefaultShader();
+    
+    if (!shader)
+        shader = GetDefaultShader();
 
     material->SetLoaded();
     material->SetSentToGPU();

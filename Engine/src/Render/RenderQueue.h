@@ -46,6 +46,7 @@ public:
     };
     
     RenderQueue(QueueType type) : m_type(type) {}
+    ~RenderQueue();
     
     void Submit(const RenderCommand& command);
 
@@ -63,13 +64,21 @@ public:
     
 private:
     QueueType m_type;
+    
     std::vector<RenderCommand> m_commands;
+    
+    std::vector<std::unique_ptr<Material>> m_gBufferMaterialPool;
+    std::vector<Texture*> m_gBufferLastAlbedo;
+    size_t m_gBufferPoolHighWaterMark = 0;
+
+    Material* AcquireGBufferMaterial(size_t index, const Material* templateMaterial);
 };
 
 class RenderQueueManager
 {
 public:
     RenderQueueManager();
+    void Cleanup();
 
     RenderQueue* GetOpaqueQueue() const { return m_opaqueQueue.get(); }
     RenderQueue* GetTransparentQueue() const { return m_transparentQueue.get(); }

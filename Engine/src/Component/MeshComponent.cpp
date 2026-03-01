@@ -49,6 +49,10 @@ void MeshComponent::OnRender(VulkanRenderer* renderer)
         return;
     
     auto queue = renderer->GetRenderQueueManager()->GetOpaqueQueue();
+    if (m_materials.size() > 0 && m_materials[0]->GetShader().getPtr() != Engine::Get()->GetResourceManager()->GetDefaultShader().get())
+    {
+        queue = renderer->GetRenderQueueManager()->GetTransparentQueue(); // Use transparent queue to render in forward pass
+    }
     queue->SubmitMeshRenderer(GetGameObject(), m_mesh.getPtr(), m_materials);
 }
 
@@ -68,6 +72,15 @@ void MeshComponent::RemoveMaterial(const SafePtr<Material>& material)
     {
         return mat.getPtr() == material.getPtr();
     }));
+}
+
+void MeshComponent::SetMaterial(size_t index, const SafePtr<Material>& material)
+{
+    if (index >= m_materials.size())
+    {
+        m_materials.resize(index + 1);
+    }
+    m_materials[index] = material;
 }
 
 std::vector<SafePtr<Material>> MeshComponent::GetMaterials() const

@@ -19,6 +19,7 @@ public:
 
     void AddMaterial(const SafePtr<Material>& material);
     void RemoveMaterial(const SafePtr<Material>& material);
+    void SetMaterial(size_t index, const SafePtr<Material>& material);
 
     std::vector<SafePtr<Material>> GetMaterials() const;
 

@@ -54,22 +54,47 @@ void Editor::Initialize()
     auto resourceManager = m_engine->GetResourceManager();
     auto currentScene = m_engine->GetSceneHolder()->GetCurrentScene();
     
+    // ===== Debug ===== //
     auto model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Cube.obj");
     resourceManager->Load<Model>(RESOURCE_PATH"/models/Suzanne.obj");
     resourceManager->Load<Model>(RESOURCE_PATH"/models/Plane.obj");
     resourceManager->Load<CubeMap>(RESOURCE_PATH"/envMap/wooden_studio_09_4k.hdr");
     resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/inverted.pshader");
-    // model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Sponza/sponza.obj");
     model = resourceManager->Load<Model>(RESOURCE_PATH"models/Sphere.obj");
     
     model->EOnLoaded.Bind([model, this, currentScene]()
     {
-        auto go = Model::CreateGameObject(model.getPtr(), currentScene);
-        go->GetTransform()->SetLocalPosition(Vec3f(0, 0, 0));
+        auto resourceManager = m_engine->GetResourceManager();
+        auto unlitForwardShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/Unlit/unlit.shader");
+        auto unlitForwardMat = resourceManager->CreateMaterial("UnlitForward", unlitForwardShader);
+        unlitForwardMat->SetAttribute("albedoSampler", resourceManager->GetDefaultTexture());
+        
+        const int height = 3;
+        const float spacing = 2.5f;
+        
+        for (int y = 0; y < height; y++)
+        {
+            int layerSize = height - y;
+        
+            for (int x = 0; x < layerSize; x++)
+            {
+                for (int z = 0; z < layerSize; z++)
+                {
+                    auto go = Model::CreateGameObject(model.getPtr(), currentScene);
+        
+                    Vec3f position(
+                        (x - layerSize / 2.0f) * spacing,
+                        y * spacing,
+                        (z - layerSize / 2.0f) * spacing
+                    );
+        
+                    go->GetTransform()->SetLocalPosition(position);
+                }
+            }
+        }
     });
     
-    // auto go = currentScene->CreateGameObject();
-    // go->AddComponent<GPUSoftBodyComponent>();
+    // ===== Debug ===== //
 }
 
 void Editor::Run()

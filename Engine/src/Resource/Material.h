@@ -1,4 +1,5 @@
 #pragma once
+#include <map>
 #include <memory>
 #include <set>
 #include <galaxymath/Maths.h>
@@ -62,6 +63,13 @@ struct MaterialAttributes
     }
 };
 
+struct UBOWriteEntry
+{
+    const void* src; 
+    void* dst;
+    size_t size;
+};
+
 class Material : public IResource
 {
 public:
@@ -102,9 +110,10 @@ public:
 
 private:
     void OnShaderChanged();
-
     void SendTexture(Texture* texture, const Uniform& uniform) const;
     void SendCubeMap(CubeMap* cubeMap, const Uniform& uniform) const;
+
+    void BakeWriteEntries();
 
 private:
     std::unique_ptr<VulkanMaterial> m_handle;
@@ -116,4 +125,8 @@ private:
     std::unordered_map<std::string, uint32_t> m_attributesToSync;
 
     EventHandle m_shaderChangeEvent;
+
+    // Used with BakeWriteEntries() to build UBOs.
+    std::map<std::pair<uint32_t, uint32_t>, std::vector<uint8_t>> m_uniformScratch;
+    std::vector<UBOWriteEntry> m_writeEntries;
 };

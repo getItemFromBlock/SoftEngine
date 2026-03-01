@@ -70,7 +70,7 @@ public:
     void LoadDefaultCubeMap(const std::filesystem::path& cubeMapPath);
     void LoadBlankCubeMap(const std::filesystem::path& cubeMapPath);
 
-    SafePtr<Material> CreateMaterial(std::filesystem::path path);
+    SafePtr<Material> CreateMaterial(std::filesystem::path path, SafePtr<Shader> shader = {});
 
     std::shared_ptr<Shader> GetDefaultShader() const;
     std::shared_ptr<Texture> GetDefaultTexture() const;

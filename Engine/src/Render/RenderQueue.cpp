@@ -30,6 +30,14 @@ void RenderCommand::GenerateSortKeyWithDepth(float depth)
     sortKey |= depthKey;
 }
 
+RenderQueue::~RenderQueue()
+{
+    for (auto& mat : m_gBufferMaterialPool)
+        mat->Unload();
+    m_gBufferMaterialPool.clear();
+    m_gBufferLastAlbedo.clear();
+}
+
 void RenderQueue::Submit(const RenderCommand& command)
 {
     m_commands.push_back(command);
@@ -138,41 +146,58 @@ void RenderQueue::Execute(VulkanRenderer* renderer)
     }
 }
 
+Material* RenderQueue::AcquireGBufferMaterial(size_t index, const Material* templateMaterial)
+{
+    if (index < m_gBufferMaterialPool.size())
+        return m_gBufferMaterialPool[index].get();
+
+    auto instance = std::make_unique<Material>("");
+    instance->SetShader(templateMaterial->GetShader());
+
+    m_gBufferMaterialPool.push_back(std::move(instance));
+    return m_gBufferMaterialPool.back().get();
+}
+
 void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMaterial)
 {
     if (!gBufferMaterial || !gBufferMaterial->GetShader())
         return;
 
-    // Bind the G-Buffer shader once for the entire pass
     if (!renderer->BindShader(gBufferMaterial->GetShader().getPtr()))
         return;
 
-    Texture* lastAlbedo = nullptr;
+    const auto& cameraVP = Engine::Get()->GetSceneHolder()
+                               ->GetCurrentScene()->GetCameraData().VP;
 
-    
-    gBufferMaterial->SetAttribute("viewProj", Engine::Get()->GetSceneHolder()->GetCurrentScene()->GetCameraData().VP);
-    for (auto& cmd : m_commands)
+    for (size_t i = 0; i < m_commands.size(); ++i)
     {
-        // Swap albedo texture only when it actually changes
-        if (cmd.albedoTexture.getPtr() != lastAlbedo)
+        auto& cmd = m_commands[i];
+        Material* mat = AcquireGBufferMaterial(i, gBufferMaterial);
+
+        mat->SetAttribute("viewProj", cameraVP);
+        mat->SetAttribute("color",    cmd.material->GetVec4Attribute("color"));
+
+        Texture* albedo = cmd.albedoTexture.getPtr();
+        if (i >= m_gBufferLastAlbedo.size())
+            m_gBufferLastAlbedo.resize(i + 1, nullptr);
+
+        if (albedo != m_gBufferLastAlbedo[i])
         {
-            gBufferMaterial->SetAttribute("albedoSampler", cmd.albedoTexture);
-            lastAlbedo = cmd.albedoTexture.getPtr();
+            mat->SetAttribute("albedoSampler", cmd.albedoTexture);
+            m_gBufferLastAlbedo[i] = albedo;
         }
-        Vec4f color = cmd.material->GetVec4Attribute("color");
-        gBufferMaterial->SetAttribute("color", color);
 
-        gBufferMaterial->SendAllValues(renderer);
+        mat->SendAllValues(renderer);
 
-        if (!renderer->BindMaterial(gBufferMaterial))
+        if (!renderer->BindMaterial(mat))
             continue;
 
-        if (cmd.mesh != nullptr)
+        if (cmd.mesh)
             renderer->BindVertexBuffers(cmd.mesh->GetVertexBuffer(), cmd.mesh->GetIndexBuffer());
 
-        PushConstant pushConstant = gBufferMaterial->GetShader()->GetPushConstants()[ShaderType::Vertex];
+        PushConstant pushConstant = mat->GetShader()->GetPushConstants()[ShaderType::Vertex];
         renderer->SendPushConstants(&cmd.modelMatrix, sizeof(Mat4),
-                                    gBufferMaterial->GetShader().getPtr(), pushConstant);
+                                    mat->GetShader().getPtr(), pushConstant);
 
         renderer->DrawVertexSubMesh(cmd.mesh->GetIndexBuffer(), cmd.startIndex, cmd.indexCount);
     }
@@ -188,6 +213,13 @@ RenderQueueManager::RenderQueueManager()
     m_opaqueQueue = std::make_unique<RenderQueue>(RenderQueue::QueueType::Opaque);
     m_transparentQueue = std::make_unique<RenderQueue>(RenderQueue::QueueType::Transparent);
     m_uiQueue = std::make_unique<RenderQueue>(RenderQueue::QueueType::UI);
+}
+
+void RenderQueueManager::Cleanup()
+{
+    m_opaqueQueue.reset();
+    m_transparentQueue.reset();
+    m_uiQueue.reset();
 }
 
 void RenderQueueManager::SortAll() const

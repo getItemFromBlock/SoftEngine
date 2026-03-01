@@ -136,6 +136,7 @@ void VulkanRenderer::WaitForGPU()
 
 void VulkanRenderer::Cleanup()
 {
+    m_renderQueueManager->Cleanup();
     m_lineRenderer.Cleanup();
     
     m_syncObjects.reset();
