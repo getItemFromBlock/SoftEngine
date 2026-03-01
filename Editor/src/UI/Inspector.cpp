@@ -422,7 +422,7 @@ void Inspector::ShowProperty(const Property& property)
         break;
     case PropertyType::Button:
     {
-        RenderButtonProperty(property, id);
+        RenderButtonProperty(property, "  " + id);
         break;
     }
     case PropertyType::Bool:
@@ -701,12 +701,9 @@ void Inspector::RenderQuatProperty(const Property& property, const std::string& 
     const Quat* quatPtr = static_cast<const Quat*>(property.data);
     Vec3f euler = quatPtr->ToEuler();
 
-    Vec3f eulerDeg = euler * (180.0f / PI);
-
-    if (ImGui::DragFloat3(id.c_str(), &eulerDeg.x, 0.5f))
+    if (ImGui::DragFloat3(id.c_str(), &euler.x, 0.5f))
     {
-        Vec3f eulerRad = eulerDeg * (PI / 180.0f);
-        Quat newQuat = Quat::FromEuler(eulerRad);
+        Quat newQuat = Quat::FromEuler(euler);
         UpdateProperty(property, &newQuat);
     }
 
