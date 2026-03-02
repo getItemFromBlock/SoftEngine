@@ -1,27 +1,28 @@
 ﻿#include "TestComponent.h"
 
 #include "TransformComponent.h"
+#include "Scene/GameObject.h"
 
 void TestComponent::Describe(ClassDescriptor& d)
 {
-    d.AddBool("bool", m_bool);
-    d.AddFloat("float", m_float);
-    d.AddInt("int", m_int);
-    d.AddVec2f("vec2f", m_vec2f);
-    d.AddVec3f("vec3f", m_vec3f);
-    d.AddVec4f("vec4f", m_vec4f);
-    d.AddQuat("quat", m_quat);
-    d.AddTexture("texture", m_texture);
-    d.AddCubeMap("cubeMap", m_cubeMap);
-    d.AddColor3("color3", m_color3);
-    d.AddColor4("color4", m_color4);
-    d.AddMesh("mesh", m_mesh);
 }
 
 void TestComponent::OnCreate()
 {
+    m_startPosition = GetGameObject()->GetTransform()->GetLocalPosition();
 }
 
 void TestComponent::OnUpdate(float deltaTime)
 {
+    m_time += deltaTime;
+
+    auto transform = GetGameObject()->GetTransform();
+
+    float radius = 2.0f;
+
+    float x = radius * cos(m_offset + m_time * m_speed);
+    float y = 0;
+    float z = radius * sin(m_offset + m_time * m_speed);
+
+    transform->SetLocalPosition(m_startPosition + Vec3f(x, y, z));
 }

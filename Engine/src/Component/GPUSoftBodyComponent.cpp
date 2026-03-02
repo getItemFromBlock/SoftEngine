@@ -183,10 +183,10 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
         0, 0, nullptr, 1, &barrier1, 0, nullptr);
 
     CameraData cam = p_gameObject->GetScene()->GetCameraData();
-    m_material->SetAttribute("viewProj", cam.VP);
-    m_material->SetAttribute("cameraRight", cam.right);
-    m_material->SetAttribute("cameraUp", cam.up);
-    m_material->SetAttribute("cameraFront", cam.forward);
+    m_material->SetAttribute("cameraUBO.viewProj", cam.VP);
+    m_material->SetAttribute("cameraUBO.cameraRight", cam.right);
+    m_material->SetAttribute("cameraUBO.cameraUp", cam.up);
+    m_material->SetAttribute("cameraUBO.cameraFront", cam.forward);
 }
 
 void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)

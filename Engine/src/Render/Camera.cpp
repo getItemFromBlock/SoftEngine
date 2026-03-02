@@ -483,7 +483,6 @@ void Camera::BeginGBufferPass(RenderTargetTexture* rtt)
         static_cast<uint32_t>(p_renderTargetSize.y)
     };
 
-    // ── Transition all G-Buffer color attachments → COLOR_ATTACHMENT_OPTIMAL ──
     std::array<VkImage, 3> gBufferImages = {
         m_gBuffer->GetPosition().image,
         m_gBuffer->GetNormal().image,
@@ -549,7 +548,6 @@ void Camera::EndGBufferPass()
 
     renderer->GetRenderPass()->EndGBuffer(commandBuffer, m_gBuffer.get());
 
-    // ── Transition G-Buffer attachments → SHADER_READ_ONLY for composition ──
     std::array<VkImage, 3> gBufferImages = {
         m_gBuffer->GetPosition().image,
         m_gBuffer->GetNormal().image,
@@ -590,11 +588,9 @@ void Camera::BeginCompositionPass(RenderTargetTexture* rtt)
         static_cast<uint32_t>(p_renderTargetSize.y)
     };
 
-    // ── Transition render target image → COLOR_ATTACHMENT_OPTIMAL ──────────
-    // Same pattern as your original BeginRenderTarget barrier.
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout   = VK_IMAGE_LAYOUT_UNDEFINED;             // ← was: m_firstFrame ? UNDEFINED : SHADER_READ_ONLY
+    barrier.oldLayout   = VK_IMAGE_LAYOUT_UNDEFINED;
     barrier.srcAccessMask = 0;
     barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -608,7 +604,6 @@ void Camera::BeginCompositionPass(RenderTargetTexture* rtt)
                          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                          0, 0, nullptr, 0, nullptr, 1, &barrier);
 
-    // ── Begin composition rendering block ──────────────────────────────────
     renderer->GetRenderPass()->BeginComposition(
         commandBuffer,
         rtt->GetBuffer()->GetImageView(),
@@ -665,6 +660,10 @@ void Camera::DrawComposition(VulkanRenderer* renderer) const
     if (!renderer->BindMaterial(m_compositionMaterial.getPtr()))
         return;
 
+    auto scene = Engine::Get()->GetSceneHolder()->GetCurrentScene();
+    auto lightManager = scene->GetLightManager();
+    lightManager->SendLights(m_compositionMaterial.getPtr());
+    
     m_compositionMaterial->SendAllValues(renderer);
 
     VkCommandBuffer commandBuffer = renderer->GetCommandPool()->GetCommandBuffer(renderer->GetFrameIndex());

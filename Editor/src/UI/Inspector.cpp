@@ -23,6 +23,19 @@ Inspector::Inspector(Engine* engine, ImGuiHandler* handler) : EditorWindow(handl
 
 void Inspector::OnRender()
 {
+    if (m_selectedObject != UUID_INVALID)
+    {
+        Scene* scene = m_sceneHolder->GetCurrentScene();
+        auto object = scene->GetGameObject(m_selectedObject);
+        if (object)
+        {
+            auto renderer = Engine::Get()->GetRenderer();
+            auto pos = object->GetTransform()->GetWorldPosition();
+            renderer->AddLine(pos, pos + Vec3f::Right(), {Vec3f::Right(), 1});
+            renderer->AddLine(pos, pos + Vec3f::Up(), {Vec3f::Up(), 1});
+            renderer->AddLine(pos, pos + Vec3f::Forward(), {Vec3f::Forward() * -1, 1});
+        }
+    }
     if (ImGui::Begin("Inspector"))
     {
         if (m_selectedObject == UUID_INVALID)
@@ -698,22 +711,18 @@ void Inspector::RenderFVec4Property(const Property& property, const std::string&
 
 void Inspector::RenderQuatProperty(const Property& property, const std::string& id)
 {
-    const Quat* quatPtr = static_cast<const Quat*>(property.data);
-    Vec3f euler = quatPtr->ToEuler();
+    Quat quatPtr = *static_cast<const Quat*>(property.data);
+    Vec3f euler = quatPtr.ToEuler();
 
-    Vec3f eulerDeg = euler * (180.0f / PI);
-
-    if (ImGui::DragFloat3(id.c_str(), &eulerDeg.x, 0.5f))
+    if (ImGui::DragFloat3(id.c_str(), &euler.x, 0.5f))
     {
-        Vec3f eulerRad = eulerDeg * (PI / 180.0f);
-        Quat newQuat = Quat::FromEuler(eulerRad);
+        Quat newQuat = euler.ToQuaternion();
         UpdateProperty(property, &newQuat);
     }
 
     if (ImGui::IsItemHovered())
     {
-        ImGui::SetTooltip("Quat(%.3f, %.3f, %.3f, %.3f)",
-                          quatPtr->x, quatPtr->y, quatPtr->z, quatPtr->w);
+        ImGui::SetTooltip("Quat(%.3f, %.3f, %.3f, %.3f)", quatPtr.x, quatPtr.y, quatPtr.z, quatPtr.w);
     }
 }
 

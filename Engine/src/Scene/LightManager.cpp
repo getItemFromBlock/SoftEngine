@@ -15,13 +15,15 @@ void LightManager::SendLights(Material* material) const
 {
     if (m_lights.empty())
         return;
-    auto firstLight = m_lights.back();
-    LightData lightData;
-    lightData.position = firstLight->GetGameObject()->GetTransform()->GetWorldPosition();
-    lightData.color = firstLight->GetColor();
-    
-    material->SetAttribute("position", lightData.position);
-    material->SetAttribute("color", lightData.color);
+    material->SetAttribute("lightData.numLights", static_cast<int>(m_lights.size()));
+    material->SetAttribute("lightData.cameraPos", Vec4f(m_scene->GetEditorCamera()->GetTransform()->GetWorldPosition()));
+    size_t i = 0;
+    for (const auto& light : m_lights)
+    {
+        material->SetAttribute("lightData.lights[" + std::to_string(i) + "].position", Vec4f(light->GetGameObject()->GetTransform()->GetWorldPosition()));
+        material->SetAttribute("lightData.lights[" + std::to_string(i) + "].color", Vec4f(light->GetColor(), light->GetIntensity()));
+        i++;
+    }
 }
 
 void LightManager::AddLight(LightComponent* light)
@@ -42,3 +44,4 @@ void LightManager::RemoveLight(LightComponent* light)
         m_lights.erase(it);
     }
 }
+

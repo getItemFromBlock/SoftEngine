@@ -80,6 +80,8 @@ void Material::SetAttribute(const std::string& name, float attribute)
         m_attributes.floatAttributes[name].value = attribute;
     else if (m_shader && !m_shader->SentToGPU())
         m_temporaryAttributes.floatAttributes[name] = attribute;
+    else
+        PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
 }
 
 void Material::SetAttribute(const std::string& name, int attribute)
@@ -88,6 +90,8 @@ void Material::SetAttribute(const std::string& name, int attribute)
         m_attributes.intAttributes[name].value = attribute;
     else if (m_shader && !m_shader->SentToGPU())
         m_temporaryAttributes.intAttributes[name] = attribute;
+    else
+        PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
 }
 
 void Material::SetAttribute(const std::string& name, const Vec2f& attribute)
@@ -96,6 +100,8 @@ void Material::SetAttribute(const std::string& name, const Vec2f& attribute)
         m_attributes.vec2Attributes[name].value = attribute;
     else if (m_shader && !m_shader->SentToGPU())
         m_temporaryAttributes.vec2Attributes[name] = attribute;
+    else
+        PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
 }
 
 void Material::SetAttribute(const std::string& name, const Vec3f& attribute)
@@ -104,6 +110,8 @@ void Material::SetAttribute(const std::string& name, const Vec3f& attribute)
         m_attributes.vec3Attributes[name].value = attribute;
     else if (m_shader && !m_shader->SentToGPU())
         m_temporaryAttributes.vec3Attributes[name] = attribute;
+    else
+        PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
 }
 
 void Material::SetAttribute(const std::string& name, const Vec4f& attribute)
@@ -112,6 +120,8 @@ void Material::SetAttribute(const std::string& name, const Vec4f& attribute)
         m_attributes.vec4Attributes[name].value = attribute;
     else if (m_shader && !m_shader->SentToGPU())
         m_temporaryAttributes.vec4Attributes[name] = attribute;
+    else
+        PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
 }
 
 void Material::SetAttribute(const std::string& name, const Mat4& attribute)
@@ -120,6 +130,8 @@ void Material::SetAttribute(const std::string& name, const Mat4& attribute)
         m_attributes.matrixAttributes[name].value = attribute;
     else if (m_shader && !m_shader->SentToGPU())
         m_temporaryAttributes.matrixAttributes[name] = attribute;
+    else
+        PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
 }
 
 void Material::SetAttribute(const std::string& name, const SafePtr<Texture>& texture)
@@ -133,7 +145,7 @@ void Material::SetAttribute(const std::string& name, const SafePtr<Texture>& tex
         {
             texture->EOnSentToGPU.Bind([this, texture, name]()
             {
-                if (m_shader) 
+                if (m_shader)
                     m_attributesToSync[name] = 0;
             });
         });
@@ -142,6 +154,8 @@ void Material::SetAttribute(const std::string& name, const SafePtr<Texture>& tex
     {
         m_temporaryAttributes.samplerAttributes[name] = texture;
     }
+    else
+        PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
 }
 
 void Material::SetAttribute(const std::string& name, const SafePtr<CubeMap>& cubeMap)
@@ -149,14 +163,14 @@ void Material::SetAttribute(const std::string& name, const SafePtr<CubeMap>& cub
     if (m_attributes.sampler3DAttributes.contains(name))
     {
         m_attributes.sampler3DAttributes[name].value = cubeMap;
-        if (!cubeMap || !m_shader) 
+        if (!cubeMap || !m_shader)
             return;
 
         m_shader->EOnSentToGPU.Bind([this, cubeMap, name]()
         {
             cubeMap->EOnSentToGPU.Bind([this, cubeMap, name]()
             {
-                if (m_shader) 
+                if (m_shader)
                     m_attributesToSync[name] = 0;
             });
         });
@@ -165,6 +179,36 @@ void Material::SetAttribute(const std::string& name, const SafePtr<CubeMap>& cub
     {
         m_temporaryAttributes.sampler3DAttributes[name] = cubeMap;
     }
+    else
+        PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
+}
+
+static uint32_t ResolveMemberOffset(const std::vector<UniformMember>& members, const std::string& path)
+{
+    const size_t dotPos = path.find('.');
+    const std::string component = dotPos != std::string::npos ? path.substr(0, dotPos) : path;
+    const std::string remaining = dotPos != std::string::npos ? path.substr(dotPos + 1) : "";
+
+    uint32_t arrayIndex = 0;
+    const size_t bracketPos = component.find('[');
+    const std::string baseName = bracketPos != std::string::npos ? component.substr(0, bracketPos) : component;
+    if (bracketPos != std::string::npos)
+        arrayIndex = static_cast<uint32_t>(std::stoi(component.substr(bracketPos + 1)));
+
+    for (const auto& member : members)
+    {
+        if (member.name != baseName) continue;
+
+        uint32_t offset = member.offset;
+        if (member.isArray)
+            offset += arrayIndex * member.stride;
+
+        if (!remaining.empty())
+            offset += ResolveMemberOffset(member.members, remaining);
+
+        return offset;
+    }
+    return 0;
 }
 
 void Material::BakeWriteEntries()
@@ -186,12 +230,12 @@ void Material::BakeWriteEntries()
             buf.assign(uniform.size, 0);
     }
 
-    auto Bake = [&](const std::string& uniformName,
-                    const std::string& memberName,
+    auto Bake = [&](const std::string& attrName,
+                    const std::string& rootUniformName,
                     const void* srcPtr,
                     size_t size)
     {
-        auto uniformIt = uniforms.find(uniformName);
+        auto uniformIt = uniforms.find(rootUniformName);
         if (uniformIt == uniforms.end()) return;
 
         const Uniform& uniform = uniformIt->second;
@@ -200,15 +244,8 @@ void Material::BakeWriteEntries()
         auto scratchIt = m_uniformScratch.find(key);
         if (scratchIt == m_uniformScratch.end()) return;
 
-        uint32_t memberOffset = 0;
-        for (const auto& member : uniform.members)
-        {
-            if (member.name == memberName)
-            {
-                memberOffset = member.offset;
-                break;
-            }
-        }
+        const std::string memberPath = attrName.substr(rootUniformName.size() + 1);
+        const uint32_t memberOffset = ResolveMemberOffset(uniform.members, memberPath);
 
         m_writeEntries.push_back({
             .src = srcPtr,
@@ -218,22 +255,17 @@ void Material::BakeWriteEntries()
     };
 
     for (auto& [name, attrib] : m_attributes.floatAttributes)
-        Bake(attrib.uniformName, name, &attrib.value, sizeof(float));
-
+        Bake(name, attrib.uniformName, &attrib.value, sizeof(float));
     for (auto& [name, attrib] : m_attributes.intAttributes)
-        Bake(attrib.uniformName, name, &attrib.value, sizeof(int));
-
+        Bake(name, attrib.uniformName, &attrib.value, sizeof(int));
     for (auto& [name, attrib] : m_attributes.vec2Attributes)
-        Bake(attrib.uniformName, name, &attrib.value, sizeof(Vec2f));
-
+        Bake(name, attrib.uniformName, &attrib.value, sizeof(Vec2f));
     for (auto& [name, attrib] : m_attributes.vec3Attributes)
-        Bake(attrib.uniformName, name, &attrib.value, sizeof(Vec3f));
-
+        Bake(name, attrib.uniformName, &attrib.value, sizeof(Vec3f));
     for (auto& [name, attrib] : m_attributes.vec4Attributes)
-        Bake(attrib.uniformName, name, &attrib.value, sizeof(Vec4f));
-
+        Bake(name, attrib.uniformName, &attrib.value, sizeof(Vec4f));
     for (auto& [name, attrib] : m_attributes.matrixAttributes)
-        Bake(attrib.uniformName, name, &attrib.value, sizeof(Mat4));
+        Bake(name, attrib.uniformName, &attrib.value, sizeof(Mat4));
 }
 
 void Material::SendAllValues(VulkanRenderer* renderer)
@@ -253,7 +285,14 @@ void Material::SendAllValues(VulkanRenderer* renderer)
             Uniform uniform = m_shader->GetUniform(attrib);
             SafePtr<Texture> texture = m_attributes.samplerAttributes.at(attrib).value;
             if (!texture)
+            {
                 texture = Engine::Get()->GetResourceManager()->GetBlankTexture();
+            }
+            else if (!texture->SentToGPU())
+            {
+                ++it;
+                continue; // Not sent to GPU yet, will try next frame
+            }
 
             m_handle->SetTextureForFrame(renderer->GetFrameIndex(),
                                          uniform.set, uniform.binding,
@@ -267,9 +306,16 @@ void Material::SendAllValues(VulkanRenderer* renderer)
         {
             Uniform uniform = m_shader->GetUniform(attrib);
             SafePtr<CubeMap> cubeMap = m_attributes.sampler3DAttributes.at(attrib).value;
-            
+
             if (!cubeMap)
+            {
                 cubeMap = Engine::Get()->GetResourceManager()->GetBlankCubeMap();
+            }
+            else if (!cubeMap->SentToGPU())
+            {
+                ++it;
+                continue; // Not sent to GPU yet, will try next frame
+            }
 
             m_handle->SetCubemapForFrame(renderer->GetFrameIndex(),
                                          uniform.set, uniform.binding,
@@ -333,7 +379,76 @@ Vec4f Material::GetVec4Attribute(const std::string& name) const
 SafePtr<Texture> Material::GetTexture(const std::string& name) const
 {
     if (!m_handle) return {};
+    auto it = m_attributes.samplerAttributes.find(name);
+    if (it == m_attributes.samplerAttributes.end())
+        return {};
     return m_attributes.samplerAttributes.at(name).value;
+}
+
+void Material::InitAttributes(const std::vector<UniformMember>& members, const std::string& uniformName, const std::string& rootName)
+{
+    for (const UniformMember& member : members)
+    {
+        const std::string name = uniformName + "." + member.name;
+        const size_t count = member.isArray ? member.arrayDims[0] : 1;
+
+        for (size_t i = 0; i < count; ++i)
+        {
+            std::string fullName = name;
+            if (member.isArray)
+                fullName = name + "[" + std::to_string(i) + "]";
+
+            switch (member.type)
+            {
+            case UniformType::Float:
+                {
+                    float v = m_temporaryAttributes.floatAttributes.contains(fullName)
+                                  ? m_temporaryAttributes.floatAttributes[fullName].value : 0.f;
+                    m_attributes.floatAttributes[fullName] = Attribute<float>(rootName, v);
+                }
+                break;
+            case UniformType::Int:
+                {
+                    int v = m_temporaryAttributes.intAttributes.contains(fullName)
+                                ? m_temporaryAttributes.intAttributes[fullName].value : 0;
+                    m_attributes.intAttributes[fullName] = Attribute<int>(rootName, v);
+                }
+                break;
+            case UniformType::Vec2:
+                {
+                    Vec2f v = m_temporaryAttributes.vec2Attributes.contains(fullName)
+                                  ? m_temporaryAttributes.vec2Attributes[fullName].value : Vec2f::Zero();
+                    m_attributes.vec2Attributes[fullName] = Attribute<Vec2f>(rootName, v);
+                }
+                break;
+            case UniformType::Vec3:
+                {
+                    Vec3f v = m_temporaryAttributes.vec3Attributes.contains(fullName)
+                                  ? m_temporaryAttributes.vec3Attributes[fullName].value : Vec3f::Zero();
+                    m_attributes.vec3Attributes[fullName] = Attribute<Vec3f>(rootName, v);
+                }
+                break;
+            case UniformType::Vec4:
+                {
+                    Vec4f v = m_temporaryAttributes.vec4Attributes.contains(fullName)
+                                  ? m_temporaryAttributes.vec4Attributes[fullName].value : Vec4f::Zero();
+                    m_attributes.vec4Attributes[fullName] = Attribute<Vec4f>(rootName, v);
+                }
+                break;
+            case UniformType::Mat4:
+                {
+                    Mat4 v = m_temporaryAttributes.matrixAttributes.contains(fullName)
+                                 ? m_temporaryAttributes.matrixAttributes[fullName].value : Mat4::Identity();
+                    m_attributes.matrixAttributes[fullName] = Attribute<Mat4>(rootName, v);
+                }
+                break;
+            case UniformType::NestedStruct:
+                InitAttributes(member.members, fullName, rootName);
+                break;
+            default: break;
+            }
+        }
+    }
 }
 
 void Material::OnShaderChanged()
@@ -364,61 +479,7 @@ void Material::OnShaderChanged()
         {
         case UniformType::StorageBuffer:
         case UniformType::NestedStruct:
-            for (UniformMember& member : uniform.members)
-            {
-                switch (member.type)
-                {
-                case UniformType::Float:
-                    {
-                        float v = m_temporaryAttributes.floatAttributes.contains(member.name)
-                                      ? m_temporaryAttributes.floatAttributes[member.name].value
-                                      : 0.f;
-                        m_attributes.floatAttributes[member.name] = Attribute<float>(uniform.name, v);
-                    }
-                    break;
-                case UniformType::Int:
-                    {
-                        int v = m_temporaryAttributes.intAttributes.contains(member.name)
-                                    ? m_temporaryAttributes.intAttributes[member.name].value
-                                    : 0;
-                        m_attributes.intAttributes[member.name] = Attribute<int>(uniform.name, v);
-                    }
-                    break;
-                case UniformType::Vec2:
-                    {
-                        Vec2f v = m_temporaryAttributes.vec2Attributes.contains(member.name)
-                                      ? m_temporaryAttributes.vec2Attributes[member.name].value
-                                      : Vec2f::Zero();
-                        m_attributes.vec2Attributes[member.name] = Attribute<Vec2f>(uniform.name, v);
-                    }
-                    break;
-                case UniformType::Vec3:
-                    {
-                        Vec3f v = m_temporaryAttributes.vec3Attributes.contains(member.name)
-                                      ? m_temporaryAttributes.vec3Attributes[member.name].value
-                                      : Vec3f::Zero();
-                        m_attributes.vec3Attributes[member.name] = Attribute<Vec3f>(uniform.name, v);
-                    }
-                    break;
-                case UniformType::Vec4:
-                    {
-                        Vec4f v = m_temporaryAttributes.vec4Attributes.contains(member.name)
-                                      ? m_temporaryAttributes.vec4Attributes[member.name].value
-                                      : Vec4f::Zero();
-                        m_attributes.vec4Attributes[member.name] = Attribute<Vec4f>(uniform.name, v);
-                    }
-                    break;
-                case UniformType::Mat4:
-                    {
-                        Mat4 v = m_temporaryAttributes.matrixAttributes.contains(member.name)
-                                     ? m_temporaryAttributes.matrixAttributes[member.name].value
-                                     : Mat4::Identity();
-                        m_attributes.matrixAttributes[member.name] = Attribute<Mat4>(uniform.name, v);
-                    }
-                    break;
-                default: break;
-                }
-            }
+            InitAttributes(uniform.members, uniform.name, uniform.name);
             break;
 
         case UniformType::Sampler2D:
@@ -468,16 +529,10 @@ void Material::SendTexture(Texture* texture, const Uniform& uniform) const
 {
     VulkanRenderer* renderer = Engine::Get()->GetRenderer();
     m_handle->SetTexture(uniform.set, uniform.binding, texture, renderer);
-    PrintLog("Send Texture %s to material %s",
-             texture->GetPath().filename().generic_string().c_str(),
-             GetPath().generic_string().c_str());
 }
 
 void Material::SendCubeMap(CubeMap* cubeMap, const Uniform& uniform) const
 {
     VulkanRenderer* renderer = Engine::Get()->GetRenderer();
     m_handle->SetCubemap(uniform.set, uniform.binding, cubeMap, renderer);
-    PrintLog("Send CubeMap %s to material %s",
-             cubeMap->GetPath().filename().generic_string().c_str(),
-             GetPath().generic_string().c_str());
 }

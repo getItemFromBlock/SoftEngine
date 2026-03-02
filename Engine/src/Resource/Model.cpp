@@ -46,7 +46,7 @@ bool Model::Load(ResourceManager* resourceManager)
                     auto texture = resourceManager->Load<Texture>(p_path.parent_path() / mat.albedo.value());
                     matResource->SetAttribute("albedoSampler", texture);
                 }
-                matResource->SetAttribute("color", static_cast<Vec4f>(Color(mat.diffuse, mat.transparency)));
+                matResource->SetAttribute("material.color", static_cast<Vec4f>(Color(mat.diffuse, mat.transparency)));
                 
                 materials[mat.name.generic_string()] = matResource;
             }
@@ -120,10 +120,10 @@ void Model::Unload()
 {
 }
 
-SafePtr<GameObject> Model::CreateGameObject(Model* model, Scene* scene)
+SafePtr<GameObject> Model::CreateGameObject(Model* model, Scene* scene, GameObject* parent)
 {
     auto resourceManager = Engine::Get()->GetResourceManager();
-    SafePtr<GameObject> go = scene->CreateGameObject();
+    SafePtr<GameObject> go = scene->CreateGameObject(parent);
     go->SetName(model->GetName());
 	size_t materialIndex = 0;
     for (size_t i = 0; i < model->m_meshes.size(); i++)

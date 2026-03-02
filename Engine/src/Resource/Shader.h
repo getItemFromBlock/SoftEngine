@@ -22,23 +22,30 @@ enum class ShaderType
 class BaseShader : public IResource
 {
 public:
-    BaseShader(std::filesystem::path path) : IResource(std::move(path)) {}
+    BaseShader(std::filesystem::path path) : IResource(std::move(path))
+    {
+    }
+
     BaseShader(const BaseShader&) = delete;
     BaseShader(BaseShader&&) = delete;
     BaseShader& operator=(const BaseShader&) = delete;
     virtual ~BaseShader() override;
-    
+
     virtual bool Load(ResourceManager* resourceManager) override;
     virtual bool SendToGPU(VulkanRenderer* renderer) override;
-    virtual void Unload() override {}
-    
+
+    virtual void Unload() override
+    {
+    }
+
     virtual ResourceType GetResourceType() const override = 0;
-    
+
     virtual ShaderType GetShaderType() const = 0;
     std::string GetContent() const { return p_content; }
     VulkanShaderBuffer* GetBuffer() const { return p_buffer.get(); }
-    
+
     std::filesystem::path GetCompiledPath() const;
+
 private:
     std::string p_content;
     bool p_compiled = false;
@@ -69,18 +76,21 @@ enum class UniformType
     ImageCube
 };
 
-struct UniformMember {
+struct UniformMember
+{
     std::string name;
     std::string typeName;
     UniformType type = UniformType::None;
     uint32_t offset = 0;
+    uint32_t stride = 0;
     uint32_t size = 0;
     bool isArray = false;
     std::vector<uint32_t> arrayDims;
     std::vector<UniformMember> members;
 };
 
-struct Uniform {
+struct Uniform
+{
     std::string name;
     uint32_t set = 0;
     uint32_t binding = 0;
@@ -93,8 +103,8 @@ struct Uniform {
 
 struct PushConstant
 {
-    std::string name;   
-    uint32_t size = 0;  
+    std::string name;
+    uint32_t size = 0;
     uint32_t offset = 0;
     ShaderType shaderType = ShaderType::None;
     std::vector<UniformMember> members;
@@ -127,40 +137,41 @@ inline Topology topology_from_string(std::string topology)
 }
 
 
-
 using Uniforms = std::unordered_map<std::string, Uniform>;
 using PushConstants = std::unordered_map<ShaderType, PushConstant>;
+
 class Shader : public IResource
 {
 public:
     DECLARE_RESOURCE_TYPE(Shader)
-    
+
     bool Load(ResourceManager* resourceManager) override;
     bool SendToGPU(VulkanRenderer* renderer) override;
     void Unload() override;
 
-    PushConstants GetPushConstants() const {return m_pushConstants;}
+    PushConstants GetPushConstants() const { return m_pushConstants; }
     Uniform GetUniform(const std::string& name) { return m_uniforms[name]; }
     Uniforms GetUniforms() const { return m_uniforms; }
-    
+
     VertexShader* GetVertexShader() const { return m_vertexShader.getPtr(); }
     FragmentShader* GetFragmentShader() const { return m_fragmentShader.getPtr(); }
     ComputeShader* GetComputeShader() const { return m_computeShader.getPtr(); }
-    
+
     void SendTexture(UBOBinding binding, Texture* texture, VulkanRenderer* renderer);
     void SendValue(UBOBinding binding, void* value, uint32_t size, VulkanRenderer* renderer);
-    
+
     VulkanPipeline* GetPipeline() const { return m_pipeline.get(); }
-    
+
     bool IsGraphic() const { return m_graphic; }
-    
+
     Topology GetTopology() const { return m_topology; }
     bool IsDepthTestEnabled() const { return m_depthTestEnabled; }
     bool IsDepthWriteEnabled() const { return m_depthWriteEnabled; }
-    
+
     std::unique_ptr<ComputeDispatch> CreateDispatch(VulkanRenderer* renderer);
-    
+
     std::vector<VkFormat> GetAttachments() const { return m_attachments; }
+
 protected:
     SafePtr<VertexShader> m_vertexShader;
     SafePtr<FragmentShader> m_fragmentShader;
@@ -169,12 +180,12 @@ protected:
     PushConstants m_pushConstants;
     Uniforms m_uniforms;
     std::unique_ptr<VulkanPipeline> m_pipeline;
-    
+
     std::vector<VkFormat> m_attachments;
-    
+
     Topology m_topology = Topology::Triangle;
     bool m_depthTestEnabled = true;
     bool m_depthWriteEnabled = true;
-    
+
     bool m_graphic = true;
 };

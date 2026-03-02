@@ -11,7 +11,13 @@ public:
     
     void Describe(ClassDescriptor& d) override;
     
-    Vec4f GetColor() const { return m_color; }
+    Vec3f GetColor() const { return m_color; }
+    float GetIntensity() const { return m_intensity; }
+    
+    void SetColor(const Vec4f& color) { m_color = color; }
+    void SetIntensity(float intensity) { m_intensity = intensity; }
+    
 private:
-    Vec4f m_color = Vec4f::One();
+    Vec3f m_color = Vec3f::One();
+    float m_intensity = 1.0f;
 };

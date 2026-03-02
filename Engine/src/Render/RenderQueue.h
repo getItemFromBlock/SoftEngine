@@ -25,6 +25,7 @@ struct RenderCommand
     Material* material;
     Shader* shader;
     SafePtr<Texture> albedoTexture = {};
+    SafePtr<Texture> normalTexture = {};
     
     Mat4 modelMatrix;
     
@@ -67,11 +68,8 @@ private:
     
     std::vector<RenderCommand> m_commands;
     
-    std::vector<std::unique_ptr<Material>> m_gBufferMaterialPool;
-    std::vector<Texture*> m_gBufferLastAlbedo;
-    size_t m_gBufferPoolHighWaterMark = 0;
-
-    Material* AcquireGBufferMaterial(size_t index, const Material* templateMaterial);
+    Texture* m_lastBoundAlbedo = nullptr;
+    Texture* m_lastBoundNormal = nullptr;
 };
 
 class RenderQueueManager

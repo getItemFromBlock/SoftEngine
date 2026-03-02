@@ -37,23 +37,23 @@ void Editor::Initialize()
     config.size = Vec2i(1280, 720);
     config.attributes = static_cast<WindowAttributes>(VSync);
     m_window = Window::Create(WindowAPI::GLFW, config);
-    
+
     EngineDesc desc = {
         .window = m_window.get(),
     };
-    
+
     m_engine = Engine::Create();
     m_engine->Initialize(desc);
-    
+
     m_imguiHandler = std::make_unique<ImGuiHandler>();
     m_imguiHandler->Initialize(m_window.get(), m_engine->GetRenderer());
-    
+
     m_windowManager = std::make_unique<EditorWindowManager>();
     m_windowManager->Initialize(m_engine, m_imguiHandler.get());
-    
+
     auto resourceManager = m_engine->GetResourceManager();
     auto currentScene = m_engine->GetSceneHolder()->GetCurrentScene();
-    
+
     // ===== Debug ===== //
     auto model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Cube.obj");
     resourceManager->Load<Model>(RESOURCE_PATH"/models/Suzanne.obj");
@@ -61,59 +61,109 @@ void Editor::Initialize()
     resourceManager->Load<CubeMap>(RESOURCE_PATH"/envMap/wooden_studio_09_4k.hdr");
     resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/inverted.pshader");
     model = resourceManager->Load<Model>(RESOURCE_PATH"models/Sphere.obj");
+
+        
+    auto sphereMaterial = resourceManager->CreateMaterial("SphereMat", resourceManager->GetDefaultShader());
+    auto albedo = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/Albedo.png");
+    auto normal = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/NormalGL.png");
+    sphereMaterial->SetAttribute("material.color", Vec4f::One());
+    sphereMaterial->SetAttribute("albedoSampler", albedo);
+    sphereMaterial->SetAttribute("normalSampler", normal);
+
+     model->EOnLoaded.Bind([sphereMaterial, model, this, currentScene]()
+     {
+         /*auto parent = currentScene->CreateGameObject();
+         parent->SetName("Spheres");
+         
+         // Cube Shape
+         const int objPerSide = 4;
+         const float spacing = 3.0f;
+
+         for (int x = -objPerSide / 2; x <= objPerSide / 2; x++)
+         {
+             for (int z = -objPerSide / 2; z <= objPerSide / 2; z++)
+             {
+                 auto go = Model::CreateGameObject(model.getPtr(), currentScene, parent.getPtr());
+                 go->GetTransform()->SetLocalPosition(Vec3f(x * spacing, -1.0f, z * spacing));
+                 auto meshComponent = go->GetComponent<MeshComponent>();
+                 meshComponent->SetMaterial(0, sphereMaterial);
+             }
+         }*/
+     });
     
-    model->EOnLoaded.Bind([model, this, currentScene]()
+    auto cube = resourceManager->Load<Model>(RESOURCE_PATH"models/Cube.obj");
+    cube->EOnLoaded.Bind([cube, this, currentScene]()
     {
+        auto parent = currentScene->CreateGameObject();
+        parent->SetName("Lights");
+        
         auto resourceManager = m_engine->GetResourceManager();
         auto unlitForwardShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/Unlit/unlit.shader");
-        auto unlitForwardMat = resourceManager->CreateMaterial("UnlitForward", unlitForwardShader);
-        unlitForwardMat->SetAttribute("albedoSampler", resourceManager->GetDefaultTexture());
+        auto red = resourceManager->CreateMaterial("Red", unlitForwardShader);
+        red->SetAttribute("material.color", Vec4f(1, 0, 0, 1));
         
-        const int height = 3;
-        const float spacing = 2.5f;
+        auto green = resourceManager->CreateMaterial("Green", unlitForwardShader);
+        green->SetAttribute("material.color", Vec4f(0, 1, 0, 1));
         
-        for (int y = 0; y < height; y++)
+        auto blue = resourceManager->CreateMaterial("Blue", unlitForwardShader);
+        blue->SetAttribute("material.color", Vec4f(0, 0, 1, 1));
+        
+        float spacing2 = 2.66f;
+        for (size_t i = 0 ; i < 1; i++)
         {
-            int layerSize = height - y;
+            SafePtr<GameObject> light = Model::CreateGameObject(cube.getPtr(), currentScene, parent.getPtr());
+            SafePtr<MeshComponent> meshComponent = light->GetComponent<MeshComponent>();
+            meshComponent->SetMaterial(0, i % 3 == 0 ? red : i % 3 == 1 ? green : blue);
         
-            for (int x = 0; x < layerSize; x++)
-            {
-                for (int z = 0; z < layerSize; z++)
-                {
-                    auto go = Model::CreateGameObject(model.getPtr(), currentScene);
-        
-                    Vec3f position(
-                        (x - layerSize / 2.0f) * spacing,
-                        y * spacing,
-                        (z - layerSize / 2.0f) * spacing
-                    );
-        
-                    go->GetTransform()->SetLocalPosition(position);
-                }
-            }
+            light->GetTransform()->SetLocalScale(Vec3f(0.25f));
+            float x = (i % 3) - 1.0f;
+            float z = (i / 3) - 1.0f;
+            light->GetTransform()->SetLocalPosition(Vec3f(x * spacing2, 0.0f, z * spacing2));
+            light->SetName("Light " + std::to_string(i));
+            
+            auto lightComponent = light->AddComponent<LightComponent>();
+            Vec3f color = Vec3f::Zero();
+            color[(i % 3)] = 1.0f;
+            lightComponent->SetColor(color);
+            lightComponent->SetIntensity(10.f);
+            
+            auto testComponent = light->AddComponent<TestComponent>();
+            testComponent->SetOffset(i);
         }
     });
     
+    auto plane = resourceManager->Load<Model>(RESOURCE_PATH"models/Plane.obj");
+    plane->EOnLoaded.Bind([sphereMaterial, plane, this, currentScene]()
+    {        
+        auto go = Model::CreateGameObject(plane.getPtr(), currentScene);
+        auto transformComponent = go->GetTransform();
+        transformComponent->SetLocalPosition(Vec3f(0.0f, -2.0f, 0.0f));
+        transformComponent->SetLocalRotation(Quat::FromEuler(Vec3f(90.0f, 0.0f, 0.0f)));
+        transformComponent->SetLocalScale(Vec3f(10.0f, 10.0f, 1.0f));
+        
+        auto meshComponent = go->GetComponent<MeshComponent>();
+        meshComponent->SetMaterial(0, sphereMaterial);
+    });
     // ===== Debug ===== //
 }
 
 void Editor::Run()
-{    
+{
     while (!m_window->ShouldClose())
     {
         m_window->PollEvents();
-        
+
         if (!m_engine->BeginFrame())
             continue;
-        
+
         m_engine->Update();
-        
+
         m_engine->Render();
-        
+
         m_imguiHandler->BeginFrame();
         OnRender();
         m_imguiHandler->EndFrame();
-        
+
         m_engine->EndFrame();
         //std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }

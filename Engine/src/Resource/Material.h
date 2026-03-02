@@ -107,6 +107,7 @@ public:
     VulkanMaterial* GetHandle() const { return m_handle.get(); }
 
     SafePtr<Texture> GetTexture(const std::string& name) const;
+    void InitAttributes(const std::vector<UniformMember>& members, const std::string& uniformName, const std::string& rootName);
 
 private:
     void OnShaderChanged();

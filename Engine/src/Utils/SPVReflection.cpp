@@ -356,6 +356,7 @@ void SPV::ParseBlockVariable(const SpvReflectBlockVariable* var, UniformMember& 
 
     out.offset = var->offset;
     out.size = var->size;
+    out.stride = var->array.stride;
 
     if (var->type_description)
     {

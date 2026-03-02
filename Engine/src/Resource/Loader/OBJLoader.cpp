@@ -179,63 +179,57 @@ bool AreVerticesSimilar(const Vec3f& v1, const Vec2f& uv1, const Vec3f& n1,
 		std::abs(n1.y - n2.y) < epsilon &&
 		std::abs(n1.z - n2.z) < epsilon);
 }
-
 void OBJLoader::ComputeVertices(Mesh& mesh)
 {
-	mesh.tangents.resize(mesh.indices.size());
+    mesh.tangents.resize(mesh.positions.size(), { 0.0f, 0.0f, 0.0f });
 
-	for (size_t k = 0; k < mesh.indices.size(); k += 3)
-	{
-		const Vec3i& idx0 = mesh.indices[k];
-		const Vec3i& idx1 = mesh.indices[k + 1];
-		const Vec3i& idx2 = mesh.indices[k + 2];
+    for (size_t k = 0; k < mesh.indices.size(); k += 3)
+    {
+        const Vec3i& idx0 = mesh.indices[k];
+        const Vec3i& idx1 = mesh.indices[k + 1];
+        const Vec3i& idx2 = mesh.indices[k + 2];
 
-		const Vec3f& Edge1 = mesh.positions[idx1.x] - mesh.positions[idx0.x];
-		const Vec3f& Edge2 = mesh.positions[idx2.x] - mesh.positions[idx0.x];
+        const Vec3f& Edge1 = mesh.positions[idx1.x] - mesh.positions[idx0.x];
+        const Vec3f& Edge2 = mesh.positions[idx2.x] - mesh.positions[idx0.x];
 
-		const float DeltaU1 = mesh.textureUVs[idx1.y].x - mesh.textureUVs[idx0.y].x;
-		const float DeltaV1 = mesh.textureUVs[idx1.y].y - mesh.textureUVs[idx0.y].y;
-		const float DeltaU2 = mesh.textureUVs[idx2.y].x - mesh.textureUVs[idx0.y].x;
-		const float DeltaV2 = mesh.textureUVs[idx2.y].y - mesh.textureUVs[idx0.y].y;
+        const float DeltaU1 = mesh.textureUVs[idx1.y].x - mesh.textureUVs[idx0.y].x;
+        const float DeltaV1 = mesh.textureUVs[idx1.y].y - mesh.textureUVs[idx0.y].y;
+        const float DeltaU2 = mesh.textureUVs[idx2.y].x - mesh.textureUVs[idx0.y].x;
+        const float DeltaV2 = mesh.textureUVs[idx2.y].y - mesh.textureUVs[idx0.y].y;
 
-		float f = DeltaU1 * DeltaV2 - DeltaU2 * DeltaV1;
-		if (fabs(f) < 1e-6) {
-			f = 1.0f; // Prevent division by zero and provide a default value for 'f'
-		}
-		else {
-			f = 1.0f / f;
-		}
+        float f = DeltaU1 * DeltaV2 - DeltaU2 * DeltaV1;
+        f = (fabs(f) < 1e-6f) ? 1.0f : 1.0f / f;
 
-		Vec3f Tangent;
+        Vec3f Tangent;
+        Tangent.x = f * (DeltaV2 * Edge1.x - DeltaV1 * Edge2.x);
+        Tangent.y = f * (DeltaV2 * Edge1.y - DeltaV1 * Edge2.y);
+        Tangent.z = f * (DeltaV2 * Edge1.z - DeltaV1 * Edge2.z);
 
-		Tangent.x = f * (DeltaV2 * Edge1.x - DeltaV1 * Edge2.x);
-		Tangent.y = f * (DeltaV2 * Edge1.y - DeltaV1 * Edge2.y);
-		Tangent.z = f * (DeltaV2 * Edge1.z - DeltaV1 * Edge2.z);
+        mesh.tangents[idx0.x] = mesh.tangents[idx0.x] + Tangent;
+        mesh.tangents[idx1.x] = mesh.tangents[idx1.x] + Tangent;
+        mesh.tangents[idx2.x] = mesh.tangents[idx2.x] + Tangent;
+    }
 
-		Tangent.Normalize();
+    for (auto& t : mesh.tangents)
+        t.Normalize();
 
-		mesh.tangents[k] = Tangent;
-		mesh.tangents[k + 1] = Tangent;
-		mesh.tangents[k + 2] = Tangent;
-	}
+    for (size_t i = 0; i < mesh.indices.size(); i++)
+    {
+        const Vec3i& idx = mesh.indices[i];
 
-	for (size_t i = 0; i < mesh.indices.size(); i++)
-	{
-		const Vec3i& idx = mesh.indices[i];
+        mesh.finalVertices.push_back(mesh.positions[idx.x].x);
+        mesh.finalVertices.push_back(mesh.positions[idx.x].y);
+        mesh.finalVertices.push_back(mesh.positions[idx.x].z);
 
-		mesh.finalVertices.push_back(mesh.positions[idx.x].x);
-		mesh.finalVertices.push_back(mesh.positions[idx.x].y);
-		mesh.finalVertices.push_back(mesh.positions[idx.x].z);
+        mesh.finalVertices.push_back(mesh.textureUVs[idx.y].x);
+        mesh.finalVertices.push_back(mesh.textureUVs[idx.y].y);
 
-		mesh.finalVertices.push_back(mesh.textureUVs[idx.y].x);
-		mesh.finalVertices.push_back(mesh.textureUVs[idx.y].y);
+        mesh.finalVertices.push_back(mesh.normals[idx.z].x);
+        mesh.finalVertices.push_back(mesh.normals[idx.z].y);
+        mesh.finalVertices.push_back(mesh.normals[idx.z].z);
 
-		mesh.finalVertices.push_back(mesh.normals[idx.z].x);
-		mesh.finalVertices.push_back(mesh.normals[idx.z].y);
-		mesh.finalVertices.push_back(mesh.normals[idx.z].z);
-
-		mesh.finalVertices.push_back(mesh.tangents[i].x);
-		mesh.finalVertices.push_back(mesh.tangents[i].y);
-		mesh.finalVertices.push_back(mesh.tangents[i].z);
-	}
+        mesh.finalVertices.push_back(mesh.tangents[idx.x].x);
+        mesh.finalVertices.push_back(mesh.tangents[idx.x].y);
+        mesh.finalVertices.push_back(mesh.tangents[idx.x].z);
+    }
 }

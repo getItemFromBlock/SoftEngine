@@ -14,7 +14,7 @@ Scene::Scene()
     root->SetName("Root");
     m_rootUUID = root->GetUUID();
     
-    m_lightManager = std::make_unique<LightManager>(); 
+    m_lightManager = std::make_unique<LightManager>(this); 
     m_editorCamera = std::make_unique<Camera>();
     m_editorCamera->GetTransform()->SetLocalPosition(Vec3f::Zero());
 
@@ -75,9 +75,6 @@ void Scene::OnRender(VulkanRenderer* renderer)
     transparentQueue->Clear();
 
     auto lineRenderer = renderer->GetLineRenderer();
-    renderer->AddLine(Vec3f::Zero(), Vec3f::Right(), {Vec3f::Right(), 1});
-    renderer->AddLine(Vec3f::Zero(), Vec3f::Up(), {Vec3f::Up(), 1});
-    renderer->AddLine(Vec3f::Zero(), Vec3f::Forward(), {Vec3f::Forward() * -1, 1});
     
     lineRenderer->Render(renderer, m_editorCameraData.VP);
 

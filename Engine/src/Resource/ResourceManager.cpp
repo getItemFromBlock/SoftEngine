@@ -203,7 +203,7 @@ void ResourceManager::LoadDefaultMaterial(const std::filesystem::path& materialP
 
     m_defaultMaterial = material->GetUUID();
 
-    material->SetAttribute("color", Vec4f::One());
+    material->SetAttribute("material.color", Vec4f::One());
     material->SetAttribute("albedoSampler", GetBlankTexture());
 }
 

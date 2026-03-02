@@ -13,17 +13,25 @@ layout(location = 1) in vec2 inTexCoord;
 layout(location = 2) in vec3 inNormal;
 layout(location = 3) in vec3 inTangent;
 
-layout(location = 0) out vec3 vWorldPos;    // world-space now
-layout(location = 1) out vec3 vWorldNormal;
-layout(location = 2) out vec2 vTexCoord;
+layout(location = 0) out vec3 vWorldPos;
+layout(location = 1) out vec2 vTexCoord;
+layout(location = 2) out mat3 vTBN;
 
 void main() {
     vec4 worldPos = pc.model * vec4(inPosition, 1.0);
     vWorldPos = worldPos.xyz;
+    vTexCoord = inTexCoord;
 
     mat3 normalMatrix = transpose(inverse(mat3(pc.model)));
-    vWorldNormal = normalize(normalMatrix * inNormal);
 
-    vTexCoord = inTexCoord;
+    vec3 N = normalize(normalMatrix * inNormal);
+    vec3 T = normalize(normalMatrix * inTangent);
+
+    T = normalize(T - dot(T, N) * N);
+
+    vec3 B = cross(N, T);
+
+    vTBN = mat3(T, B, N);
+
     gl_Position = cameraUBO.viewProj * worldPos;
 }

@@ -21,7 +21,7 @@ public:
     
     const std::vector<SafePtr<Mesh>>& GetMeshes() const { return m_meshes; }
     
-    static SafePtr<GameObject> CreateGameObject(Model* model, Scene* scene);
+    static SafePtr<GameObject> CreateGameObject(Model* model, Scene* scene, GameObject* parent = nullptr);
 
 private:
     void ComputeBoundingBox(const std::vector<std::vector<Vec3f>>& positionVertices);

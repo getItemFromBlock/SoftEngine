@@ -32,10 +32,6 @@ void RenderCommand::GenerateSortKeyWithDepth(float depth)
 
 RenderQueue::~RenderQueue()
 {
-    for (auto& mat : m_gBufferMaterialPool)
-        mat->Unload();
-    m_gBufferMaterialPool.clear();
-    m_gBufferLastAlbedo.clear();
 }
 
 void RenderQueue::Submit(const RenderCommand& command)
@@ -75,6 +71,7 @@ void RenderQueue::SubmitMeshRenderer(GameObject* gameObject, Mesh* mesh,
         cmd.shader = material->GetShader().getPtr();
         cmd.modelMatrix = model;
         cmd.albedoTexture = material->GetTexture("albedoSampler");
+        cmd.normalTexture = material->GetTexture("normalSampler");
         cmd.GenerateSortKey();
             
         Submit(cmd);
@@ -145,19 +142,6 @@ void RenderQueue::Execute(VulkanRenderer* renderer)
                                     cmd.indexCount);
     }
 }
-
-Material* RenderQueue::AcquireGBufferMaterial(size_t index, const Material* templateMaterial)
-{
-    if (index < m_gBufferMaterialPool.size())
-        return m_gBufferMaterialPool[index].get();
-
-    auto instance = std::make_unique<Material>("");
-    instance->SetShader(templateMaterial->GetShader());
-
-    m_gBufferMaterialPool.push_back(std::move(instance));
-    return m_gBufferMaterialPool.back().get();
-}
-
 void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMaterial)
 {
     if (!gBufferMaterial || !gBufferMaterial->GetShader())
@@ -166,40 +150,63 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
     if (!renderer->BindShader(gBufferMaterial->GetShader().getPtr()))
         return;
 
+    // Set camera once — same for all draws
     const auto& cameraVP = Engine::Get()->GetSceneHolder()
                                ->GetCurrentScene()->GetCameraData().VP;
+    gBufferMaterial->SetAttribute("cameraUBO.viewProj", cameraVP);
 
-    for (size_t i = 0; i < m_commands.size(); ++i)
+    m_lastBoundAlbedo = nullptr;
+    m_lastBoundNormal = nullptr;
+    Mesh* lastMesh = nullptr;
+
+    for (auto& cmd : m_commands)
     {
-        auto& cmd = m_commands[i];
-        Material* mat = AcquireGBufferMaterial(i, gBufferMaterial);
-
-        mat->SetAttribute("viewProj", cameraVP);
-        mat->SetAttribute("color",    cmd.material->GetVec4Attribute("color"));
+        // Only rebind textures when they actually change
+        bool texturesDirty = false;
 
         Texture* albedo = cmd.albedoTexture.getPtr();
-        if (i >= m_gBufferLastAlbedo.size())
-            m_gBufferLastAlbedo.resize(i + 1, nullptr);
+        Texture* normal = cmd.normalTexture.getPtr();
 
-        if (albedo != m_gBufferLastAlbedo[i])
+        if (albedo != m_lastBoundAlbedo)
         {
-            mat->SetAttribute("albedoSampler", cmd.albedoTexture);
-            m_gBufferLastAlbedo[i] = albedo;
+            gBufferMaterial->SetAttribute("albedoSampler", cmd.albedoTexture);
+            m_lastBoundAlbedo = albedo;
+            texturesDirty = true;
         }
 
-        mat->SendAllValues(renderer);
+        if (normal != m_lastBoundNormal)
+        {
+            gBufferMaterial->SetAttribute("normalSampler", cmd.normalTexture);
+            m_lastBoundNormal = normal;
+            texturesDirty = true;
+        }
 
-        if (!renderer->BindMaterial(mat))
-            continue;
+        // Per-object color from the original material
+        gBufferMaterial->SetAttribute("material.color",
+                                      cmd.material->GetVec4Attribute("material.color"));
 
-        if (cmd.mesh)
-            renderer->BindVertexBuffers(cmd.mesh->GetVertexBuffer(), cmd.mesh->GetIndexBuffer());
+        if (texturesDirty)
+        {
+            gBufferMaterial->SendAllValues(renderer);
+            if (!renderer->BindMaterial(gBufferMaterial))
+                continue;
+        }
 
-        PushConstant pushConstant = mat->GetShader()->GetPushConstants()[ShaderType::Vertex];
+        if (cmd.mesh != lastMesh)
+        {
+            renderer->BindVertexBuffers(cmd.mesh->GetVertexBuffer(),
+                                        cmd.mesh->GetIndexBuffer());
+            lastMesh = cmd.mesh;
+        }
+
+        PushConstant pushConstant = gBufferMaterial->GetShader()
+                                        ->GetPushConstants()[ShaderType::Vertex];
         renderer->SendPushConstants(&cmd.modelMatrix, sizeof(Mat4),
-                                    mat->GetShader().getPtr(), pushConstant);
+                                    gBufferMaterial->GetShader().getPtr(),
+                                    pushConstant);
 
-        renderer->DrawVertexSubMesh(cmd.mesh->GetIndexBuffer(), cmd.startIndex, cmd.indexCount);
+        renderer->DrawVertexSubMesh(cmd.mesh->GetIndexBuffer(),
+                                    cmd.startIndex, cmd.indexCount);
     }
 }
 
