@@ -27,6 +27,8 @@ bool VulkanGBuffer::Initialize(VulkanDevice* device, uint32_t width, uint32_t he
         return false;
     if (!CreateAttachment(m_albedo, kAlbedoFormat)) 
         return false;
+    if (!CreateAttachment(m_metallicRoughness, kMetallicRoughnessFormat)) 
+        return false;
     if (!CreateSampler()) 
         return false;
 
@@ -155,6 +157,7 @@ void VulkanGBuffer::Cleanup()
     DestroyAttachment(m_position);
     DestroyAttachment(m_normal);
     DestroyAttachment(m_albedo);
+    DestroyAttachment(m_metallicRoughness);
 }
 
 bool VulkanGBuffer::Resize(uint32_t width, uint32_t height)

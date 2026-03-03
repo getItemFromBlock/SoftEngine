@@ -369,7 +369,7 @@ void VulkanMaterial::SetCombinedImageSampler(uint32_t set, uint32_t binding,
 
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrite.dstSet = m_descriptorSets[renderer->GetFrameIndex()]->GetDescriptorSet(set); // Use 'set' parameter
+    descriptorWrite.dstSet = m_descriptorSets[set]->GetDescriptorSet(renderer->GetFrameIndex());
     descriptorWrite.dstBinding = binding;
     descriptorWrite.dstArrayElement = 0;
     descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -450,7 +450,7 @@ void VulkanMaterial::SetStorageImage(uint32_t set, uint32_t binding,
 
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrite.dstSet = m_descriptorSets[renderer->GetFrameIndex()]->GetDescriptorSet(set); // Use 'set' parameter
+    descriptorWrite.dstSet = m_descriptorSets[set]->GetDescriptorSet(renderer->GetFrameIndex());
     descriptorWrite.dstBinding = binding;
     descriptorWrite.dstArrayElement = 0;
     descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;

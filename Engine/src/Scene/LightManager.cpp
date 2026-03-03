@@ -15,8 +15,8 @@ void LightManager::SendLights(Material* material) const
 {
     if (m_lights.empty())
         return;
+    
     material->SetAttribute("lightData.numLights", static_cast<int>(m_lights.size()));
-    material->SetAttribute("lightData.cameraPos", Vec4f(m_scene->GetEditorCamera()->GetTransform()->GetWorldPosition()));
     size_t i = 0;
     for (const auto& light : m_lights)
     {
@@ -35,10 +35,13 @@ void LightManager::AddLight(LightComponent* light)
 
 void LightManager::RemoveLight(LightComponent* light)
 {
-    auto it = std::ranges::remove_if(m_lights, [light](const SafePtr<LightComponent>& i)
+    size_t index = 0;
+    auto it = std::ranges::remove_if(m_lights, [light, &index](const SafePtr<LightComponent>& i)
     {
+        index++;
         return i.getPtr() == light;
     }).begin();
+    
     if (it != m_lights.end())
     {
         m_lights.erase(it);

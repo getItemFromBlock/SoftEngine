@@ -9,6 +9,7 @@
 #include "VulkanGBuffer.h"
 
 #include "Debug/Log.h"
+#include "Resource/Texture.h"
 #include "Resource/Loader/ImageLoader.h"
 
 VulkanTexture::~VulkanTexture()
@@ -58,12 +59,32 @@ void VulkanTexture::Cleanup()
 }
 
 bool VulkanTexture::CreateFromImage(const ImageLoader::Image& image, VulkanDevice* device,
-                                    VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue)
+                                    VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue, const TextureParam& param)
 {
     if (!device)
         return false;
 
+    switch (param.format) {
+    case TextureFormat::SRGB:
+        m_format = VK_FORMAT_R8G8B8A8_SRGB;
+        break;
+    case TextureFormat::UNORM:
+        m_format = VK_FORMAT_R8G8B8A8_UNORM;
+        break;
+    }
+    
     m_device = device;
+    switch (param.filter)
+    {
+    case TextureFilter::LINEAR:
+        m_preferredFilter = VK_FILTER_LINEAR;
+        break;
+    case TextureFilter::NEAREST:
+        m_preferredFilter = VK_FILTER_NEAREST;
+        break;
+    }
+
+
     m_width = image.size.x;
     m_height = image.size.y;
     m_mipLevels = static_cast<uint32_t>(
@@ -507,7 +528,7 @@ void VulkanTexture::CreateCubemapSampler()
     samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
     samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
     samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
+    samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
 
     if (vkCreateSampler(m_device->GetDevice(), &samplerInfo, nullptr, &m_sampler) != VK_SUCCESS)
         throw std::runtime_error("Failed to create cubemap sampler!");

@@ -62,87 +62,131 @@ void Editor::Initialize()
     resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/inverted.pshader");
     model = resourceManager->Load<Model>(RESOURCE_PATH"models/Sphere.obj");
 
+
+    model->EOnLoaded.Bind([model, this, currentScene, resourceManager]()
+    {
+        auto parent = currentScene->CreateGameObject();
+        parent->SetName("Spheres");
+        {
+            auto sphereMaterial = resourceManager->CreateMaterial("SphereMat", resourceManager->GetDefaultShader());
+            
+            auto albedo = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/Color.png");
+            auto normal = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/BumpMapFlatColour.png");
+            auto metallic = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/Metalness.png");
+            auto roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/Roughness.png");
         
-    auto sphereMaterial = resourceManager->CreateMaterial("SphereMat", resourceManager->GetDefaultShader());
-    auto albedo = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/Albedo.png");
-    auto normal = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/NormalGL.png");
-    sphereMaterial->SetAttribute("material.color", Vec4f::One());
-    sphereMaterial->SetAttribute("albedoSampler", albedo);
-    sphereMaterial->SetAttribute("normalSampler", normal);
+            /*
+            auto albedo = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/PavingStones150_4K-PNG_Color.png");
+            auto normal = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/PavingStones150_4K-PNG_NormalGL.png");
+            auto roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/PavingStones150_4K-PNG_Roughness.png");
+            auto metallic = resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png");
+            */
+            
+            auto unorm = TextureParam{.format = TextureFormat::UNORM};
+            normal->SetTextureParameters(unorm);
+            roughness->SetTextureParameters(unorm);
+            metallic->SetTextureParameters(unorm);
+            
+            sphereMaterial->SetAttribute("material.color", Vec4f::One());
+            sphereMaterial->SetAttribute("albedoSampler", albedo);
+            sphereMaterial->SetAttribute("normalSampler", normal);
+            sphereMaterial->SetAttribute("roughnessSampler", roughness);
+            sphereMaterial->SetAttribute("metalnessSampler", metallic);
+            sphereMaterial->SetAttribute("material.roughnessFactor", 1.f);
+            sphereMaterial->SetAttribute("material.metalnessFactor", 1.f);
 
-     model->EOnLoaded.Bind([sphereMaterial, model, this, currentScene]()
-     {
-         /*auto parent = currentScene->CreateGameObject();
-         parent->SetName("Spheres");
-         
-         // Cube Shape
-         const int objPerSide = 4;
-         const float spacing = 3.0f;
+            auto go = Model::CreateGameObject(model.getPtr(), currentScene, parent.getPtr());
+            go->GetTransform()->SetLocalPosition(Vec3f(0.0f, 0.0f, 0.0f));
+            go->GetComponent<MeshComponent>()->SetMaterial(0, sphereMaterial);
+        }
+        
+        {
+            auto pbrForward = resourceManager->Load<Shader>(RESOURCE_PATH"shaders/PBR/pbr.shader");
+            auto sphereMaterialForward = resourceManager->CreateMaterial("SphereMatForward", pbrForward);
+            sphereMaterialForward->SetAttribute("material.color", Vec4f::One());
 
-         for (int x = -objPerSide / 2; x <= objPerSide / 2; x++)
-         {
-             for (int z = -objPerSide / 2; z <= objPerSide / 2; z++)
-             {
-                 auto go = Model::CreateGameObject(model.getPtr(), currentScene, parent.getPtr());
-                 go->GetTransform()->SetLocalPosition(Vec3f(x * spacing, -1.0f, z * spacing));
-                 auto meshComponent = go->GetComponent<MeshComponent>();
-                 meshComponent->SetMaterial(0, sphereMaterial);
-             }
-         }*/
-     });
-    
+            auto go = Model::CreateGameObject(model.getPtr(), currentScene, parent.getPtr());
+            go->GetTransform()->SetLocalPosition(Vec3f(2.0f, 0.0f, 0.0f));
+            go->GetComponent<MeshComponent>()->SetMaterial(0, sphereMaterialForward);
+        }
+        
+        {
+            auto normalShader = resourceManager->Load<Shader>(RESOURCE_PATH"shaders/Normal/normal.shader");
+            auto normalMaterial = resourceManager->CreateMaterial("Debug Sphere", normalShader);
+            
+            
+            auto go = Model::CreateGameObject(model.getPtr(), currentScene, parent.getPtr());
+            go->GetTransform()->SetLocalPosition(Vec3f(-2.0f, 0.0f, 0.0f));
+            go->GetComponent<MeshComponent>()->SetMaterial(0, normalMaterial);
+        }
+    });
+
     auto cube = resourceManager->Load<Model>(RESOURCE_PATH"models/Cube.obj");
     cube->EOnLoaded.Bind([cube, this, currentScene]()
     {
         auto parent = currentScene->CreateGameObject();
         parent->SetName("Lights");
-        
+
         auto resourceManager = m_engine->GetResourceManager();
         auto unlitForwardShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/Unlit/unlit.shader");
         auto red = resourceManager->CreateMaterial("Red", unlitForwardShader);
         red->SetAttribute("material.color", Vec4f(1, 0, 0, 1));
-        
+
         auto green = resourceManager->CreateMaterial("Green", unlitForwardShader);
         green->SetAttribute("material.color", Vec4f(0, 1, 0, 1));
-        
+
         auto blue = resourceManager->CreateMaterial("Blue", unlitForwardShader);
         blue->SetAttribute("material.color", Vec4f(0, 0, 1, 1));
-        
+
         float spacing2 = 2.66f;
-        for (size_t i = 0 ; i < 1; i++)
+        for (size_t i = 0; i < 3; i++)
         {
             SafePtr<GameObject> light = Model::CreateGameObject(cube.getPtr(), currentScene, parent.getPtr());
             SafePtr<MeshComponent> meshComponent = light->GetComponent<MeshComponent>();
             meshComponent->SetMaterial(0, i % 3 == 0 ? red : i % 3 == 1 ? green : blue);
-        
+
             light->GetTransform()->SetLocalScale(Vec3f(0.25f));
             float x = (i % 3) - 1.0f;
             float z = (i / 3) - 1.0f;
             light->GetTransform()->SetLocalPosition(Vec3f(x * spacing2, 0.0f, z * spacing2));
             light->SetName("Light " + std::to_string(i));
-            
+
             auto lightComponent = light->AddComponent<LightComponent>();
             Vec3f color = Vec3f::Zero();
             color[(i % 3)] = 1.0f;
             lightComponent->SetColor(color);
             lightComponent->SetIntensity(10.f);
-            
+
             auto testComponent = light->AddComponent<TestComponent>();
             testComponent->SetOffset(i);
         }
     });
-    
+
     auto plane = resourceManager->Load<Model>(RESOURCE_PATH"models/Plane.obj");
-    plane->EOnLoaded.Bind([sphereMaterial, plane, this, currentScene]()
-    {        
+    plane->EOnLoaded.Bind([plane, this, currentScene, resourceManager]()
+    {
+        // auto sphereMaterial = resourceManager->CreateMaterial("Ground Material", resourceManager->GetDefaultShader());
+        // auto albedo = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/PavingStones150_4K-PNG_Color.png");
+        // auto normal = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/PavingStones150_4K-PNG_NormalGL.png");
+        // auto roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/PavingStones150_4K-PNG_Roughness.png");
+        // sphereMaterial->SetAttribute("material.color", Vec4f::One());
+        // sphereMaterial->SetAttribute("albedoSampler", albedo);
+        // sphereMaterial->SetAttribute("normalSampler", normal);
+        // sphereMaterial->SetAttribute("roughnessSampler", roughness);
+        // sphereMaterial->SetAttribute("material.roughnessFactor", 0.5f);
+        // sphereMaterial->SetAttribute("material.metalnessFactor", 0.0f);
+        auto unlitForwardShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/Unlit/unlit.shader");
+        auto groundMaterial = resourceManager->CreateMaterial("Ground", unlitForwardShader);
+        groundMaterial->SetAttribute("material.color", Vec4f(0.5f, 0.5f, 0.5f, 1.0f));
+
         auto go = Model::CreateGameObject(plane.getPtr(), currentScene);
         auto transformComponent = go->GetTransform();
         transformComponent->SetLocalPosition(Vec3f(0.0f, -2.0f, 0.0f));
         transformComponent->SetLocalRotation(Quat::FromEuler(Vec3f(90.0f, 0.0f, 0.0f)));
         transformComponent->SetLocalScale(Vec3f(10.0f, 10.0f, 1.0f));
-        
+
         auto meshComponent = go->GetComponent<MeshComponent>();
-        meshComponent->SetMaterial(0, sphereMaterial);
+        meshComponent->SetMaterial(0, groundMaterial);
     });
     // ===== Debug ===== //
 }

@@ -133,6 +133,7 @@ protected:
     SafePtr<Texture> m_positionTexture;
     SafePtr<Texture> m_normalTexture;
     SafePtr<Texture> m_albedoTexture;
+    SafePtr<Texture> m_metallicRoughnessTexture;
 private:
     std::shared_ptr<TransformComponent> m_transform;
 };

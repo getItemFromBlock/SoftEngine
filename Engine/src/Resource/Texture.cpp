@@ -19,7 +19,7 @@ bool Texture::Load(ResourceManager* resourceManager)
 
 bool Texture::SendToGPU(VulkanRenderer* renderer)
 {
-    m_buffer = renderer->CreateTexture(m_image);
+    m_buffer = renderer->CreateTexture(m_image, m_parameters);
     ImageLoader::ImageFree(m_image);
     m_image = ImageLoader::Image();
     return true;
@@ -56,4 +56,25 @@ void Texture::CreateFromBuffer(const GBufferAttachment& attachment, VkSampler sa
     
     p_sendToGPU = true;
     EOnSentToGPU.Invoke();
+}
+
+void Texture::SetTextureParameters(TextureParam param)
+{
+    m_parameters = param;
+
+    if (p_sendToGPU && m_buffer)
+    {
+        m_buffer.reset();
+
+        m_image = ImageLoader::Image();
+        if (!ImageLoader::Load(p_path, m_image))
+        {
+            PrintError("Failed to reload image %s for recreate", p_path.generic_string().c_str());
+            return;
+        }
+
+        p_sendToGPU = false;
+        auto resourceManager = Engine::Get()->GetResourceManager();
+        resourceManager->AddResourceToSend(GetUUID());
+    }
 }

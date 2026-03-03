@@ -46,7 +46,8 @@ Mat4 Camera::GetOrthographicMatrix() const
 
 Mat4 Camera::GetViewProjectionMatrix() const
 {
-    return (p_viewMode == ViewMode::Type::Perspective ? GetProjectionMatrix() : GetOrthographicMatrix()) * GetViewMatrix();
+    return (p_viewMode == ViewMode::Type::Perspective ? GetProjectionMatrix() : GetOrthographicMatrix()) *
+        GetViewMatrix();
 }
 
 void Camera::Describe(ClassDescriptor& descriptor)
@@ -216,20 +217,20 @@ void Camera::InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, ui
         }
 
         ResourceManager* rm = Engine::Get()->GetResourceManager();
-        m_compositionMaterial = rm->CreateMaterial("Camera Composition Material");
+        SafePtr<Shader> compShader = rm->Load<Shader>(RESOURCE_PATH"shaders/Deferred/composition.shader");
+        m_compositionMaterial = rm->CreateMaterial("Camera Composition Material", compShader);
         m_gBufferMaterial = rm->CreateMaterial("Camera GBuffer Material");
 
         m_positionTexture = rm->AddResource(std::make_shared<Texture>("Position GBuffer Texture"));
         m_normalTexture = rm->AddResource(std::make_shared<Texture>("Normal GBuffer Texture"));
         m_albedoTexture = rm->AddResource(std::make_shared<Texture>("Albedo GBuffer Texture"));
+        m_metallicRoughnessTexture = rm->AddResource(std::make_shared<Texture>("MetallicRoughness GBuffer Texture"));
 
         m_compositionMaterial->SetAttribute("gPosition", MakeGBufferTexture(m_positionTexture, m_gBuffer->GetPosition(), m_gBuffer->GetSampler(), width, height));
         m_compositionMaterial->SetAttribute("gNormal", MakeGBufferTexture(m_normalTexture, m_gBuffer->GetNormal(), m_gBuffer->GetSampler(), width, height));
         m_compositionMaterial->SetAttribute("gAlbedo", MakeGBufferTexture(m_albedoTexture, m_gBuffer->GetAlbedo(), m_gBuffer->GetSampler(), width, height));
+        m_compositionMaterial->SetAttribute("gMetallicRoughness", MakeGBufferTexture(m_metallicRoughnessTexture, m_gBuffer->GetMetallicRoughness(), m_gBuffer->GetSampler(), width, height));
 
-        SafePtr<Shader> compShader = rm->Load<Shader>(RESOURCE_PATH"shaders/Deferred/composition.shader");
-        m_compositionMaterial->SetShader(compShader);
-        
         SafePtr<Shader> gBufferShader = rm->Load<Shader>(RESOURCE_PATH"shaders/Deferred/gBuffer.shader");
         m_gBufferMaterial->SetShader(gBufferShader);
     }
@@ -246,9 +247,8 @@ void Camera::ResizeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32
         InitializeRenderTarget(renderer, width, height);
         return;
     }
-
     renderer->WaitForGPU();
-
+    
     m_renderTarget->Resize(renderer, width, height, VK_FILTER_NEAREST);
     if (m_postProcessRenderTarget)
     {
@@ -261,15 +261,10 @@ void Camera::ResizeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32
 
         if (m_compositionMaterial.valid())
         {
-            m_compositionMaterial->SetAttribute("gPosition",
-                                                MakeGBufferTexture(m_positionTexture, m_gBuffer->GetPosition(),
-                                                                   m_gBuffer->GetSampler(), width, height));
-            m_compositionMaterial->SetAttribute(
-                "gNormal", MakeGBufferTexture(m_normalTexture, m_gBuffer->GetNormal(), m_gBuffer->GetSampler(), width,
-                                              height));
-            m_compositionMaterial->SetAttribute(
-                "gAlbedo", MakeGBufferTexture(m_albedoTexture, m_gBuffer->GetAlbedo(), m_gBuffer->GetSampler(), width,
-                                              height));
+            m_compositionMaterial->SetAttribute("gPosition", MakeGBufferTexture(m_positionTexture, m_gBuffer->GetPosition(), m_gBuffer->GetSampler(), width, height));
+            m_compositionMaterial->SetAttribute("gNormal", MakeGBufferTexture(m_normalTexture, m_gBuffer->GetNormal(), m_gBuffer->GetSampler(), width, height));
+            m_compositionMaterial->SetAttribute("gAlbedo", MakeGBufferTexture(m_albedoTexture, m_gBuffer->GetAlbedo(), m_gBuffer->GetSampler(), width, height));
+            m_compositionMaterial->SetAttribute("gMetallicRoughness", MakeGBufferTexture(m_metallicRoughnessTexture, m_gBuffer->GetMetallicRoughness(), m_gBuffer->GetSampler(), width, height));
         }
     }
 
@@ -309,7 +304,6 @@ SafePtr<RenderTargetTexture> Camera::GetRenderTarget() const
 
 void Camera::Begin()
 {
-    UpdateResizeRenderTarget(Engine::Get()->GetRenderer());
     BeginGBufferPass(m_renderTarget.getPtr());
 }
 
@@ -389,7 +383,7 @@ void Camera::BeginRenderTarget(const RenderTargetTexture* rtt) const
     clearValues[1].depthStencil = {1.0f, 0};
 
     VkExtent2D extent = {static_cast<uint32_t>(p_renderTargetSize.x), static_cast<uint32_t>(p_renderTargetSize.y)};
-    renderer->GetRenderPass()->Begin(commandBuffer, 
+    renderer->GetRenderPass()->Begin(commandBuffer,
                                      rtt->GetBuffer()->GetImageView(),
                                      rtt->GetDepthBuffer()->GetImageView(),
                                      extent,
@@ -483,33 +477,34 @@ void Camera::BeginGBufferPass(RenderTargetTexture* rtt)
         static_cast<uint32_t>(p_renderTargetSize.y)
     };
 
-    std::array<VkImage, 3> gBufferImages = {
+    std::array<VkImage, 4> gBufferImages = {
         m_gBuffer->GetPosition().image,
         m_gBuffer->GetNormal().image,
-        m_gBuffer->GetAlbedo().image
+        m_gBuffer->GetAlbedo().image,
+        m_gBuffer->GetMetallicRoughness().image
     };
 
     std::vector<VkImageMemoryBarrier> barriers;
     for (VkImage img : gBufferImages)
     {
         VkImageMemoryBarrier b{};
-        b.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        b.oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED;
-        b.newLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        b.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        b.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        b.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        b.image               = img;
-        b.subresourceRange    = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-        b.srcAccessMask       = 0;
-        b.dstAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        b.image = img;
+        b.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        b.srcAccessMask = 0;
+        b.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
         barriers.push_back(b);
     }
 
     vkCmdPipelineBarrier(commandBuffer,
-        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        0, 0, nullptr, 0, nullptr,
-        static_cast<uint32_t>(barriers.size()), barriers.data());
+                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         0, 0, nullptr, 0, nullptr,
+                         static_cast<uint32_t>(barriers.size()), barriers.data());
 
     if (rtt->GetDepthBuffer()->NeedsTransition())
     {
@@ -548,33 +543,34 @@ void Camera::EndGBufferPass()
 
     renderer->GetRenderPass()->EndGBuffer(commandBuffer, m_gBuffer.get());
 
-    std::array<VkImage, 3> gBufferImages = {
+    std::array<VkImage, 4> gBufferImages = {
         m_gBuffer->GetPosition().image,
         m_gBuffer->GetNormal().image,
-        m_gBuffer->GetAlbedo().image
+        m_gBuffer->GetAlbedo().image,
+        m_gBuffer->GetMetallicRoughness().image
     };
 
     std::vector<VkImageMemoryBarrier> barriers;
     for (VkImage img : gBufferImages)
     {
         VkImageMemoryBarrier b{};
-        b.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        b.oldLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        b.newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        b.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        b.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        b.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        b.image               = img;
-        b.subresourceRange    = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-        b.srcAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        b.dstAccessMask       = VK_ACCESS_SHADER_READ_BIT;
+        b.image = img;
+        b.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        b.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        b.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
         barriers.push_back(b);
     }
 
     vkCmdPipelineBarrier(commandBuffer,
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-        0, 0, nullptr, 0, nullptr,
-        static_cast<uint32_t>(barriers.size()), barriers.data());
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                         0, 0, nullptr, 0, nullptr,
+                         static_cast<uint32_t>(barriers.size()), barriers.data());
 }
 
 void Camera::BeginCompositionPass(RenderTargetTexture* rtt)
@@ -590,7 +586,7 @@ void Camera::BeginCompositionPass(RenderTargetTexture* rtt)
 
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout   = VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     barrier.srcAccessMask = 0;
     barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -623,6 +619,7 @@ void Camera::BeginCompositionPass(RenderTargetTexture* rtt)
     scissor.extent = extent;
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 }
+
 void Camera::EndCompositionPass(RenderTargetTexture* rtt)
 {
     if (!rtt) return;
@@ -633,15 +630,15 @@ void Camera::EndCompositionPass(RenderTargetTexture* rtt)
     renderer->GetRenderPass()->End(commandBuffer);
 
     VkImageMemoryBarrier barrier{};
-    barrier.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    barrier.newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image               = rtt->GetBuffer()->GetImage();
-    barrier.subresourceRange    = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-    barrier.srcAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    barrier.dstAccessMask       = VK_ACCESS_SHADER_READ_BIT;
+    barrier.image = rtt->GetBuffer()->GetImage();
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
     vkCmdPipelineBarrier(commandBuffer,
                          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -662,8 +659,10 @@ void Camera::DrawComposition(VulkanRenderer* renderer) const
 
     auto scene = Engine::Get()->GetSceneHolder()->GetCurrentScene();
     auto lightManager = scene->GetLightManager();
+    m_compositionMaterial->SetAttribute("envSampler", GetSkybox());
+    m_compositionMaterial->SetAttribute("lightData.cameraPos", Vec4f(GetTransform()->GetWorldPosition()));
     lightManager->SendLights(m_compositionMaterial.getPtr());
-    
+
     m_compositionMaterial->SendAllValues(renderer);
 
     VkCommandBuffer commandBuffer = renderer->GetCommandPool()->GetCommandBuffer(renderer->GetFrameIndex());

@@ -84,14 +84,14 @@ public:
     void SetShader(const SafePtr<Shader>& shader);
     SafePtr<Shader> GetShader() const { return m_shader; }
 
-    void SetAttribute(const std::string& name, float attribute);
-    void SetAttribute(const std::string& name, int attribute);
-    void SetAttribute(const std::string& name, const Vec2f& attribute);
-    void SetAttribute(const std::string& name, const Vec3f& attribute);
-    void SetAttribute(const std::string& name, const Vec4f& attribute);
-    void SetAttribute(const std::string& name, const SafePtr<Texture>& texture);
-    void SetAttribute(const std::string& name, const SafePtr<CubeMap>& cubeMap);
-    void SetAttribute(const std::string& name, const Mat4& attribute);
+    void SetAttribute(const std::string& name, float attribute, bool optional = false);
+    void SetAttribute(const std::string& name, int attribute, bool optional = false);
+    void SetAttribute(const std::string& name, const Vec2f& attribute, bool optional = false);
+    void SetAttribute(const std::string& name, const Vec3f& attribute, bool optional = false);
+    void SetAttribute(const std::string& name, const Vec4f& attribute, bool optional = false);
+    void SetAttribute(const std::string& name, const SafePtr<Texture>& texture, bool optional = false);
+    void SetAttribute(const std::string& name, const SafePtr<CubeMap>& cubeMap, bool optional = false);
+    void SetAttribute(const std::string& name, const Mat4& attribute, bool optional = false);
 
     void SendAllValues(VulkanRenderer* renderer);
 

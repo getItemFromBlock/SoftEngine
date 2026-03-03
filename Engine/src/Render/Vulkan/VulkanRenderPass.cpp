@@ -105,10 +105,11 @@ void VulkanRenderPass::BeginGBuffer(VkCommandBuffer commandBuffer,
         return a;
     };
 
-    std::array<VkRenderingAttachmentInfo, 3> colorAttachments = {
+    std::array<VkRenderingAttachmentInfo, 4> colorAttachments = {
         makeColorAttach(gBuffer->GetPosition().imageView),
         makeColorAttach(gBuffer->GetNormal().imageView),
         makeColorAttach(gBuffer->GetAlbedo().imageView),
+        makeColorAttach(gBuffer->GetMetallicRoughness().imageView)
     };
 
     VkRenderingAttachmentInfo depthAttachment{};

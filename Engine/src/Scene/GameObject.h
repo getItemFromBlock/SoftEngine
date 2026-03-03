@@ -64,9 +64,13 @@ private:
 template<typename T>
 SafePtr<T> GameObject::GetComponent() 
 {
-    if constexpr (std::is_same_v<T, TransformComponent>) // Sometimes break with compiler
-        return m_transform;
     return m_scene.GetComponent<T>(this);
+}
+
+template<>
+inline SafePtr<TransformComponent> GameObject::GetComponent<TransformComponent>()
+{
+    return m_transform;
 }
 
 template<typename T>

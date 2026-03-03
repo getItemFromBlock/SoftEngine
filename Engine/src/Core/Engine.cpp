@@ -85,7 +85,7 @@ bool Engine::Initialize(EngineDesc desc)
     return true;
 }
 
-bool Engine::BeginFrame()
+bool Engine::BeginFrame() const
 {
     m_resourceManager->UpdateResourceToSend();
     m_renderer->WaitUntilFrameFinished();

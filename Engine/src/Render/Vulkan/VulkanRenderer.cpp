@@ -156,6 +156,14 @@ void VulkanRenderer::WaitUntilFrameFinished()
     m_syncObjects->WaitForFence(m_currentFrame);
 }
 
+void VulkanRenderer::WaitForAllFrames()
+{
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        m_syncObjects->WaitForFence(i);
+    }
+}
+
 void VulkanRenderer::Update()
 {
 }
@@ -166,6 +174,7 @@ bool VulkanRenderer::BeginFrame()
     p_vertexCount = 0;
     m_imageIndex = 0;
     
+    m_syncObjects->WaitForFence(m_currentFrame);
     VkResult result = m_swapChain->AcquireNextImage(
         m_syncObjects->GetImageAvailableSemaphore(m_currentFrame),
         &m_imageIndex
@@ -523,10 +532,10 @@ bool VulkanRenderer::BindMaterial(Material* material)
     return true;
 }
 
-std::unique_ptr<VulkanTexture> VulkanRenderer::CreateTexture(const ImageLoader::Image& image)
+std::unique_ptr<VulkanTexture> VulkanRenderer::CreateTexture(const ImageLoader::Image& image, const TextureParam& param)
 {
     std::unique_ptr<VulkanTexture> texture = std::make_unique<VulkanTexture>();
-    texture->CreateFromImage(image, m_device.get(), m_commandPool.get(), m_device->GetGraphicsQueue());
+    texture->CreateFromImage(image, m_device.get(), m_commandPool.get(), m_device->GetGraphicsQueue(), param);
     return texture;
 }
 

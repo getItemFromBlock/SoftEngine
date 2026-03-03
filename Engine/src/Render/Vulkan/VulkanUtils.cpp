@@ -110,10 +110,11 @@ void VulkanUtils::TransitionGBufferToColorAttachment(VkCommandBuffer commandBuff
         return b;
     };
 
-    std::array<VkImageMemoryBarrier, 3> barriers = {
+    std::array<VkImageMemoryBarrier, 4> barriers = {
         makeBarrier(gBuffer.GetPosition().image),
         makeBarrier(gBuffer.GetNormal().image),
         makeBarrier(gBuffer.GetAlbedo().image),
+        makeBarrier(gBuffer.GetMetallicRoughness().image)
     };
 
     vkCmdPipelineBarrier(commandBuffer,

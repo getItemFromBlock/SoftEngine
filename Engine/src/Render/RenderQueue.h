@@ -24,8 +24,11 @@ struct RenderCommand
     
     Material* material;
     Shader* shader;
+    
     SafePtr<Texture> albedoTexture = {};
     SafePtr<Texture> normalTexture = {};
+    SafePtr<Texture> roughnessTexture = {};
+    SafePtr<Texture> metallicTexture = {};
     
     Mat4 modelMatrix;
     
@@ -46,7 +49,7 @@ public:
         UI
     };
     
-    RenderQueue(QueueType type) : m_type(type) {}
+    RenderQueue(QueueType type);
     ~RenderQueue();
     
     void Submit(const RenderCommand& command);
@@ -70,6 +73,8 @@ private:
     
     Texture* m_lastBoundAlbedo = nullptr;
     Texture* m_lastBoundNormal = nullptr;
+    Texture* m_lastBoundRoughness = nullptr;
+    Texture* m_lastBoundMetallic = nullptr;
 };
 
 class RenderQueueManager

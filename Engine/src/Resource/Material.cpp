@@ -74,67 +74,67 @@ void Material::SetShader(const SafePtr<Shader>& shader)
     });
 }
 
-void Material::SetAttribute(const std::string& name, float attribute)
+void Material::SetAttribute(const std::string& name, float attribute, bool optional /*= false*/)
 {
     if (m_attributes.floatAttributes.contains(name))
         m_attributes.floatAttributes[name].value = attribute;
     else if (m_shader && !m_shader->SentToGPU())
         m_temporaryAttributes.floatAttributes[name] = attribute;
-    else
+    else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
 }
 
-void Material::SetAttribute(const std::string& name, int attribute)
+void Material::SetAttribute(const std::string& name, int attribute, bool optional /*= false*/)
 {
     if (m_attributes.intAttributes.contains(name))
         m_attributes.intAttributes[name].value = attribute;
     else if (m_shader && !m_shader->SentToGPU())
         m_temporaryAttributes.intAttributes[name] = attribute;
-    else
+    else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
 }
 
-void Material::SetAttribute(const std::string& name, const Vec2f& attribute)
+void Material::SetAttribute(const std::string& name, const Vec2f& attribute, bool optional /*= false*/)
 {
     if (m_attributes.vec2Attributes.contains(name))
         m_attributes.vec2Attributes[name].value = attribute;
     else if (m_shader && !m_shader->SentToGPU())
         m_temporaryAttributes.vec2Attributes[name] = attribute;
-    else
+    else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
 }
 
-void Material::SetAttribute(const std::string& name, const Vec3f& attribute)
+void Material::SetAttribute(const std::string& name, const Vec3f& attribute, bool optional /*= false*/)
 {
     if (m_attributes.vec3Attributes.contains(name))
         m_attributes.vec3Attributes[name].value = attribute;
     else if (m_shader && !m_shader->SentToGPU())
         m_temporaryAttributes.vec3Attributes[name] = attribute;
-    else
+    else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
 }
 
-void Material::SetAttribute(const std::string& name, const Vec4f& attribute)
+void Material::SetAttribute(const std::string& name, const Vec4f& attribute, bool optional /*= false*/)
 {
     if (m_attributes.vec4Attributes.contains(name))
         m_attributes.vec4Attributes[name].value = attribute;
     else if (m_shader && !m_shader->SentToGPU())
         m_temporaryAttributes.vec4Attributes[name] = attribute;
-    else
+    else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
 }
 
-void Material::SetAttribute(const std::string& name, const Mat4& attribute)
+void Material::SetAttribute(const std::string& name, const Mat4& attribute, bool optional /*= false*/)
 {
     if (m_attributes.matrixAttributes.contains(name))
         m_attributes.matrixAttributes[name].value = attribute;
     else if (m_shader && !m_shader->SentToGPU())
         m_temporaryAttributes.matrixAttributes[name] = attribute;
-    else
+    else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
 }
 
-void Material::SetAttribute(const std::string& name, const SafePtr<Texture>& texture)
+void Material::SetAttribute(const std::string& name, const SafePtr<Texture>& texture, bool optional /*= false*/)
 {
     if (m_attributes.samplerAttributes.contains(name))
     {
@@ -154,11 +154,11 @@ void Material::SetAttribute(const std::string& name, const SafePtr<Texture>& tex
     {
         m_temporaryAttributes.samplerAttributes[name] = texture;
     }
-    else
+    else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
 }
 
-void Material::SetAttribute(const std::string& name, const SafePtr<CubeMap>& cubeMap)
+void Material::SetAttribute(const std::string& name, const SafePtr<CubeMap>& cubeMap, bool optional /*= false*/)
 {
     if (m_attributes.sampler3DAttributes.contains(name))
     {
@@ -179,7 +179,7 @@ void Material::SetAttribute(const std::string& name, const SafePtr<CubeMap>& cub
     {
         m_temporaryAttributes.sampler3DAttributes[name] = cubeMap;
     }
-    else
+    else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
 }
 

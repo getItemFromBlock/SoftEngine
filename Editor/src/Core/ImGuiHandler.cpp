@@ -167,6 +167,10 @@ ImTextureRef ImGuiHandler::GetTextureID(Texture* texture)
     if (it == m_textureIDs.end())
     {
         auto buffer = texture->GetBuffer();
+        if (!buffer)
+        {
+            return ImTextureRef(reinterpret_cast<ImTextureID>(ID));
+        }
         ID = ImGui_ImplVulkan_AddTexture(
             buffer->GetSampler(),
             buffer->GetImageView(),

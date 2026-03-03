@@ -2,6 +2,7 @@
 #include "VulkanBuffer.h"
 #include "VulkanDevice.h"
 
+struct TextureParam;
 struct GBufferAttachment;
 
 namespace ImageLoader
@@ -23,7 +24,7 @@ public:
     VulkanTexture(VulkanTexture&&) noexcept = default;
     virtual ~VulkanTexture();
 
-    bool CreateFromImage(const ImageLoader::Image& image, VulkanDevice* device, VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);
+    bool CreateFromImage(const ImageLoader::Image& image, VulkanDevice* device, VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue, const TextureParam& param);
     bool CreateRenderTarget(const VkImageCreateInfo& imageInfo, VulkanDevice* device, VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);
     bool CreateCubemapFromHDR(const ImageLoader::HDRImage& hdr, VulkanDevice* device, VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);
     bool CreateCubemapWithMips(int resolution, int mipLevels, VulkanDevice* device, VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);
