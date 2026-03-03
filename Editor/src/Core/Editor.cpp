@@ -70,10 +70,11 @@ void Editor::Initialize()
         {
             auto sphereMaterial = resourceManager->CreateMaterial("SphereMat", resourceManager->GetDefaultShader());
             
-            auto albedo = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/Color.png");
-            auto normal = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/BumpMapFlatColour.png");
-            auto metallic = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/Metalness.png");
-            auto roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/Roughness.png");
+            auto albedo = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/albedo.png");
+            auto normal = resourceManager->Load<Texture>(RESOURCE_PATH"textures/BumpMapFlatColour.png");
+            auto metallic = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/metallic.png");
+            auto roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/roughness.png");
+            auto ao = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/ao.png");
         
             /*
             auto albedo = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/PavingStones150_4K-PNG_Color.png");
@@ -86,12 +87,14 @@ void Editor::Initialize()
             normal->SetTextureParameters(unorm);
             roughness->SetTextureParameters(unorm);
             metallic->SetTextureParameters(unorm);
+            ao->SetTextureParameters(unorm);
             
             sphereMaterial->SetAttribute("material.color", Vec4f::One());
             sphereMaterial->SetAttribute("albedoSampler", albedo);
             sphereMaterial->SetAttribute("normalSampler", normal);
             sphereMaterial->SetAttribute("roughnessSampler", roughness);
             sphereMaterial->SetAttribute("metalnessSampler", metallic);
+            sphereMaterial->SetAttribute("aoSampler", ao);
             sphereMaterial->SetAttribute("material.roughnessFactor", 1.f);
             sphereMaterial->SetAttribute("material.metalnessFactor", 1.f);
 

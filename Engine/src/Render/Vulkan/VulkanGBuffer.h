@@ -18,7 +18,7 @@ struct GBufferAttachment
 class VulkanGBuffer
 {
 public:
-    static constexpr VkFormat kPositionFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+    static constexpr VkFormat kPositionFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
     static constexpr VkFormat kNormalFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
     static constexpr VkFormat kAlbedoFormat = VK_FORMAT_R8G8B8A8_UNORM;
     static constexpr VkFormat kMetallicRoughnessFormat = VK_FORMAT_R8G8B8A8_UNORM;

@@ -78,6 +78,7 @@ void RenderQueue::SubmitMeshRenderer(GameObject* gameObject, Mesh* mesh,
         cmd.normalTexture = material->GetTexture("normalSampler");
         cmd.roughnessTexture = material->GetTexture("roughnessSampler");
         cmd.metallicTexture = material->GetTexture("metalnessSampler");
+        cmd.AOTexture = material->GetTexture("aoSampler");
         cmd.GenerateSortKey();
 
         Submit(cmd);
@@ -183,6 +184,7 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
         Texture* normal = cmd.normalTexture.getPtr();
         Texture* roughness = cmd.roughnessTexture.getPtr();
         Texture* metallic = cmd.metallicTexture.getPtr();
+        Texture* ao = cmd.AOTexture.getPtr();
 
         if (albedo != m_lastBoundAlbedo)
         {
@@ -211,6 +213,14 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
             m_lastBoundMetallic = metallic;
             texturesDirty = true;
         }
+        
+        if (ao != m_lastBoundAO)
+        {
+            gBufferMaterial->SetAttribute("aoSampler", cmd.AOTexture);
+            m_lastBoundMetallic = metallic;
+            texturesDirty = true;
+        }
+        
         gBufferMaterial->SetAttribute("material.color", cmd.material->GetVec4Attribute("material.color"));
         gBufferMaterial->SetAttribute("material.roughnessFactor",
                                       cmd.material->GetFloatAttribute("material.roughnessFactor"));

@@ -29,6 +29,7 @@ struct RenderCommand
     SafePtr<Texture> normalTexture = {};
     SafePtr<Texture> roughnessTexture = {};
     SafePtr<Texture> metallicTexture = {};
+    SafePtr<Texture> AOTexture = {};
     
     Mat4 modelMatrix;
     
@@ -75,6 +76,7 @@ private:
     Texture* m_lastBoundNormal = nullptr;
     Texture* m_lastBoundRoughness = nullptr;
     Texture* m_lastBoundMetallic = nullptr;
+    Texture* m_lastBoundAO = nullptr;
 };
 
 class RenderQueueManager
