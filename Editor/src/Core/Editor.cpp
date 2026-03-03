@@ -71,7 +71,7 @@ void Editor::Initialize()
             auto sphereMaterial = resourceManager->CreateMaterial("SphereMat", resourceManager->GetDefaultShader());
             
             auto albedo = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/albedo.png");
-            auto normal = resourceManager->Load<Texture>(RESOURCE_PATH"textures/BumpMapFlatColour.png");
+            auto normal = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/normal.png");
             auto metallic = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/metallic.png");
             auto roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/roughness.png");
             auto ao = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/ao.png");

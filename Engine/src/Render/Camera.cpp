@@ -4,6 +4,7 @@
 
 #include "Component/TransformComponent.h"
 #include "Core/Engine.h"
+#include "Resource/CubeMap.h"
 #include "Resource/PostProcessShader.h"
 #include "Resource/RenderTargetTexture.h"
 #include "Vulkan/VulkanRenderer.h"
@@ -659,7 +660,9 @@ void Camera::DrawComposition(VulkanRenderer* renderer) const
 
     auto scene = Engine::Get()->GetSceneHolder()->GetCurrentScene();
     auto lightManager = scene->GetLightManager();
-    m_compositionMaterial->SetAttribute("envSampler", GetSkybox());
+    auto skyBox = GetSkybox();
+    m_compositionMaterial->SetAttribute("envSampler", GetSkybox(), false, CubeMap::SampleMode::Environment);
+    m_compositionMaterial->SetAttribute("irradianceSampler", GetSkybox(), false, CubeMap::SampleMode::Irradiance);
     m_compositionMaterial->SetAttribute("lightData.cameraPos", Vec4f(GetTransform()->GetWorldPosition()));
     lightManager->SendLights(m_compositionMaterial.getPtr());
 

@@ -28,6 +28,7 @@ public:
     bool CreateRenderTarget(const VkImageCreateInfo& imageInfo, VulkanDevice* device, VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);
     bool CreateCubemapFromHDR(const ImageLoader::HDRImage& hdr, VulkanDevice* device, VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);
     bool CreateCubemapWithMips(int resolution, int mipLevels, VulkanDevice* device, VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);
+    bool CreateCubemap(uint32_t resolution, VulkanDevice* device, VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue);
 
     void CreateFromGBuffer(const GBufferAttachment& attachment, VkSampler sampler, uint32_t width, uint32_t height);
     
@@ -44,6 +45,7 @@ public:
     VkSampler GetSampler() const { return m_sampler; }
     VkFormat GetFormat() const { return m_format; }
 
+    VkImageView GetFaceView(int face) const { return m_mipLevelViews[face]; }
 private:
     // Texture2D
     bool CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,

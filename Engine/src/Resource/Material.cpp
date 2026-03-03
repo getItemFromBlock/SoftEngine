@@ -158,11 +158,12 @@ void Material::SetAttribute(const std::string& name, const SafePtr<Texture>& tex
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
 }
 
-void Material::SetAttribute(const std::string& name, const SafePtr<CubeMap>& cubeMap, bool optional /*= false*/)
+void Material::SetAttribute(const std::string& name, const SafePtr<CubeMap>& cubeMap, bool optional /*= false*/, CubeMap::SampleMode samplerMode)
 {
     if (m_attributes.sampler3DAttributes.contains(name))
     {
         m_attributes.sampler3DAttributes[name].value = cubeMap;
+        m_attributes.sampler3DAttributes[name].flag = (int)samplerMode;
         if (!cubeMap || !m_shader)
             return;
 
@@ -305,7 +306,8 @@ void Material::SendAllValues(VulkanRenderer* renderer)
         else if (m_attributes.sampler3DAttributes.contains(attrib))
         {
             Uniform uniform = m_shader->GetUniform(attrib);
-            SafePtr<CubeMap> cubeMap = m_attributes.sampler3DAttributes.at(attrib).value;
+            Attribute<SafePtr<CubeMap>> attribute = m_attributes.sampler3DAttributes.at(attrib);
+            SafePtr<CubeMap> cubeMap = attribute.value;
 
             if (!cubeMap)
             {
@@ -317,9 +319,11 @@ void Material::SendAllValues(VulkanRenderer* renderer)
                 continue; // Not sent to GPU yet, will try next frame
             }
 
+            cubeMap->SetSampleMode(static_cast<CubeMap::SampleMode>(attribute.flag));
             m_handle->SetCubemapForFrame(renderer->GetFrameIndex(),
                                          uniform.set, uniform.binding,
                                          cubeMap.getPtr());
+            cubeMap->SetSampleMode(CubeMap::SampleMode::Environment);
 
             it = frameProcessed >= renderer->GetMaxFramesInFlight() ? m_attributesToSync.erase(it) : std::next(it);
         }

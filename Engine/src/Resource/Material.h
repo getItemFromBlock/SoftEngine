@@ -4,6 +4,8 @@
 #include <set>
 #include <galaxymath/Maths.h>
 
+#include "CubeMap.h"
+#include "CubeMap.h"
 #include "IResource.h"
 
 #include "Utils/Type.h"
@@ -23,6 +25,7 @@ template <typename T>
 struct Attribute
 {
     std::string uniformName;
+    int flag = 0;
     T value;
 
     Attribute() = default;
@@ -90,7 +93,7 @@ public:
     void SetAttribute(const std::string& name, const Vec3f& attribute, bool optional = false);
     void SetAttribute(const std::string& name, const Vec4f& attribute, bool optional = false);
     void SetAttribute(const std::string& name, const SafePtr<Texture>& texture, bool optional = false);
-    void SetAttribute(const std::string& name, const SafePtr<CubeMap>& cubeMap, bool optional = false);
+    void SetAttribute(const std::string& name, const SafePtr<CubeMap>& cubeMap, bool optional = false, CubeMap::SampleMode samplerMode = CubeMap::SampleMode::Environment);
     void SetAttribute(const std::string& name, const Mat4& attribute, bool optional = false);
 
     void SendAllValues(VulkanRenderer* renderer);

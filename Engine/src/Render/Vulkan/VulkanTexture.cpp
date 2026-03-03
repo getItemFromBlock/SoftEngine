@@ -59,12 +59,14 @@ void VulkanTexture::Cleanup()
 }
 
 bool VulkanTexture::CreateFromImage(const ImageLoader::Image& image, VulkanDevice* device,
-                                    VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue, const TextureParam& param)
+                                    VulkanCommandPool* commandPool, VulkanQueue& graphicsQueue,
+                                    const TextureParam& param)
 {
     if (!device)
         return false;
 
-    switch (param.format) {
+    switch (param.format)
+    {
     case TextureFormat::SRGB:
         m_format = VK_FORMAT_R8G8B8A8_SRGB;
         break;
@@ -72,7 +74,7 @@ bool VulkanTexture::CreateFromImage(const ImageLoader::Image& image, VulkanDevic
         m_format = VK_FORMAT_R8G8B8A8_UNORM;
         break;
     }
-    
+
     m_device = device;
     switch (param.filter)
     {
@@ -416,7 +418,83 @@ bool VulkanTexture::CreateCubemapWithMips(int resolution, int mipLevels,
     return true;
 }
 
-void VulkanTexture::CreateFromGBuffer(const GBufferAttachment& attachment, VkSampler sampler, uint32_t width, uint32_t height)
+bool VulkanTexture::CreateCubemap(uint32_t resolution, VulkanDevice* device,
+                                  VulkanCommandPool* commandPool,
+                                  VulkanQueue& graphicsQueue)
+{
+    if (!device)
+        return false;
+
+    m_device = device;
+    m_width = resolution;
+    m_height = resolution;
+    m_mipLevels = 1;
+
+    VkImageCreateInfo imageInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent = {resolution, resolution, 1};
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 6;
+    imageInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+
+    if (vkCreateImage(device->GetDevice(), &imageInfo, nullptr, &m_image) != VK_SUCCESS)
+        return false;
+
+    VkMemoryRequirements memReq;
+    vkGetImageMemoryRequirements(device->GetDevice(), m_image, &memReq);
+
+    VkMemoryAllocateInfo allocInfo{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+    allocInfo.allocationSize = memReq.size;
+    allocInfo.memoryTypeIndex = device->FindMemoryType(memReq.memoryTypeBits,
+                                                       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    if (vkAllocateMemory(device->GetDevice(), &allocInfo, nullptr, &m_imageMemory) != VK_SUCCESS)
+    {
+        vkDestroyImage(device->GetDevice(), m_image, nullptr);
+        m_image = VK_NULL_HANDLE;
+        return false;
+    }
+
+    vkBindImageMemory(device->GetDevice(), m_image, m_imageMemory, 0);
+
+    TransitionImageLayoutWithMips(m_image, VK_IMAGE_LAYOUT_UNDEFINED,
+                                  VK_IMAGE_LAYOUT_GENERAL,
+                                  1, 6, commandPool, graphicsQueue);
+
+    CreateCubemapImageView(VK_FORMAT_R16G16B16A16_SFLOAT, 1);
+
+    m_mipLevelViews.resize(1, VK_NULL_HANDLE);
+
+    VkImageViewCreateInfo storageViewInfo{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+    storageViewInfo.image = m_image;
+    storageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+    storageViewInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+    storageViewInfo.subresourceRange = {
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        0, 1,
+        0, 6
+    };
+
+    if (vkCreateImageView(device->GetDevice(), &storageViewInfo, nullptr,
+                          &m_mipLevelViews[0]) != VK_SUCCESS)
+    {
+        Cleanup();
+        return false;
+    }
+
+    CreateCubemapSampler();
+
+    return true;
+}
+
+void VulkanTexture::CreateFromGBuffer(const GBufferAttachment& attachment, VkSampler sampler, uint32_t width,
+                                      uint32_t height)
 {
     m_image = attachment.image;
     m_imageView = attachment.imageView;
@@ -571,12 +649,21 @@ void VulkanTexture::TransitionImageLayoutWithMips(VkImage image,
 
     VkPipelineStageFlags srcStage, dstStage;
 
-    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_GENERAL)
+    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+        newLayout == VK_IMAGE_LAYOUT_GENERAL)
     {
         barrier.srcAccessMask = 0;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
         srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         dstStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    }
+    else if (oldLayout == VK_IMAGE_LAYOUT_GENERAL &&
+        newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+    {
+        barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        srcStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     }
     else
     {
