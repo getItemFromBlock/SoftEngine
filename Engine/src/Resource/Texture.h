@@ -3,7 +3,7 @@
 #include "Loader/ImageLoader.h"
 #include "Render/Vulkan/VulkanTexture.h"
 
-enum class TextureFormat { SRGB, UNORM };
+enum class TextureFormat { SRGB, UNORM, R8_UNORM };
 
 enum class TextureFilter { LINEAR, NEAREST };
 

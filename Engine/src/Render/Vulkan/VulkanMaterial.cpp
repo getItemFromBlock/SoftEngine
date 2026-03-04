@@ -274,7 +274,7 @@ void VulkanMaterial::SetUniformData(uint32_t set, uint32_t binding, const void* 
     }
 }
 
-void VulkanMaterial::SetTexture(uint32_t set, uint32_t binding, Texture* texture, VulkanRenderer* renderer)
+void VulkanMaterial::SetTexture(uint32_t set, uint32_t binding, VulkanTexture* texture, VulkanRenderer* renderer) const
 {
     for (uint32_t frameIndex = 0; frameIndex < renderer->GetMaxFramesInFlight(); ++frameIndex)
     {
@@ -282,7 +282,7 @@ void VulkanMaterial::SetTexture(uint32_t set, uint32_t binding, Texture* texture
     }
 }
 
-void VulkanMaterial::SetTextureForFrame(uint32_t frameIndex, uint32_t set, uint32_t binding, Texture* texture)
+void VulkanMaterial::SetTextureForFrame(uint32_t frameIndex, uint32_t set, uint32_t binding, VulkanTexture* texture) const
 {
     if (!texture || set >= m_descriptorSets.size())
     {
@@ -290,18 +290,10 @@ void VulkanMaterial::SetTextureForFrame(uint32_t frameIndex, uint32_t set, uint3
         return;
     }
 
-    auto* vulkanTexture = texture->GetBuffer();
-
-    if (!vulkanTexture)
-    {
-        PrintError("Invalid texture");
-        return;
-    }
-
     VkDescriptorImageInfo imageInfo{};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageInfo.imageView = vulkanTexture->GetImageView();
-    imageInfo.sampler = vulkanTexture->GetSampler();
+    imageInfo.imageView = texture->GetImageView();
+    imageInfo.sampler = texture->GetSampler();
 
     VkWriteDescriptorSet write{};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

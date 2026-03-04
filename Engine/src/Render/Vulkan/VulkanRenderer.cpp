@@ -275,7 +275,7 @@ void VulkanRenderer::EndFrame()
 
     if (result != VK_SUCCESS)
     {
-        throw std::runtime_error("Failed to submit draw command buffer!");
+        PrintError("Failed to submit draw command buffer!");
     }
 
     result = m_swapChain->PresentImage(m_device->GetPresentQueue(), m_imageIndex,
@@ -288,7 +288,7 @@ void VulkanRenderer::EndFrame()
     }
     else if (result != VK_SUCCESS)
     {
-        throw std::runtime_error("Failed to present swap chain image!");
+        PrintError("Failed to present swap chain image!");
     }
 
     m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;

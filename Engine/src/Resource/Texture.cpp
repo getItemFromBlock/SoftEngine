@@ -64,6 +64,9 @@ void Texture::SetTextureParameters(TextureParam param)
 
     if (p_sendToGPU && m_buffer)
     {
+        p_sendToGPU = false;
+        EOnSentToGPU.Reset();
+        
         m_buffer.reset();
 
         m_image = ImageLoader::Image();
@@ -73,7 +76,6 @@ void Texture::SetTextureParameters(TextureParam param)
             return;
         }
 
-        p_sendToGPU = false;
         auto resourceManager = Engine::Get()->GetResourceManager();
         resourceManager->AddResourceToSend(GetUUID());
     }

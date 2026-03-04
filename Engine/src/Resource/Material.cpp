@@ -139,7 +139,8 @@ void Material::SetAttribute(const std::string& name, const SafePtr<Texture>& tex
     if (m_attributes.samplerAttributes.contains(name))
     {
         m_attributes.samplerAttributes[name].value = texture;
-        if (!texture || !m_shader) return;
+        if (!texture || !m_shader) 
+            return;
 
         m_shader->EOnSentToGPU.Bind([this, texture, name]()
         {
@@ -297,7 +298,7 @@ void Material::SendAllValues(VulkanRenderer* renderer)
 
             m_handle->SetTextureForFrame(renderer->GetFrameIndex(),
                                          uniform.set, uniform.binding,
-                                         texture.getPtr());
+                                         texture.getPtr()->GetBuffer());
 
             it = (frameProcessed >= renderer->GetMaxFramesInFlight())
                      ? m_attributesToSync.erase(it)
@@ -532,7 +533,7 @@ void Material::OnShaderChanged()
 void Material::SendTexture(Texture* texture, const Uniform& uniform) const
 {
     VulkanRenderer* renderer = Engine::Get()->GetRenderer();
-    m_handle->SetTexture(uniform.set, uniform.binding, texture, renderer);
+    m_handle->SetTexture(uniform.set, uniform.binding, texture->GetBuffer(), renderer);
 }
 
 void Material::SendCubeMap(CubeMap* cubeMap, const Uniform& uniform) const

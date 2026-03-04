@@ -41,6 +41,7 @@ public:
     void SetPreferredFilterType(VkFilter filterType) { m_preferredFilter = filterType; }
 
     VkImage GetImage() const { return m_image; }
+    VkDeviceMemory GetImageMemory() const { return m_imageMemory; }
     VkImageView GetImageView() const { return m_imageView; }
     VkSampler GetSampler() const { return m_sampler; }
     VkFormat GetFormat() const { return m_format; }

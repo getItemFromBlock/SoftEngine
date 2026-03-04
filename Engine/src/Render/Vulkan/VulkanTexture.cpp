@@ -73,6 +73,9 @@ bool VulkanTexture::CreateFromImage(const ImageLoader::Image& image, VulkanDevic
     case TextureFormat::UNORM:
         m_format = VK_FORMAT_R8G8B8A8_UNORM;
         break;
+    case TextureFormat::R8_UNORM:
+        m_format = VK_FORMAT_R8_UNORM;
+        break;
     }
 
     m_device = device;

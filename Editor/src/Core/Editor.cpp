@@ -84,6 +84,7 @@ void Editor::Initialize()
             */
             
             auto unorm = TextureParam{.format = TextureFormat::UNORM};
+            auto r8_unorm = TextureParam{.format = TextureFormat::R8_UNORM};
             normal->SetTextureParameters(unorm);
             roughness->SetTextureParameters(unorm);
             metallic->SetTextureParameters(unorm);

@@ -230,7 +230,7 @@ void Camera::InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, ui
         m_compositionMaterial->SetAttribute("gPosition", MakeGBufferTexture(m_positionTexture, m_gBuffer->GetPosition(), m_gBuffer->GetSampler(), width, height));
         m_compositionMaterial->SetAttribute("gNormal", MakeGBufferTexture(m_normalTexture, m_gBuffer->GetNormal(), m_gBuffer->GetSampler(), width, height));
         m_compositionMaterial->SetAttribute("gAlbedo", MakeGBufferTexture(m_albedoTexture, m_gBuffer->GetAlbedo(), m_gBuffer->GetSampler(), width, height));
-        m_compositionMaterial->SetAttribute("gMetallicRoughness", MakeGBufferTexture(m_metallicRoughnessTexture, m_gBuffer->GetMetallicRoughness(), m_gBuffer->GetSampler(), width, height));
+        m_compositionMaterial->SetAttribute("gMetallicRoughnessAO", MakeGBufferTexture(m_metallicRoughnessTexture, m_gBuffer->GetMetallicRoughness(), m_gBuffer->GetSampler(), width, height));
 
         SafePtr<Shader> gBufferShader = rm->Load<Shader>(RESOURCE_PATH"shaders/Deferred/gBuffer.shader");
         m_gBufferMaterial->SetShader(gBufferShader);
@@ -265,7 +265,7 @@ void Camera::ResizeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32
             m_compositionMaterial->SetAttribute("gPosition", MakeGBufferTexture(m_positionTexture, m_gBuffer->GetPosition(), m_gBuffer->GetSampler(), width, height));
             m_compositionMaterial->SetAttribute("gNormal", MakeGBufferTexture(m_normalTexture, m_gBuffer->GetNormal(), m_gBuffer->GetSampler(), width, height));
             m_compositionMaterial->SetAttribute("gAlbedo", MakeGBufferTexture(m_albedoTexture, m_gBuffer->GetAlbedo(), m_gBuffer->GetSampler(), width, height));
-            m_compositionMaterial->SetAttribute("gMetallicRoughness", MakeGBufferTexture(m_metallicRoughnessTexture, m_gBuffer->GetMetallicRoughness(), m_gBuffer->GetSampler(), width, height));
+            m_compositionMaterial->SetAttribute("gMetallicRoughnessAO", MakeGBufferTexture(m_metallicRoughnessTexture, m_gBuffer->GetMetallicRoughness(), m_gBuffer->GetSampler(), width, height));
         }
     }
 
@@ -661,8 +661,10 @@ void Camera::DrawComposition(VulkanRenderer* renderer) const
     auto scene = Engine::Get()->GetSceneHolder()->GetCurrentScene();
     auto lightManager = scene->GetLightManager();
     auto skyBox = GetSkybox();
-    m_compositionMaterial->SetAttribute("envSampler", GetSkybox(), false, CubeMap::SampleMode::Environment);
-    m_compositionMaterial->SetAttribute("irradianceSampler", GetSkybox(), false, CubeMap::SampleMode::Irradiance);
+    m_compositionMaterial->SetAttribute("envSampler", skyBox, false, CubeMap::SampleMode::Environment);
+    m_compositionMaterial->SetAttribute("irradianceSampler", skyBox, false, CubeMap::SampleMode::Irradiance);
+    m_compositionMaterial->SetAttribute("prefilteredSampler", skyBox, false, CubeMap::SampleMode::Prefilter);
+    m_compositionMaterial->SetAttribute("brdfLut", skyBox->GetBRDFLutTexture());
     m_compositionMaterial->SetAttribute("lightData.cameraPos", Vec4f(GetTransform()->GetWorldPosition()));
     lightManager->SendLights(m_compositionMaterial.getPtr());
 

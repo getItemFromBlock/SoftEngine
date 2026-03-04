@@ -60,7 +60,7 @@ bool Engine::Initialize(EngineDesc desc)
     {
         m_resourceManager->LoadDefaultTexture(RESOURCE_PATH"/textures/debug.jpeg");
         m_resourceManager->LoadBlankTexture(RESOURCE_PATH"/textures/blank.png");
-        m_resourceManager->LoadDefaultCubeMap(RESOURCE_PATH"/envMap/clearNight.hdr");
+        m_resourceManager->LoadDefaultCubeMap(RESOURCE_PATH"/envMap/newport_loft.hdr");
         m_resourceManager->LoadBlankCubeMap(RESOURCE_PATH"/envMap/blank.hdr");
         m_resourceManager->LoadDefaultShader(RESOURCE_PATH"/shaders/Deferred/gBuffer.shader");
         m_resourceManager->LoadDefaultMaterial(RESOURCE_PATH"/materials/pbr.mat");
