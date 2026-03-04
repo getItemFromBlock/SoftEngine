@@ -51,6 +51,7 @@ public:
     void SetStorageBufferData(uint32_t set, uint32_t binding, const void* data, size_t size, VulkanRenderer* renderer);
     VulkanPipeline* GetPipeline() const { return m_pipeline; }
 
+    void BindWithTextureSet(VulkanRenderer* renderer, VkDescriptorSet textureSet, uint32_t textureSetIndex);
 private:
     VulkanPipeline* m_pipeline = nullptr;
     VulkanDevice* m_device = nullptr;

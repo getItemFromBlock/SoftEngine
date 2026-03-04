@@ -568,3 +568,23 @@ void VulkanMaterial::SetStorageBufferData(uint32_t set, uint32_t binding, const 
         PrintError("Storage buffer not found for set %u binding %u", set, binding);
     }
 }
+
+void VulkanMaterial::BindWithTextureSet(VulkanRenderer* renderer, VkDescriptorSet textureSet, uint32_t textureSetIndex)
+{
+    VkCommandBuffer cmd = renderer->GetCommandBuffer();
+    uint32_t frameIndex = renderer->GetFrameIndex();
+
+    for (uint32_t i = 0; i < m_descriptorSets.size(); ++i)
+    {
+        if (i == textureSetIndex) continue;
+
+        VkDescriptorSet set = m_descriptorSets[i]->GetDescriptorSet(frameIndex);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                m_pipeline->GetPipelineLayout(),
+                                i, 1, &set, 0, nullptr);
+    }
+
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            m_pipeline->GetPipelineLayout(),
+                            textureSetIndex, 1, &textureSet, 0, nullptr);
+}

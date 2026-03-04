@@ -665,7 +665,7 @@ void Camera::DrawComposition(VulkanRenderer* renderer) const
     m_compositionMaterial->SetAttribute("irradianceSampler", skyBox, false, CubeMap::SampleMode::Irradiance);
     m_compositionMaterial->SetAttribute("prefilteredSampler", skyBox, false, CubeMap::SampleMode::Prefilter);
     m_compositionMaterial->SetAttribute("brdfLut", skyBox->GetBRDFLutTexture());
-    m_compositionMaterial->SetAttribute("lightData.cameraPos", Vec4f(GetTransform()->GetWorldPosition()));
+    m_compositionMaterial->SetAttribute("lightData.cameraPos", Vec4f(scene->GetCameraData().position));
     lightManager->SendLights(m_compositionMaterial.getPtr());
 
     m_compositionMaterial->SendAllValues(renderer);

@@ -111,7 +111,7 @@ public:
 
     SafePtr<Texture> GetTexture(const std::string& name) const;
     void InitAttributes(const std::vector<UniformMember>& members, const std::string& uniformName, const std::string& rootName);
-
+    void SendUBOValues(VulkanRenderer* renderer);
 private:
     void OnShaderChanged();
     void SendTexture(Texture* texture, const Uniform& uniform) const;

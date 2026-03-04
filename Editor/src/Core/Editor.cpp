@@ -75,13 +75,6 @@ void Editor::Initialize()
             auto metallic = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/metallic.png");
             auto roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/roughness.png");
             auto ao = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/ao.png");
-        
-            /*
-            auto albedo = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/PavingStones150_4K-PNG_Color.png");
-            auto normal = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/PavingStones150_4K-PNG_NormalGL.png");
-            auto roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/PavingStones150_4K-PNG_Roughness.png");
-            auto metallic = resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png");
-            */
             
             auto unorm = TextureParam{.format = TextureFormat::UNORM};
             auto r8_unorm = TextureParam{.format = TextureFormat::R8_UNORM};
@@ -169,19 +162,29 @@ void Editor::Initialize()
     auto plane = resourceManager->Load<Model>(RESOURCE_PATH"models/Plane.obj");
     plane->EOnLoaded.Bind([plane, this, currentScene, resourceManager]()
     {
-        // auto sphereMaterial = resourceManager->CreateMaterial("Ground Material", resourceManager->GetDefaultShader());
-        // auto albedo = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/PavingStones150_4K-PNG_Color.png");
-        // auto normal = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/PavingStones150_4K-PNG_NormalGL.png");
-        // auto roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/PavingStones150_4K-PNG_Roughness.png");
-        // sphereMaterial->SetAttribute("material.color", Vec4f::One());
-        // sphereMaterial->SetAttribute("albedoSampler", albedo);
-        // sphereMaterial->SetAttribute("normalSampler", normal);
-        // sphereMaterial->SetAttribute("roughnessSampler", roughness);
-        // sphereMaterial->SetAttribute("material.roughnessFactor", 0.5f);
-        // sphereMaterial->SetAttribute("material.metalnessFactor", 0.0f);
-        auto unlitForwardShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/Unlit/unlit.shader");
-        auto groundMaterial = resourceManager->CreateMaterial("Ground", unlitForwardShader);
-        groundMaterial->SetAttribute("material.color", Vec4f(0.5f, 0.5f, 0.5f, 1.0f));
+        auto groundMaterial = resourceManager->CreateMaterial("Ground Material", resourceManager->GetDefaultShader());
+            
+        auto albedo = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/Rock058_4K-PNG_Color.png");
+        auto normal = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/Rock058_4K-PNG_NormalGL.png");
+        // auto metallic = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/Rock058_4K-PNG_Metalness.png");
+        auto roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/Rock058_4K-PNG_Roughness.png");
+        auto ao = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/Rock058_4K-PNG_AmbientOcclusion.png");
+            
+        auto unorm = TextureParam{.format = TextureFormat::UNORM};
+        auto r8_unorm = TextureParam{.format = TextureFormat::R8_UNORM};
+        normal->SetTextureParameters(unorm);
+        roughness->SetTextureParameters(unorm);
+        // metallic->SetTextureParameters(unorm);
+        ao->SetTextureParameters(unorm);
+            
+        groundMaterial->SetAttribute("material.color", Vec4f::One());
+        groundMaterial->SetAttribute("albedoSampler", albedo);
+        groundMaterial->SetAttribute("normalSampler", normal);
+        groundMaterial->SetAttribute("roughnessSampler", roughness);
+        // groundMaterial->SetAttribute("metalnessSampler", metallic);
+        groundMaterial->SetAttribute("aoSampler", ao);
+        groundMaterial->SetAttribute("material.roughnessFactor", 1.f);
+        groundMaterial->SetAttribute("material.metalnessFactor", 0.f);
 
         auto go = Model::CreateGameObject(plane.getPtr(), currentScene);
         auto transformComponent = go->GetTransform();

@@ -456,6 +456,23 @@ void Material::InitAttributes(const std::vector<UniformMember>& members, const s
     }
 }
 
+void Material::SendUBOValues(VulkanRenderer* renderer)
+{
+    if (!m_shader->IsLoaded() || !m_shader->SentToGPU())
+        return;
+
+    for (const auto& entry : m_writeEntries)
+        std::memcpy(entry.dst, entry.src, entry.size);
+
+    for (auto& [key, buffer] : m_uniformScratch)
+    {
+        if (!buffer.empty())
+        {
+            m_handle->SetUniformData(key.first, key.second,
+                                     buffer.data(), buffer.size(), renderer);
+        }
+    }
+}
 void Material::OnShaderChanged()
 {
     if (!m_shader || !m_shader->SentToGPU())

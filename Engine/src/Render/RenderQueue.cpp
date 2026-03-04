@@ -130,16 +130,15 @@ void RenderQueue::Execute(VulkanRenderer* renderer)
         {
             auto currentScene = Engine::Get()->GetSceneHolder()->GetCurrentScene();
             const auto& cameraVP = currentScene->GetCameraData().VP;
-            
+
             cmd.material->SetAttribute("cameraUBO.viewProj", cameraVP, true);
             cmd.material->SetAttribute("cameraUBO.camPos", currentScene->GetCameraData().position, true);
             cmd.material->SetAttribute("debugCubemap", currentScene->GetEditorCamera()->GetSkybox(), true);
-            
+
             cmd.material->SendAllValues(renderer);
             if (!renderer->BindMaterial(cmd.material))
                 continue;
             lastMaterial = cmd.material;
-            
         }
 
         if (cmd.mesh != lastMesh)
@@ -161,76 +160,159 @@ void RenderQueue::Execute(VulkanRenderer* renderer)
 
 void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMaterial)
 {
-    if (!gBufferMaterial || !gBufferMaterial->GetShader())
+    if (!gBufferMaterial || !gBufferMaterial->GetShader()) return;
+
+    auto* vulkanMaterial = gBufferMaterial->GetHandle();
+    auto* pipeline = vulkanMaterial->GetPipeline();
+
+    constexpr uint32_t TEXTURE_SET_INDEX = 0;
+    VkDescriptorSetLayout setLayout = pipeline->GetDescriptorSetLayouts()[TEXTURE_SET_INDEX]->GetLayout();
+
+    uint32_t maxFrames = renderer->GetMaxFramesInFlight();
+    uint32_t frameIndex = renderer->GetFrameIndex();
+
+    // --- Init descriptor pools ---
+    if (!m_gBufferPoolInitialized)
+    {
+        m_gBufferPools.resize(maxFrames);
+        std::vector<VkDescriptorPoolSize> sizes = {
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 512 * 2},
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 512 * 5},
+        };
+        for (uint32_t i = 0; i < maxFrames; ++i)
+        {
+            m_gBufferPools[i] = std::make_unique<VulkanDescriptorPool>();
+            m_gBufferPools[i]->Initialize(renderer->GetDevice(), sizes, 512, 0);
+        }
+        m_gBufferPoolInitialized = true;
+    }
+
+    // --- Init per-frame material data buffers ---
+    if (!m_materialBuffersInitialized)
+    {
+        m_materialDataBuffers.resize(maxFrames);
+        for (uint32_t i = 0; i < maxFrames; ++i)
+        {
+            m_materialDataBuffers[i].buffer = std::make_unique<VulkanUniformBuffer>();
+            // 512 draws * sizeof(MaterialData)
+            m_materialDataBuffers[i].buffer->Initialize(
+                renderer->GetDevice(),
+                sizeof(MaterialData) * 512,
+                1, // single slot, we manage offsets manually
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+            m_materialDataBuffers[i].buffer->MapAll();
+        }
+        m_materialBuffersInitialized = true;
+    }
+
+    // Reset this frame's pool and material buffer write head
+    m_gBufferPools[frameIndex]->Reset();
+    m_materialDataBuffers[frameIndex].offset = 0;
+
+    if (!renderer->BindShader(gBufferMaterial->GetShader().getPtr())) return;
+
+    auto* currentScene = Engine::Get()->GetSceneHolder()->GetCurrentScene();
+    gBufferMaterial->SetAttribute("cameraUBO.viewProj", currentScene->GetCameraData().VP);
+    gBufferMaterial->SendUBOValues(renderer);
+
+    auto* camUBO = vulkanMaterial->GetUniformBuffer(0, 0);
+    if (!camUBO)
+    {
+        PrintError("ExecuteGBuffer: missing camera UBO");
         return;
+    }
 
-    if (!renderer->BindShader(gBufferMaterial->GetShader().getPtr()))
+    auto blank = Engine::Get()->GetResourceManager()->GetBlankTexture();
+    if (!blank || !blank->SentToGPU())
+    {
+        PrintError("ExecuteGBuffer: blank texture not ready");
         return;
+    }
 
-    auto currentScene = Engine::Get()->GetSceneHolder()->GetCurrentScene();
-    const auto& cameraVP = currentScene->GetCameraData().VP;
-    gBufferMaterial->SetAttribute("cameraUBO.viewProj", cameraVP);
+    auto& matFrameBuffer = m_materialDataBuffers[frameIndex];
+    VkBuffer matVkBuffer = matFrameBuffer.buffer->GetBuffer(0);
 
-    m_lastBoundAlbedo = nullptr;
-    m_lastBoundNormal = nullptr;
     Mesh* lastMesh = nullptr;
 
     for (auto& cmd : m_commands)
     {
-        // Only rebind textures when they actually change
-        bool texturesDirty = false;
+        MaterialData matData{};
+        matData.color = cmd.material->GetVec4Attribute("material.color");
+        matData.roughnessFactor = cmd.material->GetFloatAttribute("material.roughnessFactor");
+        matData.metalnessFactor = cmd.material->GetFloatAttribute("material.metalnessFactor");
 
-        Texture* albedo = cmd.albedoTexture.getPtr();
-        Texture* normal = cmd.normalTexture.getPtr();
-        Texture* roughness = cmd.roughnessTexture.getPtr();
-        Texture* metallic = cmd.metallicTexture.getPtr();
-        Texture* ao = cmd.AOTexture.getPtr();
+        uint32_t matOffset = matFrameBuffer.offset;
+        matFrameBuffer.buffer->UpdateDataAtOffset(&matData, sizeof(MaterialData), matOffset, 0);
+        matFrameBuffer.offset += sizeof(MaterialData);
 
-        if (albedo != m_lastBoundAlbedo)
+        VkDescriptorSet drawSet = m_gBufferPools[frameIndex]->Allocate(setLayout);
+        if (drawSet == VK_NULL_HANDLE)
         {
-            gBufferMaterial->SetAttribute("albedoSampler", cmd.albedoTexture);
-            m_lastBoundAlbedo = albedo;
-            texturesDirty = true;
-        }
-
-        if (normal != m_lastBoundNormal)
-        {
-            gBufferMaterial->SetAttribute("normalSampler", cmd.normalTexture);
-            m_lastBoundNormal = normal;
-            texturesDirty = true;
-        }
-
-        if (roughness != m_lastBoundRoughness)
-        {
-            gBufferMaterial->SetAttribute("roughnessSampler", cmd.roughnessTexture);
-            m_lastBoundRoughness = roughness;
-            texturesDirty = true;
-        }
-
-        if (metallic != m_lastBoundMetallic)
-        {
-            gBufferMaterial->SetAttribute("metalnessSampler", cmd.metallicTexture);
-            m_lastBoundMetallic = metallic;
-            texturesDirty = true;
-        }
-        
-        if (ao != m_lastBoundAO)
-        {
-            gBufferMaterial->SetAttribute("aoSampler", cmd.AOTexture);
-            m_lastBoundMetallic = metallic;
-            texturesDirty = true;
-        }
-        
-        gBufferMaterial->SetAttribute("material.color", cmd.material->GetVec4Attribute("material.color"));
-        gBufferMaterial->SetAttribute("material.roughnessFactor",
-                                      cmd.material->GetFloatAttribute("material.roughnessFactor"));
-        gBufferMaterial->SetAttribute("material.metalnessFactor",
-                                      cmd.material->GetFloatAttribute("material.metalnessFactor"));
-
-
-        gBufferMaterial->SendAllValues(renderer);
-        if (!renderer->BindMaterial(gBufferMaterial))
+            PrintError("ExecuteGBuffer: failed to allocate descriptor set");
             continue;
+        }
+
+        std::vector<VkWriteDescriptorSet> writes;
+        std::vector<VkDescriptorBufferInfo> bufferInfos;
+        std::vector<VkDescriptorImageInfo> imageInfos;
+        writes.reserve(7);
+        bufferInfos.reserve(2);
+        imageInfos.reserve(5);
+
+        auto PushUBO = [&](uint32_t binding, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize size)
+        {
+            bufferInfos.push_back({buffer, offset, size});
+            VkWriteDescriptorSet w{};
+            w.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            w.dstSet = drawSet;
+            w.dstBinding = binding;
+            w.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            w.descriptorCount = 1;
+            w.pBufferInfo = &bufferInfos.back();
+            writes.push_back(w);
+        };
+
+        // binding 0: camera UBO (shared, no offset)
+        PushUBO(0, camUBO->GetBuffer(frameIndex), 0, camUBO->GetSize());
+
+        // binding 1: this draw's material slice at its own offset
+        PushUBO(1, matVkBuffer, matOffset, sizeof(MaterialData));
+
+        auto PushTexture = [&](SafePtr<Texture>& tex, uint32_t binding)
+        {
+            Texture* t = (tex && tex->SentToGPU()) ? tex.getPtr() : blank.get();
+
+            VkDescriptorImageInfo imgInfo{};
+            imgInfo.sampler = t->GetBuffer()->GetSampler();
+            imgInfo.imageView = t->GetBuffer()->GetImageView();
+            imgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfos.push_back(imgInfo);
+
+            VkWriteDescriptorSet w{};
+            w.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            w.dstSet = drawSet;
+            w.dstBinding = binding;
+            w.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            w.descriptorCount = 1;
+            w.pImageInfo = &imageInfos.back();
+            writes.push_back(w);
+        };
+
+        PushTexture(cmd.albedoTexture, 2);
+        PushTexture(cmd.normalTexture, 3);
+        PushTexture(cmd.roughnessTexture, 4);
+        PushTexture(cmd.metallicTexture, 5);
+        PushTexture(cmd.AOTexture, 6);
+
+        vkUpdateDescriptorSets(renderer->GetDevice()->GetDevice(),
+                               static_cast<uint32_t>(writes.size()),
+                               writes.data(), 0, nullptr);
+
+        vkCmdBindDescriptorSets(renderer->GetCommandBuffer(),
+                                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                pipeline->GetPipelineLayout(),
+                                TEXTURE_SET_INDEX, 1, &drawSet,
+                                0, nullptr);
 
         if (cmd.mesh != lastMesh)
         {
@@ -242,8 +324,7 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
         PushConstant pushConstant = gBufferMaterial->GetShader()
                                                    ->GetPushConstants()[ShaderType::Vertex];
         renderer->SendPushConstants(&cmd.modelMatrix, sizeof(Mat4),
-                                    gBufferMaterial->GetShader().getPtr(),
-                                    pushConstant);
+                                    gBufferMaterial->GetShader().getPtr(), pushConstant);
 
         renderer->DrawVertexSubMesh(cmd.mesh->GetIndexBuffer(),
                                     cmd.startIndex, cmd.indexCount);
