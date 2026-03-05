@@ -83,15 +83,17 @@ public:
     void ApplySettings();
     BodySettings& GetSettings() { return m_particleSettings; }
     
-    // Pwease dwo not caww at wuntiwe, i am a sweepy method OwO
-    void InitializeFromMesh(SafePtr<Mesh> inputMesh, float density, float maxDistToConnect);
+    void CreateFromMesh(SafePtr<Mesh> inputMesh);
 
     SafePtr<Material> GetMaterial() const { return m_material; }
     SafePtr<Mesh> GetMesh() const { return m_mesh; }
 private:
     void CreateParticleBuffers();
     void CreateSkinnedMesh(std::vector<WeightedVertex> &vertices, std::vector<uint32_t> &indices);
+    void MapMeshToParticles(std::vector<WeightedVertex> &vertices);
     void InitializeParticleData(std::vector<SBParticleData> &particles, std::vector<ConnectionData> &connections);
+    // Pwease dwo not caww at wuntiwe, i am a sweepy method OwO
+    void InitializeParticleDataFromMesh(float density, float maxDistToConnect);
 
 private:
     bool m_loadedFromMesh = false;
@@ -115,7 +117,6 @@ private:
     std::vector<SBParticleData> m_particles;
     std::vector<ConnectionData> m_connections;
 
-    bool m_initialUploadComplete = false;
     bool m_needsRecreation = false;
     bool m_drawDebug = false;
 

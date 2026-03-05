@@ -64,15 +64,13 @@ void Editor::Initialize()
     
     model->EOnLoaded.Bind([model, this, currentScene]()
     {
-        auto go = Model::CreateGameObject(model.getPtr(), currentScene);
-        go->GetTransform()->SetLocalPosition(Vec3f(4, 0, 0));
+        loadedA = true;
     });
     
-    model = resourceManager->Load<Model>(RESOURCE_PATH"models/Cylinder.obj");
+    model = resourceManager->Load<Model>(RESOURCE_PATH"models/Barrel.obj");
     model->EOnLoaded.Bind([model, this, currentScene]()
     {
-        auto go = currentScene->CreateGameObject();
-        go->AddComponent<GPUSoftBodyComponent>();
+        loadedB = true;
     });
 }
 
@@ -80,6 +78,17 @@ void Editor::Run()
 {    
     while (!m_window->ShouldClose())
     {
+        if (!initialised && loadedA && loadedB)
+        {
+            initialised = true;
+            auto currentScene = m_engine->GetSceneHolder()->GetCurrentScene();
+            auto go0 = Model::CreateGameObject(m_engine->GetResourceManager()->Load<Model>(RESOURCE_PATH"models/Sphere.obj").getPtr(), currentScene);
+            go0->GetTransform()->SetLocalPosition(Vec3f(4, 0, 0));
+
+            auto go1 = currentScene->CreateGameObject();
+            auto soft = go1->AddComponent<GPUSoftBodyComponent>();
+            soft->CreateFromMesh(m_engine->GetResourceManager()->Load<Mesh>(RESOURCE_PATH"/models/Barrel.obj/Cylinder.mesh"));
+        }
         m_window->PollEvents();
         
         if (!m_engine->BeginFrame())

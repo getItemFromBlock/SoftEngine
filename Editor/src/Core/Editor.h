@@ -25,6 +25,9 @@ private:
     inline static std::unique_ptr<Editor> s_instance = nullptr;
     
     Engine* m_engine;
+    std::atomic_bool loadedA = false;
+    std::atomic_bool loadedB = false;
+    bool initialised = false;
     std::unique_ptr<ImGuiHandler> m_imguiHandler;
     std::unique_ptr<Window> m_window = nullptr;
     std::unique_ptr<EditorWindowManager> m_windowManager = nullptr;
