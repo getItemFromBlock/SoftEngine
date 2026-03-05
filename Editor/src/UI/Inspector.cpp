@@ -606,16 +606,17 @@ void Inspector::RenderIVec2Property(const Property& property, const std::string&
     Vec2i value = *static_cast<const Vec2i*>(property.data);
     
     ImGuiSliderFlags flags = ImGuiSliderFlags_None;
-    bool changed = false;
-
-    if (property.hasRange)
-        changed = ImGui::SliderInt2(id.c_str(), &value.x, property.range.intRange.minInt,
-            property.range.intRange.maxInt);
-    else
-        changed = ImGui::DragInt2(id.c_str(), &value.x);
+    bool changed = ImGui::DragInt2(id.c_str(), &value.x);
 
     if (changed)
+    {
+        if (property.hasRange)
+        for (uint32_t i = 0; i < 2; i++)
+        {
+            value[i] = std::clamp(value[i], property.range.intRange.minInt, property.range.intRange.maxInt);
+        }
         UpdateProperty(property, &value);
+    }
 }
 
 void Inspector::RenderIVec3Property(const Property& property, const std::string& id)
@@ -623,16 +624,17 @@ void Inspector::RenderIVec3Property(const Property& property, const std::string&
     Vec3i value = *static_cast<const Vec3i*>(property.data);
     
     ImGuiSliderFlags flags = ImGuiSliderFlags_None;
-    bool changed = false;
-
-    if (property.hasRange)
-        changed = ImGui::SliderInt3(id.c_str(), &value.x, property.range.intRange.minInt,
-            property.range.intRange.maxInt);
-    else
-        changed = ImGui::DragInt3(id.c_str(), &value.x);
+    bool changed = ImGui::DragInt3(id.c_str(), &value.x);
 
     if (changed)
+    {
+        if (property.hasRange)
+        for (uint32_t i = 0; i < 3; i++)
+        {
+            value[i] = std::clamp(value[i], property.range.intRange.minInt, property.range.intRange.maxInt);
+        }
         UpdateProperty(property, &value);
+    }
 }
 
 void Inspector::RenderIVec4Property(const Property& property, const std::string& id)
@@ -640,16 +642,17 @@ void Inspector::RenderIVec4Property(const Property& property, const std::string&
     Vec4i value = *static_cast<const Vec4i*>(property.data);
     
     ImGuiSliderFlags flags = ImGuiSliderFlags_None;
-    bool changed = false;
-
-    if (property.hasRange)
-        changed = ImGui::SliderInt4(id.c_str(), &value.x, property.range.intRange.minInt,
-            property.range.intRange.maxInt);
-    else
-        changed = ImGui::DragInt4(id.c_str(), &value.x);
+    bool changed = ImGui::DragInt4(id.c_str(), &value.x);
 
     if (changed)
+    {
+        if (property.hasRange)
+        for (uint32_t i = 0; i < 4; i++)
+        {
+            value[i] = std::clamp(value[i], property.range.intRange.minInt, property.range.intRange.maxInt);
+        }
         UpdateProperty(property, &value);
+    }
 }
 
 void Inspector::RenderFloatProperty(const Property& property, const std::string& id)

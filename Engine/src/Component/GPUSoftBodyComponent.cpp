@@ -26,7 +26,7 @@ void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
         };
 
     auto &res2 = d.AddProperty("Connections Amount", PropertyType::Int, &m_particleSettings.general.connectionStrength)
-        .SetRangeInt(1, 256);
+        .SetRangeInt(2, 256);
     res2.onModified = [this](void)
         {
             m_needsRecreation = true;
