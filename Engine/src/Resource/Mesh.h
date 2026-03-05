@@ -18,7 +18,7 @@ struct Vertex
     Vec3f position;
     Vec2f texCoord;
     Vec3f normal;
-    Vec3f tangent;
+    Vec4f tangent;
 };
 
 struct WeightedVertex
@@ -26,7 +26,7 @@ struct WeightedVertex
     Vec3f position;
     Vec2f texCoord;
     Vec3f normal;
-    Vec3f tangent;
+    Vec4f tangent;
     Vec4i indices;
     Vec4f weights;
 };

@@ -78,13 +78,14 @@ private:
     };
     std::vector<PerFrameMaterialBuffer> m_materialDataBuffers;
     bool m_materialBuffersInitialized = false;
+    uint32_t m_materialDataStride = 0;
 
     struct MaterialData
     {
         Vec4f  color;
         float  roughnessFactor;
         float  metalnessFactor;
-        float  _pad0 = 0.f;
+        float  aoFactor;
         float  _pad1 = 0.f;
     };
 

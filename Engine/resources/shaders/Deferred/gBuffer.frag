@@ -4,6 +4,7 @@ layout(set = 0, binding = 1) uniform Material {
     vec4  color;
     float roughnessFactor;
     float metalnessFactor;
+    float aoFactor;
 } material;
 
 layout(set = 0, binding = 2) uniform sampler2D albedoSampler;
@@ -24,15 +25,15 @@ layout(location = 3) out vec4 outMetallicRoughnessAO;
 void main() {
     vec3 albedo = texture(albedoSampler, vTexCoord).rgb * material.color.rgb;
 
-    vec3 tangentNormal = texture(normalSampler, vTexCoord).rgb * 2.0 - 1.0;
+    vec3 tangentNormal = normalize(texture(normalSampler, vTexCoord).rgb * 2.0 - 1.0);
     vec3 worldNormal   = normalize(vTBN * tangentNormal);
 
     float roughness = texture(roughnessSampler, vTexCoord).r * material.roughnessFactor;
     float metalness = texture(metalnessSampler, vTexCoord).r * material.metalnessFactor;
-    float bakedAO   = texture(aoSampler, vTexCoord).r;
+    float bakedAO   = texture(aoSampler, vTexCoord).r * material.aoFactor;
 
-    outPosition          = vec4(vWorldPos, 1.0);
-    outNormal            = vec4(worldNormal * 0.5 + 0.5, 0.0);
-    outAlbedo            = vec4(albedo, 1.0);
+    outPosition            = vec4(vWorldPos, 1.0);
+    outNormal              = vec4(worldNormal, 0.0);
+    outAlbedo              = vec4(albedo, 1.0);
     outMetallicRoughnessAO = vec4(metalness, roughness, bakedAO, 1.0);
 }

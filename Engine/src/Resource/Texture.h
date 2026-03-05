@@ -11,6 +11,11 @@ struct TextureParam
 {
     TextureFormat format = TextureFormat::SRGB;
     TextureFilter filter = TextureFilter::LINEAR;
+    
+    bool operator==(const TextureParam& o) const
+    {
+        return format == o.format && filter == o.filter;
+    }
 };
 
 class Texture : public IResource
@@ -25,6 +30,7 @@ public:
     void Describe(ClassDescriptor& descriptor) override;
 
     void CreateFromBuffer(const GBufferAttachment& attachment, VkSampler sampler, uint32_t width, uint32_t height);
+    void CreateFromData(const ImageLoader::Image& image);
 
     VulkanTexture* GetBuffer() const { return m_buffer.get(); }
     

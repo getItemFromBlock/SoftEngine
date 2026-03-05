@@ -58,8 +58,15 @@ void Texture::CreateFromBuffer(const GBufferAttachment& attachment, VkSampler sa
     EOnSentToGPU.Invoke();
 }
 
+void Texture::CreateFromData(const ImageLoader::Image& image)
+{
+    m_image = std::move(image);
+}
+
 void Texture::SetTextureParameters(TextureParam param)
 {
+    if (m_parameters == param)
+        return;
     m_parameters = param;
 
     if (p_sendToGPU && m_buffer)

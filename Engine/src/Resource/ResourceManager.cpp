@@ -197,6 +197,15 @@ void ResourceManager::LoadBlankTexture(const std::filesystem::path& texturePath)
     m_blankTexture = texture->GetUUID();
 }
 
+void ResourceManager::LoadDefaultNormal(const std::filesystem::path& texturePath)
+{
+    SafePtr<Texture> texture = Load<Texture>(texturePath, false);
+    
+    texture->SetTextureParameters(TextureParam{.format = TextureFormat::UNORM});
+
+    m_defaultNormal = texture->GetUUID();
+}
+
 void ResourceManager::LoadDefaultMaterial(const std::filesystem::path& materialPath)
 {
     SafePtr<Material> material = CreateMaterial(materialPath);
@@ -205,6 +214,9 @@ void ResourceManager::LoadDefaultMaterial(const std::filesystem::path& materialP
 
     material->SetAttribute("material.color", Vec4f::One());
     material->SetAttribute("albedoSampler", GetBlankTexture());
+    material->SetAttribute("normalSampler", GetDefaultNormal());
+    material->SetAttribute("material.roughnessFactor", 0.f);
+    material->SetAttribute("material.metalnessFactor", 0.f);
 }
 
 void ResourceManager::LoadDefaultCubeMap(const std::filesystem::path& cubeMapPath)
@@ -255,6 +267,11 @@ std::shared_ptr<Texture> ResourceManager::GetDefaultTexture() const
 std::shared_ptr<Texture> ResourceManager::GetBlankTexture() const
 {
     return GetResource<Texture>(m_blankTexture);
+}
+
+std::shared_ptr<Texture> ResourceManager::GetDefaultNormal() const
+{
+    return GetResource<Texture>(m_defaultNormal);
 }
 
 std::shared_ptr<Material> ResourceManager::GetDefaultMaterial() const

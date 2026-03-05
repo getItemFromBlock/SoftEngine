@@ -187,25 +187,30 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
         m_gBufferPoolInitialized = true;
     }
 
-    // --- Init per-frame material data buffers ---
     if (!m_materialBuffersInitialized)
     {
+        VkPhysicalDeviceProperties props;
+        vkGetPhysicalDeviceProperties(renderer->GetDevice()->GetPhysicalDevice(), &props);
+        VkDeviceSize alignment = props.limits.minUniformBufferOffsetAlignment;
+
+        // Round sizeof(MaterialData) up to the nearest multiple of the alignment
+        VkDeviceSize rawSize = sizeof(MaterialData);
+        m_materialDataStride = (uint32_t)((rawSize + alignment - 1) & ~(alignment - 1));
+
         m_materialDataBuffers.resize(maxFrames);
         for (uint32_t i = 0; i < maxFrames; ++i)
         {
             m_materialDataBuffers[i].buffer = std::make_unique<VulkanUniformBuffer>();
-            // 512 draws * sizeof(MaterialData)
             m_materialDataBuffers[i].buffer->Initialize(
                 renderer->GetDevice(),
-                sizeof(MaterialData) * 512,
-                1, // single slot, we manage offsets manually
+                m_materialDataStride * 512,
+                1,
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
             m_materialDataBuffers[i].buffer->MapAll();
         }
         m_materialBuffersInitialized = true;
     }
 
-    // Reset this frame's pool and material buffer write head
     m_gBufferPools[frameIndex]->Reset();
     m_materialDataBuffers[frameIndex].offset = 0;
 
@@ -240,10 +245,12 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
         matData.color = cmd.material->GetVec4Attribute("material.color");
         matData.roughnessFactor = cmd.material->GetFloatAttribute("material.roughnessFactor");
         matData.metalnessFactor = cmd.material->GetFloatAttribute("material.metalnessFactor");
+        matData.aoFactor = cmd.material->GetFloatAttribute("material.aoFactor");
+
 
         uint32_t matOffset = matFrameBuffer.offset;
         matFrameBuffer.buffer->UpdateDataAtOffset(&matData, sizeof(MaterialData), matOffset, 0);
-        matFrameBuffer.offset += sizeof(MaterialData);
+        matFrameBuffer.offset += m_materialDataStride; // advance by aligned stride
 
         VkDescriptorSet drawSet = m_gBufferPools[frameIndex]->Allocate(setLayout);
         if (drawSet == VK_NULL_HANDLE)
@@ -272,10 +279,8 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
             writes.push_back(w);
         };
 
-        // binding 0: camera UBO (shared, no offset)
         PushUBO(0, camUBO->GetBuffer(frameIndex), 0, camUBO->GetSize());
 
-        // binding 1: this draw's material slice at its own offset
         PushUBO(1, matVkBuffer, matOffset, sizeof(MaterialData));
 
         auto PushTexture = [&](SafePtr<Texture>& tex, uint32_t binding)

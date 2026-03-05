@@ -661,7 +661,6 @@ void Camera::DrawComposition(VulkanRenderer* renderer) const
     auto scene = Engine::Get()->GetSceneHolder()->GetCurrentScene();
     auto lightManager = scene->GetLightManager();
     auto skyBox = GetSkybox();
-    m_compositionMaterial->SetAttribute("envSampler", skyBox, false, CubeMap::SampleMode::Environment);
     m_compositionMaterial->SetAttribute("irradianceSampler", skyBox, false, CubeMap::SampleMode::Irradiance);
     m_compositionMaterial->SetAttribute("prefilteredSampler", skyBox, false, CubeMap::SampleMode::Prefilter);
     m_compositionMaterial->SetAttribute("brdfLut", skyBox->GetBRDFLutTexture());

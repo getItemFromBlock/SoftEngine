@@ -1,10 +1,12 @@
 ﻿#include "TestComponent.h"
 
 #include "TransformComponent.h"
+#include "Core/Engine.h"
 #include "Scene/GameObject.h"
 
 void TestComponent::Describe(ClassDescriptor& d)
 {
+    d.AddBool("Attach to camera", m_attachToCamera);
 }
 
 void TestComponent::OnCreate()
@@ -14,9 +16,16 @@ void TestComponent::OnCreate()
 
 void TestComponent::OnUpdate(float deltaTime)
 {
+    auto transform = GetGameObject()->GetTransform();
+    if (m_attachToCamera)
+    {
+        auto position = p_gameObject->GetScene()->GetEditorCamera()->GetTransform()->GetLocalPosition();
+        
+        transform->SetWorldPosition(position);
+        return;
+    }
     m_time += deltaTime;
 
-    auto transform = GetGameObject()->GetTransform();
 
     float radius = 2.0f;
 

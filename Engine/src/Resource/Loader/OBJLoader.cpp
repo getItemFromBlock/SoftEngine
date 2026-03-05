@@ -179,9 +179,14 @@ bool AreVerticesSimilar(const Vec3f& v1, const Vec2f& uv1, const Vec3f& n1,
 		std::abs(n1.y - n2.y) < epsilon &&
 		std::abs(n1.z - n2.z) < epsilon);
 }
+
 void OBJLoader::ComputeVertices(Mesh& mesh)
 {
-    mesh.tangents.resize(mesh.positions.size(), { 0.0f, 0.0f, 0.0f });
+    const size_t vertCount = mesh.positions.size();
+
+    mesh.tangents.resize(vertCount, { 0.0f, 0.0f, 0.0f, 0.0f });
+
+    std::vector<Vec3f> bitangents(vertCount, { 0.0f, 0.0f, 0.0f });
 
     for (size_t k = 0; k < mesh.indices.size(); k += 3)
     {
@@ -194,7 +199,7 @@ void OBJLoader::ComputeVertices(Mesh& mesh)
 
         const float DeltaU1 = mesh.textureUVs[idx1.y].x - mesh.textureUVs[idx0.y].x;
         const float DeltaV1 = mesh.textureUVs[idx1.y].y - mesh.textureUVs[idx0.y].y;
-        const float DeltaU2 = mesh.textureUVs[idx2.y].x - mesh.textureUVs[idx0.y].x;
+        const float DeltaU2 = mesh.textureUVs[idx2.y].x - mesh.textureUVs[idx0.y].x; // was idx0.y, correct
         const float DeltaV2 = mesh.textureUVs[idx2.y].y - mesh.textureUVs[idx0.y].y;
 
         float f = DeltaU1 * DeltaV2 - DeltaU2 * DeltaV1;
@@ -205,31 +210,60 @@ void OBJLoader::ComputeVertices(Mesh& mesh)
         Tangent.y = f * (DeltaV2 * Edge1.y - DeltaV1 * Edge2.y);
         Tangent.z = f * (DeltaV2 * Edge1.z - DeltaV1 * Edge2.z);
 
+        Vec3f Bitangent;
+        Bitangent.x = f * (-DeltaU2 * Edge1.x + DeltaU1 * Edge2.x);
+        Bitangent.y = f * (-DeltaU2 * Edge1.y + DeltaU1 * Edge2.y);
+        Bitangent.z = f * (-DeltaU2 * Edge1.z + DeltaU1 * Edge2.z);
+
         mesh.tangents[idx0.x] = mesh.tangents[idx0.x] + Tangent;
         mesh.tangents[idx1.x] = mesh.tangents[idx1.x] + Tangent;
         mesh.tangents[idx2.x] = mesh.tangents[idx2.x] + Tangent;
-    }
 
-    for (auto& t : mesh.tangents)
-        t.Normalize();
+        bitangents[idx0.x] = bitangents[idx0.x] + Bitangent;
+        bitangents[idx1.x] = bitangents[idx1.x] + Bitangent;
+        bitangents[idx2.x] = bitangents[idx2.x] + Bitangent;
+    }
 
     for (size_t i = 0; i < mesh.indices.size(); i++)
     {
         const Vec3i& idx = mesh.indices[i];
 
+        const Vec3f& N = mesh.normals[idx.z];
+        Vec3f T        = mesh.tangents[idx.x];
+        const Vec3f& B = bitangents[idx.x];
+
+        float NdotT = N.x * T.x + N.y * T.y + N.z * T.z;
+        T.x -= NdotT * N.x;
+        T.y -= NdotT * N.y;
+        T.z -= NdotT * N.z;
+        T.Normalize();
+    	
+        Vec3f cross;
+        cross.x = N.y * T.z - N.z * T.y;
+        cross.y = N.z * T.x - N.x * T.z;
+        cross.z = N.x * T.y - N.y * T.x;
+
+        float dot    = cross.x * B.x + cross.y * B.y + cross.z * B.z;
+        float sign   = (dot < 0.0f) ? -1.0f : 1.0f;
+
+        // Position
         mesh.finalVertices.push_back(mesh.positions[idx.x].x);
         mesh.finalVertices.push_back(mesh.positions[idx.x].y);
         mesh.finalVertices.push_back(mesh.positions[idx.x].z);
 
+        // UV
         mesh.finalVertices.push_back(mesh.textureUVs[idx.y].x);
         mesh.finalVertices.push_back(mesh.textureUVs[idx.y].y);
 
-        mesh.finalVertices.push_back(mesh.normals[idx.z].x);
-        mesh.finalVertices.push_back(mesh.normals[idx.z].y);
-        mesh.finalVertices.push_back(mesh.normals[idx.z].z);
+        // Normal
+        mesh.finalVertices.push_back(N.x);
+        mesh.finalVertices.push_back(N.y);
+        mesh.finalVertices.push_back(N.z);
 
-        mesh.finalVertices.push_back(mesh.tangents[idx.x].x);
-        mesh.finalVertices.push_back(mesh.tangents[idx.x].y);
-        mesh.finalVertices.push_back(mesh.tangents[idx.x].z);
+        // Tangent xyz + handedness w
+        mesh.finalVertices.push_back(T.x);
+        mesh.finalVertices.push_back(T.y);
+        mesh.finalVertices.push_back(T.z);
+        mesh.finalVertices.push_back(sign);
     }
 }

@@ -266,16 +266,15 @@ bool CubeMap::GeneratePrefiltered(VulkanRenderer* renderer, uint32_t resolution,
             vkUpdateDescriptorSets(device->GetDevice(), 1, &write, 0, nullptr);
 
             // Now record + submit for this mip
-            VkCommandBufferAllocateInfo allocInfo{};
+            allocInfo = {};
             allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
             allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
             allocInfo.commandPool = renderer->GetCommandPool()->GetCommandPool();
             allocInfo.commandBufferCount = 1;
-
-            VkCommandBuffer cmd;
+            
             vkAllocateCommandBuffers(device->GetDevice(), &allocInfo, &cmd);
 
-            VkCommandBufferBeginInfo beginInfo{};
+            beginInfo = {};
             beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
             beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
             vkBeginCommandBuffer(cmd, &beginInfo);
@@ -499,7 +498,6 @@ bool CubeMap::GenerateBRDFLut(VulkanRenderer* renderer, uint32_t resolution)
 
         m_brdfLutReady = true;
         
-        auto resourceManager = Engine::Get()->GetResourceManager();
         m_brdfLutTexture = std::make_shared<Texture>("BRDF Temp");
         m_brdfLutTexture->CreateFromBuffer(
             GBufferAttachment{
