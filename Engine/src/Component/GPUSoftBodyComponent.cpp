@@ -13,7 +13,7 @@
 // Aligns an integer to the next nearest memory aligned value. Alignement MUST be a power of two!
 uint64_t align(uint64_t value, uint64_t alignement)
 {
-    assert(((alignement-1) & alignement) == 0);
+    ASSERT(((alignement-1) & alignement) == 0);
     return (value + alignement - 1) & ~(alignement - 1);
 }
 
@@ -26,7 +26,7 @@ void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
         };
 
     auto &res2 = d.AddProperty("Connections Amount", PropertyType::Int, &m_particleSettings.general.connectionStrength)
-        .SetRangeInt(1, 256);
+        .SetRangeInt(2, 256);
     res2.onModified = [this](void)
         {
             m_needsRecreation = true;
@@ -48,6 +48,8 @@ void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
             m_needsRecreation = true;
         };
 
+    d.AddBool("Debug", m_drawDebug);
+
     d.AddButton("Reset")
         .onModified = [this](void)
         {
@@ -64,13 +66,18 @@ void GPUSoftBodyComponent::OnCreate()
     auto computeShader0 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/softbody0.shader");
     auto computeShader1 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/softbody1.shader");
     auto instancingShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/sb_instancing.shader");
+    auto skinnedShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/sb_skinning.shader");
 
-    m_material = resourceManager->CreateMaterial("SoftbodyInstancing");
-    m_material->SetShader(instancingShader);
+    m_billboardMaterial = resourceManager->CreateMaterial("SoftbodyInstancing");
+    m_billboardMaterial->SetShader(instancingShader);
+    m_billboardMaterial->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
     
+    m_material = resourceManager->CreateMaterial("SoftbodySkinned");
+    m_material->SetShader(skinnedShader);
     m_material->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
 
-    m_mesh = resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cube.obj/Cube.mesh");
+    m_mesh = std::make_shared<Mesh>("internal");
+    m_billboardMesh = resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cube.obj/Cube.mesh");
 
     computeShader0->EOnSentToGPU.Bind([this, computeShader0, renderer]()
         {
@@ -105,7 +112,6 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
 
     VulkanMaterial* mat0 = m_simulationCompute0->GetMaterial();
     VulkanMaterial* mat1 = m_simulationCompute1->GetMaterial();
-    //VulkanMaterial* mat2 = m_material->GetHandle();
 
     // First compute pass needs both particle data and connections
     mat0->SetStorageBuffer(0, 0, m_particleBuffer->GetBuffer(), 0,
@@ -128,12 +134,12 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
     push0.deltaTime = std::min(deltaTime, 1/60.0f);
     push0.damping = m_particleSettings.general.damping;
     push0.strength = m_particleSettings.general.strength;
-    push0.particleCount = totalParticleCount;
+    push0.particleCount = m_totalParticleCount;
 
     vkCmdPushConstants(cmd, mat0->GetPipeline()->GetPipelineLayout(),
                        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(Push0), &push0);
 
-    uint32_t groups = (totalParticleCount + 63) / 64;
+    uint32_t groups = (m_totalParticleCount + 63) / 64;
     mat0->DispatchCompute(renderer, groups, 1, 1);
 
     VkBufferMemoryBarrier barrier0{};
@@ -164,7 +170,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
     } push1;
 
     push1.deltaTime = std::min(deltaTime, 1 / 60.0f);
-    push1.particleCount = totalParticleCount;
+    push1.particleCount = m_totalParticleCount;
 
     vkCmdPushConstants(cmd, mat1->GetPipeline()->GetPipelineLayout(),
         VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(Push1), &push1);
@@ -190,6 +196,14 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
     m_material->SetAttribute("cameraRight", cam.right);
     m_material->SetAttribute("cameraUp", cam.up);
     m_material->SetAttribute("cameraFront", cam.forward);
+
+    if (m_drawDebug)
+    {
+        m_billboardMaterial->SetAttribute("viewProj", cam.VP);
+        m_billboardMaterial->SetAttribute("cameraRight", cam.right);
+        m_billboardMaterial->SetAttribute("cameraUp", cam.up);
+        m_billboardMaterial->SetAttribute("cameraFront", cam.forward);
+    }
 }
 
 void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
@@ -225,7 +239,26 @@ void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
     if (!renderer->BindMaterial(m_material.getPtr()))
         return;
 
-    renderer->DrawInstanced(m_mesh->GetIndexBuffer(), m_mesh->GetVertexBuffer(), totalParticleCount);
+    renderer->DrawInstanced(m_mesh->GetIndexBuffer(), m_mesh->GetVertexBuffer(), 1);
+
+    if (!m_drawDebug || !m_billboardMaterial || !m_billboardMesh)
+        return;
+
+    if (!renderer->BindShader(m_billboardMaterial->GetShader().getPtr()))
+        return;
+
+    // vertex shader needs particle data as source to "map" the mesh onto
+    m_billboardMaterial->GetHandle()->SetStorageBuffer(0, 2, m_particleBuffer->GetBuffer(), 0,
+        PBufSizeAligned, renderer);
+
+    vkCmdPushConstants(renderer->GetCommandBuffer(), m_billboardMaterial->GetHandle()->GetPipeline()->GetPipelineLayout(),
+        VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Push), &push);
+
+    m_billboardMaterial->SendAllValues(renderer);
+    if (!renderer->BindMaterial(m_billboardMaterial.getPtr()))
+        return;
+
+    renderer->DrawInstanced(m_billboardMesh->GetIndexBuffer(), m_billboardMesh->GetVertexBuffer(), m_totalParticleCount);
 }
 
 void GPUSoftBodyComponent::OnDestroy()
@@ -233,15 +266,6 @@ void GPUSoftBodyComponent::OnDestroy()
     Engine::Get()->GetRenderer()->WaitForGPU();
 
     if (m_particleBuffer) m_particleBuffer->Cleanup();
-}
-
-void GPUSoftBodyComponent::Restart()
-{
-    // TODO reset buffers ? hmleh
-    /*
-    Play();
-    m_currentTime = 0.f;
-    */
 }
 
 void GPUSoftBodyComponent::CreateParticleBuffers()
@@ -324,8 +348,111 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
     m_particleBuffer = std::move(particleBuffer);
     stagingBuffer->Cleanup();
 
+    std::vector<WeightedVertex> vertices;
+    std::vector<uint32_t> indices;
+    CreateSkinnedMesh(vertices, indices);
+
+    m_mesh->CreateFrom(reinterpret_cast<float*>(vertices.data()), vertices.size(), indices.data(), indices.size(), true);
+    
     m_particles.clear();
     m_connections.clear();
+}
+
+const uint32_t _cubeSwizzlesValues[] =
+{
+    2, 0, 1,
+    1, 2, 0,
+    0, 1, 2,
+    2, 1, 0,
+    0, 2, 1,
+    1, 0, 2
+};
+
+void GPUSoftBodyComponent::CreateSkinnedMesh(std::vector<WeightedVertex> &vertices, std::vector<uint32_t> &indices)
+{
+    if (m_particleSettings.shape.type == BodySettings::Shape::Type::Cube)
+    {
+        for (int32_t i = 0; i < 6; i++)
+        {
+            for (int32_t j = 0; j < m_particleSettings.general.surfacePoints.x; j++)
+            {
+                for (int32_t k = 0; k < m_particleSettings.general.surfacePoints.y; k++)
+                {
+                                        
+                    Vec3f pos = Vec3f(   float(j) / (m_particleSettings.general.surfacePoints.x - 1),
+                                         float(k) / (m_particleSettings.general.surfacePoints.y - 1),
+                                         i < 3 ? -1 : 1);
+                    pos.x = pos.x * 2 - 1;
+                    pos.y = pos.y * 2 - 1;
+                    const uint32_t *ptr = _cubeSwizzlesValues + (i*3);
+                    pos = Vec3f(pos[ptr[0]], pos[ptr[1]], pos[ptr[2]]);
+                    WeightedVertex v;
+                    v.position = pos;
+                    v.normal = Vec3f(0);
+                    v.normal[i % 3] = i < 3 ? -1.0f : 1.0f;
+                    v.tangent = Vec3f(i % 3 == 0, i % 3 == 1, i % 3 == 2);
+                    if (i >= 3) v.tangent = Vec3f(1) - v.tangent;
+
+                    struct ParticleDist
+                    {
+                        uint32_t id;
+                        float dist;
+                    };
+
+                    std::array<ParticleDist, 3> closests = std::array<ParticleDist, 3>();
+                    uint32_t count = 0;
+                    for (uint32_t l = 0; l < m_particles.size(); l++)
+                    {
+                        float d = m_particles[l].position.Distance(pos);
+                        if (count < closests.size())
+                        {
+                            ParticleDist p;
+                            p.id = l;
+                            p.dist = d;
+                            closests[count] = p;
+                            count++;
+                            continue;
+                        }
+                        for (uint32_t m = 0; m < count; m++)
+                        {
+                            if (d < closests[m].dist)
+                            {
+                                for (uint32_t n = 1; n < count-m; n++)
+                                {
+                                    closests[count-n] = closests[count-n-1];
+                                }
+                                closests[m].id = l;
+                                closests[m].dist = d;
+                                break;
+                            }
+                        }
+                    }
+                    v.weights = Vec4f(1,0,0,0);
+                    v.indices = Vec4i(closests[0].id, closests[1].id, closests[2].id, -1);
+
+                    vertices.push_back(v);
+                }
+            }
+        }
+
+        for (int32_t i = 0; i < 6; i++)
+        {
+            const int32_t offset = m_particleSettings.general.surfacePoints.x * m_particleSettings.general.surfacePoints.y * i;
+            for (int32_t j = 0; j < m_particleSettings.general.surfacePoints.x-1; j++)
+            {
+                for (int32_t k = 0; k < m_particleSettings.general.surfacePoints.y-1; k++)
+                {
+                    indices.push_back(offset + k * m_particleSettings.general.surfacePoints.x + j);
+                    indices.push_back(offset + k * m_particleSettings.general.surfacePoints.x + j + 1);
+                    indices.push_back(offset + (k + 1) * m_particleSettings.general.surfacePoints.x + j);
+
+                    indices.push_back(offset + (k + 1) * m_particleSettings.general.surfacePoints.x + j);
+                    indices.push_back(offset + k * m_particleSettings.general.surfacePoints.x + j + 1);
+                    indices.push_back(offset + (k + 1) * m_particleSettings.general.surfacePoints.x + j + 1);
+                }
+            }
+        }
+    }
 }
 
 void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &particles, std::vector<ConnectionData> &connections)
@@ -333,8 +460,8 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &p
     const Vec3i amount = m_particleSettings.general.particleAmount;
     const int32_t maxL = m_particleSettings.general.connectionStrength;
 
-    totalParticleCount = amount.x * amount.y * amount.z;
-    particles.resize(totalParticleCount);
+    m_totalParticleCount = amount.x * amount.y * amount.z;
+    particles.resize(m_totalParticleCount);
 
     for (int32_t j = 0; j < amount.y; j++)
     {
@@ -347,6 +474,7 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &p
                 const uint32_t index = i + j * (amount.x * amount.z) + k * (amount.x);
 
                 particles[index].position = pos;
+                particles[index].originalPos = pos;
             }
         }
     }
@@ -389,7 +517,7 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &p
             }
         }
     }
-
+    
     if (m_particleSettings.shape.type != BodySettings::Shape::Type::Cube)
     {
         std::vector<uint32_t> toRemove;
@@ -397,7 +525,7 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &p
         const float maxDist = powf((m_particleSettings.shape.scale), 2) + 0.01f;
         SBParticleData *pPointer = &particles[0];
 
-        for (uint32_t i = 0; i < totalParticleCount; i++)
+        for (uint32_t i = 0; i < m_totalParticleCount; i++)
         {
             Vec3f delta = particles[i].position;
             switch (m_particleSettings.shape.type)
@@ -454,7 +582,7 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &p
             }
         }
     }
-    totalParticleCount = uint32_t(particles.size());
+    m_totalParticleCount = uint32_t(particles.size());
 }
 
 void GPUSoftBodyComponent::ApplySettings()
@@ -464,6 +592,9 @@ void GPUSoftBodyComponent::ApplySettings()
 
 void GPUSoftBodyComponent::InitializeFromMesh(SafePtr<Mesh> inputMesh, float density, float maxDistToConnect)
 {
+    m_particles.clear();
+    m_connections.clear();
+
     m_loadedFromMesh = true;
     int itConnectionOffset = 0;
 
@@ -508,10 +639,11 @@ void GPUSoftBodyComponent::InitializeFromMesh(SafePtr<Mesh> inputMesh, float den
                 if (shouldDiscard)
                     continue;
 
-                SBParticleData data;
+                SBParticleData data = { };
 
                 data.position = pos;
                 data.velocity = { 0 , 0 , 0 };
+                data.connectionsCount = 0;
                 m_particles.push_back(data);
             }
         }
@@ -543,5 +675,5 @@ void GPUSoftBodyComponent::InitializeFromMesh(SafePtr<Mesh> inputMesh, float den
         m_particles[i].connectionsCount = m_connections.size() - m_particles[i].connectionsOffset;
     }
 
-    totalParticleCount = m_particles.size();
+    m_totalParticleCount = uint32_t(m_particles.size());
 }

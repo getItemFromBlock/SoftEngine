@@ -13,16 +13,26 @@ bool Mesh::Load(ResourceManager* resourceManager)
 
 void Mesh::CreateFrom(float *vertices, uint32_t verticeCount, uint32_t *indices, uint32_t indiceCount, bool isWeighted)
 {
-    ASSERT(vertices != nullptr && verticeCount > 0 && indices != nullptr && indiceCount > 0);
+    p_isLoaded = false;
+    p_sendToGPU = true;
+    ASSERT(vertices != nullptr && verticeCount > 0 && (indiceCount == 0 || indices != nullptr));
     ASSERT(indiceCount % 3 == 0);
 
-    const uint32_t verticeSize = isWeighted ? sizeof(WeightedVertex) : sizeof(Vertex);
+    const uint32_t verticeSize = (isWeighted ? sizeof(WeightedVertex) : sizeof(Vertex)) / sizeof(float);
 
     m_vertices.resize(verticeCount * verticeSize);
     std::copy(vertices, vertices + (verticeCount * verticeSize), m_vertices.data());
     m_isWeighted = isWeighted;
 
+    if (indiceCount)
+    {
+        m_indices.resize(indiceCount);
+        std::copy(indices, indices + indiceCount, m_indices.data());
+    }
+
     SendToGPU(Engine::Get()->GetRenderer());
+    p_isLoaded = true;
+    p_sendToGPU = true;
 }
 
 bool Mesh::SendToGPU(VulkanRenderer* renderer)

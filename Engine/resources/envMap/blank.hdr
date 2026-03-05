@@ -1,6 +1,3 @@
-#?RADIANCE
-SOFTWARE=GEGL
-FORMAT=32-bit_rle_rgbe
-
--Y 2 +X 4
-€€€€€€€€€€€€€€€€€€€€€€€€
+version https://git-lfs.github.com/spec/v1
+oid sha256:022934b8a56d4692a0fe6a72563daac8c8327787aa2227544222430c5e71eeca
+size 91

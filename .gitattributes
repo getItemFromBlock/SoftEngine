@@ -9,99 +9,88 @@
 *.h     text diff=cpp
 *.h++   text diff=cpp
 *.hh    text diff=cpp
-
 # Compiled Object files
-*.slo   binary
-*.lo    binary
-*.o     binary
-*.obj   binary
-
+*.slo        binary          merge=lfs
+*.lo         binary          merge=lfs
+*.o          binary          merge=lfs
+*.obj        binary          merge=lfs
 # Precompiled Headers
-*.gch   binary
-*.pch   binary
-
+*.gch        binary          merge=lfs
+*.pch        binary          merge=lfs
 # Compiled Dynamic libraries
-*.so    binary
-*.dylib binary
-*.dll   binary
-
+*.so         binary          merge=lfs
+*.dylib      binary          merge=lfs
+*.dll        binary          merge=lfs
 # Compiled Static libraries
-*.lai   binary
-*.la    binary
-*.a     binary
-*.lib   binary
-
+*.lai        binary          merge=lfs
+*.la         binary          merge=lfs
+*.a          binary          merge=lfs
+*.lib        binary          merge=lfs
 # Executables
-*.exe   binary
-*.out   binary
-*.app   binary
-
-
+*.exe        binary          merge=lfs
+*.out        binary          merge=lfs
+*.app        binary          merge=lfs
 # 3D models
-*.3dm        binary           lfs
-*.3ds        binary           lfs
-*.blend      binary           lfs
-*.blend1     binary           lfs
-*.c4d        binary           lfs
-*.collada    binary           lfs
-*.dae        binary           lfs
-*.dxf        binary           lfs
-*.FBX        binary           lfs
-*.fbx        binary           lfs
-*.jas        binary           lfs
-*.lws        binary           lfs
-*.lxo        binary           lfs
-*.ma         binary           lfs
-*.max        binary           lfs
-*.mb         binary           lfs
-*.obj                         lfs
-*.ply        binary           lfs
-*.skp        binary           lfs
-*.stl        binary           lfs
-*.ztl        binary           lfs
-
+*.3dm        binary          merge=lfs
+*.3ds        binary          merge=lfs
+*.blend      binary          merge=lfs
+*.blend1     binary          merge=lfs
+*.c4d        binary          merge=lfs
+*.collada    binary          merge=lfs
+*.dae        binary          merge=lfs
+*.dxf        binary          merge=lfs
+*.FBX        binary          merge=lfs
+*.fbx        binary          merge=lfs
+*.jas        binary          merge=lfs
+*.lws        binary          merge=lfs
+*.lxo        binary          merge=lfs
+*.ma         binary          merge=lfs
+*.max        binary          merge=lfs
+*.mb         binary          merge=lfs
+*.obj                        merge=lfs
+*.ply        binary          merge=lfs
+*.skp        binary          merge=lfs
+*.stl        binary          merge=lfs
+*.ztl        binary          merge=lfs
 # Audio
-*.aif         binary          lfs
-*.aiff        binary          lfs
-*.it          binary          lfs
-*.mod         binary          lfs
-*.mp3         binary          lfs
-*.ogg         binary          lfs
-*.s3m         binary          lfs
-*.wav         binary          lfs
-*.xm          binary          lfs
-
+*.aif         filter=lfs diff=lfs merge=lfs -text
+*.aiff        filter=lfs diff=lfs merge=lfs -text
+*.it          filter=lfs diff=lfs merge=lfs -text
+*.mod         filter=lfs diff=lfs merge=lfs -text
+*.mp3         filter=lfs diff=lfs merge=lfs -text
+*.ogg         filter=lfs diff=lfs merge=lfs -text
+*.s3m         filter=lfs diff=lfs merge=lfs -text
+*.wav         filter=lfs diff=lfs merge=lfs -text
+*.xm          filter=lfs diff=lfs merge=lfs -text
 # Video
-*.asf         binary          lfs
-*.avi         binary          lfs
-*.flv         binary          lfs
-*.mov         binary          lfs
-*.mp4         binary          lfs
-*.mpeg        binary          lfs
-*.mpg         binary          lfs
-*.ogv         binary          lfs
-*.wmv         binary          lfs
-
+*.asf         filter=lfs diff=lfs merge=lfs -text
+*.avi         filter=lfs diff=lfs merge=lfs -text
+*.flv         filter=lfs diff=lfs merge=lfs -text
+*.mov         filter=lfs diff=lfs merge=lfs -text
+*.mp4         filter=lfs diff=lfs merge=lfs -text
+*.mpeg        filter=lfs diff=lfs merge=lfs -text
+*.mpg         filter=lfs diff=lfs merge=lfs -text
+*.ogv         filter=lfs diff=lfs merge=lfs -text
+*.wmv         filter=lfs diff=lfs merge=lfs -text
 # Images
-*.bmp         binary          lfs
-*.exr         binary          lfs
-*.gif         binary          lfs
-*.hdr         binary          lfs
-*.iff         binary          lfs
-*.jpeg        binary          lfs
-*.jpg         binary          lfs
-*.pict        binary          lfs
-*.png         binary          lfs
-*.psd         binary          lfs
-*.tga         binary          lfs
-*.tif         binary          lfs
-*.tiff        binary          lfs
-*.webp        binary          lfs
-
+*.bmp         filter=lfs diff=lfs merge=lfs -text
+*.exr         filter=lfs diff=lfs merge=lfs -text
+*.gif         filter=lfs diff=lfs merge=lfs -text
+*.hdr         filter=lfs diff=lfs merge=lfs -text
+*.iff         filter=lfs diff=lfs merge=lfs -text
+*.jpeg        filter=lfs diff=lfs merge=lfs -text
+*.jpg         filter=lfs diff=lfs merge=lfs -text
+*.pict        filter=lfs diff=lfs merge=lfs -text
+*.png         filter=lfs diff=lfs merge=lfs -text
+*.psd         filter=lfs diff=lfs merge=lfs -text
+*.tga         filter=lfs diff=lfs merge=lfs -text
+*.tif         filter=lfs diff=lfs merge=lfs -text
+*.tiff        filter=lfs diff=lfs merge=lfs -text
+*.webp        filter=lfs diff=lfs merge=lfs -text
 # Compressed Archive
-*.7z          binary          lfs
-*.bz2         binary          lfs
-*.gz          binary          lfs
-*.rar         binary          lfs
-*.tar         binary          lfs
-*.zip         binary          lfs
+*.7z          filter=lfs diff=lfs merge=lfs -text
+*.bz2         filter=lfs diff=lfs merge=lfs -text
+*.gz          filter=lfs diff=lfs merge=lfs -text
+*.rar         filter=lfs diff=lfs merge=lfs -text
+*.tar         filter=lfs diff=lfs merge=lfs -text
+*.zip         filter=lfs diff=lfs merge=lfs -text

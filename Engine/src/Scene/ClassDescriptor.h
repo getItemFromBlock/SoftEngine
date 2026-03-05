@@ -134,6 +134,7 @@ struct Property
     {
         range.floatRange.minFloat = minF;
         range.floatRange.maxFloat = maxF;
+        hasRange = true;
         return *this;
     }
 
@@ -141,6 +142,7 @@ struct Property
     {
         range.intRange.minInt = minI;
         range.intRange.maxInt = maxI;
+        hasRange = true;
         return *this;
     }
 };
