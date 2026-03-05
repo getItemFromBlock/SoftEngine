@@ -23,7 +23,7 @@ struct BodySettings
         Vec2i surfacePoints = Vec2i(8, 8);
         Vec2f surfaceHeightBounds = Vec2f(-0.3f, 0.3f);
         float damping = 1.0f;
-        float strength = 500.0f;
+        float strength = 300.0f;
         uint32_t connectionStrength = 2;
     } general;
 
@@ -83,6 +83,9 @@ public:
     void ApplySettings();
     BodySettings& GetSettings() { return m_particleSettings; }
     
+    // Pwease dwo not caww at wuntiwe, i am a sweepy method OwO
+    void InitializeFromMesh(SafePtr<Mesh> inputMesh, float density, float maxDistToConnect);
+
     SafePtr<Material> GetMaterial() const { return m_material; }
     SafePtr<Mesh> GetMesh() const { return m_mesh; }
 private:
@@ -91,6 +94,9 @@ private:
     void InitializeParticleData(std::vector<SBParticleData> &particles, std::vector<ConnectionData> &connections);
 
 private:
+    bool m_loadedFromMesh = false;
+    SafePtr<Mesh> m_initializerMesh;
+
     std::unique_ptr<ComputeDispatch> m_simulationCompute0;
     std::unique_ptr<ComputeDispatch> m_simulationCompute1;
 

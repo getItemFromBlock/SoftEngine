@@ -61,6 +61,7 @@ private:
     void ComputeBoundingBox(const std::vector<Vec3f>& positionVertices);
 private:
     friend class Model;
+    friend class GPUSoftBodyComponent;
     
     std::vector<float> m_vertices;
     std::vector<uint32_t> m_indices;

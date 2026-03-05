@@ -89,6 +89,8 @@ void GPUSoftBodyComponent::OnCreate()
             m_simulationCompute1 = computeShader1->CreateDispatch(renderer);
         });
     
+    InitializeFromMesh(resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cylinder.obj/Cylinder.mesh"), 5, 0.5);
+
     CreateParticleBuffers();
 }
 
@@ -99,6 +101,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
     
     if (m_needsRecreation)
     {
+        if (m_loadedFromMesh) InitializeFromMesh(m_initializerMesh, 5, 0.5);
         CreateParticleBuffers();
         m_needsRecreation = false;
         return;
@@ -274,7 +277,7 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
 
     if (m_particleBuffer)
         m_particleBuffer->Cleanup();
-
+    
     if (m_particles.empty())
         InitializeParticleData(m_particles, m_connections);
 
@@ -514,7 +517,7 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &p
             }
         }
     }
-
+    
     if (m_particleSettings.shape.type != BodySettings::Shape::Type::Cube)
     {
         std::vector<uint32_t> toRemove;
@@ -585,4 +588,94 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &p
 void GPUSoftBodyComponent::ApplySettings()
 {
     m_needsRecreation = true;
+}
+
+void GPUSoftBodyComponent::InitializeFromMesh(SafePtr<Mesh> inputMesh, float density, float maxDistToConnect)
+{
+    m_particles.clear();
+    m_connections.clear();
+
+    m_initializerMesh = inputMesh;
+
+    m_loadedFromMesh = true;
+    int itConnectionOffset = 0;
+
+    BoundingBox BBox = inputMesh.getPtr()->m_boundingBox;
+
+    const int vertexSize = sizeof(Vertex) / sizeof(float);
+
+    int pointCount = inputMesh->m_vertices.size() / vertexSize;
+
+    Vertex* vertices = reinterpret_cast<Vertex*>(inputMesh->m_vertices.data());
+
+    float invDensity = 1 / density;
+
+    // Place point inside mesh
+    for (float currY = BBox.min.y; currY <= BBox.max.y; currY += invDensity)
+    {
+        for (float currZ = BBox.min.z; currZ <= BBox.max.z; currZ += invDensity)
+        {
+            for (float currX = BBox.min.x; currX <= BBox.max.x; currX += invDensity)
+            {
+
+                Vec3f pos = { currX, currY, currZ };
+
+                bool shouldDiscard = false;
+                for (int i = 0; i < pointCount / 3; i++)
+                {
+                    Vec3f a = vertices[i * 3    ].position;
+                    Vec3f b = vertices[i * 3 + 1].position;
+                    Vec3f c = vertices[i * 3 + 2].position;
+
+                    Vec3f n = (b - a).Cross(c - a);
+
+                    Vec3f offset = pos - a;
+
+                    if (n.Dot(offset) > 0)
+                    {
+                        shouldDiscard = true;
+                        break;
+                    }
+                }
+                
+                if (shouldDiscard)
+                    continue;
+
+                SBParticleData data = { };
+
+                data.position = pos;
+                data.velocity = { 0 , 0 , 0 };
+                data.connectionsCount = 0;
+                m_particles.push_back(data);
+            }
+        }
+    }
+
+    // Generate connection
+    for (int i = 0; i < m_particles.size(); i++)
+    {
+        m_particles[i].connectionsOffset = m_connections.size();
+        if (m_particles[i].position.y <= BBox.min.y + 0.1f) continue;
+
+        for (int j = 0; j < m_particles.size(); j++)
+        {
+            if (i == j) continue;
+
+            float dist = m_particles[j].position.Distance(m_particles[i].position);
+
+            if (dist <= maxDistToConnect)
+            {
+                ConnectionData connectionData;
+
+                connectionData.initialLength = dist;
+                connectionData.particleID = j;
+
+                m_connections.push_back(connectionData);
+            }
+        }
+
+        m_particles[i].connectionsCount = m_connections.size() - m_particles[i].connectionsOffset;
+    }
+
+    m_totalParticleCount = uint32_t(m_particles.size());
 }
