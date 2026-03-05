@@ -101,7 +101,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
     
     if (m_needsRecreation)
     {
-        if (m_loadedFromMesh) InitializeFromMesh(Engine::Get()->GetResourceManager()->Load<Mesh>(RESOURCE_PATH"/models/Cylinder.obj/Cylinder.mesh"), 5, 0.5);
+        if (m_loadedFromMesh) InitializeFromMesh(m_initializerMesh, 5, 0.5);
         CreateParticleBuffers();
         m_needsRecreation = false;
         return;
@@ -278,7 +278,7 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
     if (m_particleBuffer)
         m_particleBuffer->Cleanup();
     
-    if (m_particles.size() == 0)
+    if (m_particles.empty())
         InitializeParticleData(m_particles, m_connections);
 
     VkDeviceSize PBufSize = sizeof(SBParticleData) * m_particles.size();
@@ -594,6 +594,8 @@ void GPUSoftBodyComponent::InitializeFromMesh(SafePtr<Mesh> inputMesh, float den
 {
     m_particles.clear();
     m_connections.clear();
+
+    m_initializerMesh = inputMesh;
 
     m_loadedFromMesh = true;
     int itConnectionOffset = 0;

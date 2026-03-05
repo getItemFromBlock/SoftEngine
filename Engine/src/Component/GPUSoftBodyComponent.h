@@ -95,6 +95,7 @@ private:
 
 private:
     bool m_loadedFromMesh = false;
+    SafePtr<Mesh> m_initializerMesh;
 
     std::unique_ptr<ComputeDispatch> m_simulationCompute0;
     std::unique_ptr<ComputeDispatch> m_simulationCompute1;
