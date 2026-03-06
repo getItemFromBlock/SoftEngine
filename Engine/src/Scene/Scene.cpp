@@ -267,7 +267,6 @@ void Scene::UpdateCamera(float deltaTime) const
     static Vec2f startClickPos;
     static Vec2f prevMousePos = Vec2f::Zero();
     auto transform = m_editorCamera->GetTransform();
-    transform->OnUpdate(deltaTime);
     
     auto position = transform->GetLocalPosition();
     Window* window = Engine::Get()->GetWindow();
@@ -297,7 +296,10 @@ void Scene::UpdateCamera(float deltaTime) const
     }
     
     if (!isLooking)
+    {
+        transform->OnUpdate(deltaTime);
         return;
+    }
 
     constexpr float speed = 10.f;
     constexpr float freeLookSensitivity = 0.5f;
@@ -343,4 +345,6 @@ void Scene::UpdateCamera(float deltaTime) const
 
     transform->Rotate(Vec3f::Up(), -mouseX, Space::World);
     transform->Rotate(Vec3f::Right(), -mouseY, Space::Local);
+
+    transform->OnUpdate(deltaTime);
 }

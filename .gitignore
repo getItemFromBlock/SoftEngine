@@ -27,3 +27,5 @@ compile.*
 # Engine
 /Engine/cache
 /.vs
+
+*.ini

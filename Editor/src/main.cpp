@@ -22,7 +22,6 @@ int Run(int argc, char** argv, char** envp)
 #include <crtdbg.h>
 #endif
 
-
 #if defined(_WIN32) && defined(_MSC_VER) && defined(NDEBUG)
 int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR cmdLine, int cmdShow)
 {
