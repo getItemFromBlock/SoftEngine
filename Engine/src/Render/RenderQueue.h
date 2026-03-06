@@ -17,33 +17,35 @@ class Renderer;
 
 struct RenderCommand
 {
-    Mesh* mesh;
-    size_t subMeshIndex;
-    uint32_t startIndex;
-    uint32_t indexCount;
+    enum class Type
+    {
+        Mesh,
+        SoftBody,
+        SoftBodyDebug
+    };
 
-    Material* material;
-    Shader* shader;
+    Type type = Type::Mesh;
+    Mesh* mesh = nullptr;
+    Material* material = nullptr;
+    Shader* shader = nullptr;
+    Mat4 modelMatrix = {};
+    uint64_t sortKey = 0;
 
-    SafePtr<Texture> albedoTexture = {};
-    SafePtr<Texture> normalTexture = {};
-    SafePtr<Texture> roughnessTexture = {};
-    SafePtr<Texture> metallicTexture = {};
-    SafePtr<Texture> AOTexture = {};
+    // Mesh draw
+    size_t subMeshIndex = 0;
+    uint32_t startIndex = 0;
+    uint32_t indexCount = 0;
+    SafePtr<Texture> albedoTexture, normalTexture,
+                     roughnessTexture, metallicTexture,
+                     AOTexture;
 
+    // Soft body draw
     VkBuffer particleBuffer = VK_NULL_HANDLE;
     VkDeviceSize particleBufferSize = 0;
     uint32_t particleCount = 0;
     Vec3i particleGridSize = {};
-    bool isSoftBody = false;
-    bool isSoftBodyDebug = false;
-
-    Mat4 modelMatrix;
-
-    uint64_t sortKey;
 
     void GenerateSortKey();
-
     void GenerateSortKeyWithDepth(float depth);
 };
 
@@ -63,7 +65,6 @@ public:
     void Submit(const RenderCommand& command);
 
     void SubmitMeshRenderer(GameObject* gameObject, Mesh* mesh, const std::vector<SafePtr<Material>>& materials);
-    void SubmitInstancing(Mesh* mesh, Material* material, size_t instanceCount);
     void SubmitSoftBody(Mesh* mesh, Material* material, VkBuffer particleBuffer, VkDeviceSize particleBufferSize,
                         uint32_t particleCount, const Vec3i& gridSize,
                         const Mat4& transform, bool isDebug);
