@@ -1,14 +1,14 @@
 ﻿#pragma once
-#include <vector>
 
 #include "IResource.h"
-#include "Physic/BoundingBox.h"
-#include "Utils/Type.h"
+#include "Loader/GLTFLoader.h"
 
-class Material;
+#include <vector>
+
+#include "Physic/BoundingBox.h"
+
 class Scene;
 class GameObject;
-class Mesh;
 
 class Model : public IResource
 {
@@ -25,12 +25,16 @@ public:
 
 private:
     void ComputeBoundingBox(const std::vector<std::vector<Vec3f>>& positionVertices);
+
 private:
     friend class FBXLoader;
     
-    std::vector<SafePtr<Mesh>> m_meshes;
-    
-    std::vector<SafePtr<Material>> m_materials = {};
-    
-    BoundingBox m_boundingBox;
+    std::vector<SafePtr<Mesh>>     m_meshes;
+    std::vector<SafePtr<Material>> m_materials;
+    BoundingBox                    m_boundingBox;
+
+    // GLTF-only: node hierarchy and per-mesh owning node, populated by GLTFLoader.
+    std::vector<GLTFLoader::Node>  m_gltfNodes;
+    std::vector<int>               m_gltfRootNodes;
+    std::vector<int>               m_meshNodeIndices;
 };

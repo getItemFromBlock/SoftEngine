@@ -59,6 +59,13 @@ void Editor::Initialize()
     resourceManager->Load<Model>(RESOURCE_PATH"/models/Plane.obj");
     resourceManager->Load<CubeMap>(RESOURCE_PATH"/envMap/wooden_studio_09_4k.hdr");
     resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/inverted.pshader");
+    
+    auto sponza = resourceManager->Load<Model>(RESOURCE_PATH"models/Test/Sponza.gltf");
+    sponza->EOnLoaded.Bind([this, currentScene, sponza]()
+    {
+        auto go = Model::CreateGameObject(sponza.getPtr(), currentScene);
+        go->GetTransform()->SetLocalPosition({0, 0, -5});
+    });
     // model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Sponza/sponza.obj");
     model = resourceManager->Load<Model>(RESOURCE_PATH"models/Sphere.obj");
 
@@ -93,17 +100,10 @@ void Editor::Initialize()
         go->GetTransform()->SetLocalPosition(position);
         go->GetComponent<MeshComponent>()->SetMaterial(0, sphereMaterial);
         
-        auto light = Model::CreateGameObject(model.getPtr(), currentScene);
-        SafePtr<Shader> unlit = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/Unlit/Unlit.shader");
-        auto unlitMat = resourceManager->CreateMaterial("Light Material", unlit);
-        unlitMat->SetAttribute("material.color", Vec4f::One());
-        auto meshComp = light->GetComponent<MeshComponent>();
-        meshComp->SetMaterial(0, unlitMat);
-        light->GetTransform()->SetLocalPosition(position);
-        light->GetTransform()->SetLocalScale(Vec3f(0.2f));
+        auto light = currentScene->CreateGameObject();
         light->SetName("Light");
-        light->AddComponent<LightComponent>()->SetIntensity(10.f);
-        light->AddComponent<TestComponent>();
+        light->AddComponent<LightComponent>()->SetIntensity(1.f);
+        light->AddComponent<TestComponent>()->AttachToCamera(true);
         
     });
 
