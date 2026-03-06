@@ -31,6 +31,13 @@ struct RenderCommand
     SafePtr<Texture> metallicTexture = {};
     SafePtr<Texture> AOTexture = {};
 
+    VkBuffer particleBuffer = VK_NULL_HANDLE;
+    VkDeviceSize particleBufferSize = 0;
+    uint32_t particleCount = 0;
+    Vec3i particleGridSize = {};
+    bool isSoftBody = false;
+    bool isSoftBodyDebug = false;
+
     Mat4 modelMatrix;
 
     uint64_t sortKey;
@@ -57,6 +64,9 @@ public:
 
     void SubmitMeshRenderer(GameObject* gameObject, Mesh* mesh, const std::vector<SafePtr<Material>>& materials);
     void SubmitInstancing(Mesh* mesh, Material* material, size_t instanceCount);
+    void SubmitSoftBody(Mesh* mesh, Material* material, VkBuffer particleBuffer, VkDeviceSize particleBufferSize,
+                        uint32_t particleCount, const Vec3i& gridSize,
+                        const Mat4& transform, bool isDebug);
 
     void Sort();
 
@@ -70,23 +80,24 @@ public:
 private:
     std::vector<std::unique_ptr<VulkanDescriptorPool>> m_gBufferPools;
     bool m_gBufferPoolInitialized = false;
-    
+
     struct PerFrameMaterialBuffer
     {
         std::unique_ptr<VulkanUniformBuffer> buffer;
         uint32_t offset = 0; // current write head in bytes
     };
+
     std::vector<PerFrameMaterialBuffer> m_materialDataBuffers;
     bool m_materialBuffersInitialized = false;
     uint32_t m_materialDataStride = 0;
 
     struct MaterialData
     {
-        Vec4f  color;
-        float  roughnessFactor;
-        float  metalnessFactor;
-        float  aoFactor;
-        float  _pad1 = 0.f;
+        Vec4f color;
+        float roughnessFactor;
+        float metalnessFactor;
+        float aoFactor;
+        float _pad1 = 0.f;
     };
 
     QueueType m_type;

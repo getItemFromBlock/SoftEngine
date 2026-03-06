@@ -91,6 +91,31 @@ void RenderQueue::SubmitInstancing(Mesh* mesh, Material* material, size_t instan
     cmd.mesh = mesh;
 }
 
+void RenderQueue::SubmitSoftBody(
+    Mesh* mesh, Material* material,
+    VkBuffer particleBuffer, VkDeviceSize particleBufferSize,
+    uint32_t particleCount, const Vec3i& gridSize,
+    const Mat4& transform, bool isDebug)
+{
+    if (!mesh || !mesh->IsLoaded() || !mesh->SentToGPU()) return;
+    if (!material) return;
+
+    RenderCommand cmd;
+    cmd.mesh = mesh;
+    cmd.material = material;
+    cmd.shader = material->GetShader().getPtr();
+    cmd.modelMatrix = transform;
+    cmd.particleBuffer = particleBuffer;
+    cmd.particleBufferSize = particleBufferSize;
+    cmd.particleCount = particleCount;
+    cmd.particleGridSize = gridSize;
+    cmd.isSoftBody = true;
+    cmd.isSoftBodyDebug = isDebug;
+    cmd.GenerateSortKey();
+
+    Submit(cmd);
+}
+
 void RenderQueue::Sort()
 {
     if (m_type == QueueType::Transparent)
@@ -121,40 +146,68 @@ void RenderQueue::Execute(VulkanRenderer* renderer)
     {
         if (cmd.shader != lastShader)
         {
-            if (!renderer->BindShader(cmd.shader))
-                continue;
+            if (!renderer->BindShader(cmd.shader)) continue;
             lastShader = cmd.shader;
         }
 
         if (cmd.material != lastMaterial)
         {
             auto currentScene = Engine::Get()->GetSceneHolder()->GetCurrentScene();
-            const auto& cameraVP = currentScene->GetCameraData().VP;
+            const auto& cameraData = currentScene->GetCameraData();
 
-            cmd.material->SetAttribute("cameraUBO.viewProj", cameraVP, true);
-            cmd.material->SetAttribute("cameraUBO.camPos", currentScene->GetCameraData().position, true);
-            cmd.material->SetAttribute("debugCubemap", currentScene->GetEditorCamera()->GetSkybox(), true);
+            cmd.material->SetAttribute("cameraUBO.viewProj", cameraData.VP, true);
+            cmd.material->SetAttribute("cameraUBO.camPos", cameraData.position, true);
+            cmd.material->SetAttribute("cameraUBO.cameraRight", cameraData.right, true);
+            cmd.material->SetAttribute("cameraUBO.cameraUp", cameraData.up, true);
+            cmd.material->SetAttribute("cameraUBO.cameraFront", cameraData.forward, true);
+            cmd.material->SetAttribute("debugCubemap",
+                                       currentScene->GetEditorCamera()->GetSkybox(), true);
+
+            if (cmd.isSoftBody)
+            {
+                cmd.material->GetHandle()->SetStorageBuffer(
+                    0, 2, cmd.particleBuffer, 0, cmd.particleBufferSize, renderer);
+            }
 
             cmd.material->SendAllValues(renderer);
-            if (!renderer->BindMaterial(cmd.material))
-                continue;
+            if (!renderer->BindMaterial(cmd.material)) continue;
             lastMaterial = cmd.material;
         }
 
-        if (cmd.mesh != lastMesh)
+        if (!cmd.isSoftBody)
         {
-            renderer->BindVertexBuffers(cmd.mesh->GetVertexBuffer(),
-                                        cmd.mesh->GetIndexBuffer());
-            lastMesh = cmd.mesh;
+            if (cmd.mesh != lastMesh)
+            {
+                renderer->BindVertexBuffers(cmd.mesh->GetVertexBuffer(),
+                                            cmd.mesh->GetIndexBuffer());
+                lastMesh = cmd.mesh;
+            }
+
+            PushConstant pushConstant = cmd.shader->GetPushConstants()[ShaderType::Vertex];
+            renderer->SendPushConstants(&cmd.modelMatrix, sizeof(Mat4),
+                                        cmd.shader, pushConstant);
+            renderer->DrawVertexSubMesh(cmd.mesh->GetIndexBuffer(),
+                                        cmd.startIndex, cmd.indexCount);
         }
+        else
+        {
+            // Soft body uses a combined transform+gridSize push constant
+            struct SoftBodyPush
+            {
+                Mat4 transform;
+                Vec3i size;
+            } push;
+            push.transform = cmd.modelMatrix;
+            push.size = cmd.particleGridSize;
 
-        PushConstant pushConstant = cmd.shader->GetPushConstants()[ShaderType::Vertex];
-        renderer->SendPushConstants(&cmd.modelMatrix, sizeof(Mat4),
-                                    cmd.shader, pushConstant);
+            vkCmdPushConstants(renderer->GetCommandBuffer(),
+                               cmd.material->GetHandle()->GetPipeline()->GetPipelineLayout(),
+                               VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(SoftBodyPush), &push);
 
-        renderer->DrawVertexSubMesh(cmd.mesh->GetIndexBuffer(),
-                                    cmd.startIndex,
-                                    cmd.indexCount);
+            uint32_t instanceCount = cmd.isSoftBodyDebug ? cmd.particleCount : 1;
+            renderer->DrawInstanced(cmd.mesh->GetIndexBuffer(),
+                                    cmd.mesh->GetVertexBuffer(), instanceCount);
+        }
     }
 }
 
