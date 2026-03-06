@@ -174,7 +174,6 @@ bool VulkanRenderer::BeginFrame()
     p_vertexCount = 0;
     m_imageIndex = 0;
     
-    m_syncObjects->WaitForFence(m_currentFrame);
     VkResult result = m_swapChain->AcquireNextImage(
         m_syncObjects->GetImageAvailableSemaphore(m_currentFrame),
         &m_imageIndex
@@ -276,6 +275,7 @@ void VulkanRenderer::EndFrame()
     if (result != VK_SUCCESS)
     {
         PrintError("Failed to submit draw command buffer!");
+        return;
     }
 
     result = m_swapChain->PresentImage(m_device->GetPresentQueue(), m_imageIndex,
@@ -289,6 +289,7 @@ void VulkanRenderer::EndFrame()
     else if (result != VK_SUCCESS)
     {
         PrintError("Failed to present swap chain image!");
+        return;
     }
 
     m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;

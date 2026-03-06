@@ -23,20 +23,22 @@
 #include "Resource/VertexShader.h"
 #include "Utils/SPVReflection.h"
 
-std::vector<char> CompileGLSLToSPV(const std::string& source, shaderc_shader_kind kind) {
+std::vector<char> CompileGLSLToSPV(const std::string& source, shaderc_shader_kind kind)
+{
     shaderc::Compiler compiler;
     shaderc::CompileOptions options;
 
     shaderc::SpvCompilationResult module =
         compiler.CompileGlslToSpv(source, kind, "shader.glsl", options);
 
-    if (module.GetCompilationStatus() != shaderc_compilation_status_success) {
+    if (module.GetCompilationStatus() != shaderc_compilation_status_success)
+    {
         PrintError("Shader compilation failed: %s", module.GetErrorMessage().c_str());
         return {};
     }
-    
+
     std::vector<uint32_t> spirv(module.begin(), module.end());
-    
+
     const char* begin = reinterpret_cast<const char*>(spirv.data());
     const char* end = begin + spirv.size() * sizeof(uint32_t);
     return std::vector<char>(begin, end);
@@ -44,10 +46,11 @@ std::vector<char> CompileGLSLToSPV(const std::string& source, shaderc_shader_kin
 
 static VkDescriptorType ConvertType(UniformType type)
 {
-    switch (type) {
+    switch (type)
+    {
     case UniformType::NestedStruct:
         return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    case UniformType::StorageBuffer: 
+    case UniformType::StorageBuffer:
         return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     case UniformType::Sampler2D:
         return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -72,7 +75,7 @@ static VkShaderStageFlags ConvertType(ShaderType type)
         return VK_SHADER_STAGE_FRAGMENT_BIT;
     case ShaderType::Compute:
         return VK_SHADER_STAGE_COMPUTE_BIT;
-    default: 
+    default:
         break;
     }
     PrintError("Invalid shader type");
@@ -90,7 +93,7 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkExtent2D extent,
 {
     auto uniforms = shader->GetUniforms();
     auto pushConstants = shader->GetPushConstants();
-    
+
     auto fragmentShader = shader->GetFragmentShader();
     auto vertexShader = shader->GetVertexShader();
     auto computeShader = shader->GetComputeShader();
@@ -105,12 +108,12 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkExtent2D extent,
         {
             VkDescriptorSetLayoutBinding layoutBinding{};
             layoutBinding.binding = uniform.binding;
-            layoutBinding.descriptorCount = 1; 
+            layoutBinding.descriptorCount = 1;
             layoutBinding.descriptorType = ConvertType(uniform.type);
             layoutBinding.pImmutableSamplers = nullptr;
-            
+
             layoutBinding.stageFlags = ConvertType(uniform.shaderType);
-    
+
             layoutBindings[uniform.set].push_back(layoutBinding);
             m_descriptorTypeCounts[layoutBinding.descriptorType] += 1;
             m_uniformsBySet[uniform.set].push_back(uniform);
@@ -133,16 +136,16 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkExtent2D extent,
         for (auto& [shaderType, pc] : pushConstants)
         {
             VkShaderStageFlags stageFlags = 0;
-            if (shaderType == ShaderType::Vertex)   stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+            if (shaderType == ShaderType::Vertex) stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
             if (shaderType == ShaderType::Fragment) stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-            if (shaderType == ShaderType::Compute)  stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-                
-            ranges.push_back({ .stageFlags = stageFlags, .offset = pc.offset, .size = pc.size });
+            if (shaderType == ShaderType::Compute) stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+            ranges.push_back({.stageFlags = stageFlags, .offset = pc.offset, .size = pc.size});
         }
 
         std::vector<VkDescriptorSetLayout> layouts;
         layouts.reserve(m_descriptorSetLayouts.size());
-        for (const auto& layout : m_descriptorSetLayouts) 
+        for (const auto& layout : m_descriptorSetLayouts)
             layouts.push_back(layout->GetLayout());
 
         VkPipelineLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
@@ -154,21 +157,23 @@ bool VulkanPipeline::Initialize(VulkanDevice* device, VkExtent2D extent,
         if (vkCreatePipelineLayout(m_device->GetDevice(), &layoutInfo, nullptr, &m_pipelineLayout) != VK_SUCCESS)
             throw std::runtime_error("Failed to create pipeline layout");
 
-        if (computeShader) 
+        if (computeShader)
         {
             return InitializeComputePipeline(computeShader);
         }
-        else 
+        else
         {
             return InitializeGraphicsPipeline(shader, vertexShader, fragmentShader, colorFormat, depthFormat);
         }
     }
-    catch (const std::exception& e) {
+    catch (const std::exception& e)
+    {
         Cleanup();
         std::cerr << "Pipeline init failed: " << e.what() << std::endl;
         return false;
     }
 }
+
 bool VulkanPipeline::InitializeGraphicsPipeline(const Shader* shader,
                                                 const VertexShader* vertexShader,
                                                 const FragmentShader* fragmentShader,
@@ -184,7 +189,7 @@ bool VulkanPipeline::InitializeGraphicsPipeline(const Shader* shader,
     fragStage.module = fragmentShader->GetBuffer()->GetModule();
     fragStage.pName = "main";
 
-    VkPipelineShaderStageCreateInfo shaderStages[] = { vertStage, fragStage };
+    VkPipelineShaderStageCreateInfo shaderStages[] = {vertStage, fragStage};
 
     std::string vertexContent = vertexShader->GetContent();
     std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
@@ -198,14 +203,16 @@ bool VulkanPipeline::InitializeGraphicsPipeline(const Shader* shader,
     vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
-    inputAssembly.topology = shader->GetTopology() == Topology::Triangle ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST : VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+    inputAssembly.topology = shader->GetTopology() == Topology::Triangle
+                                 ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+                                 : VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
     VkPipelineViewportStateCreateInfo viewportState{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
     viewportState.viewportCount = 1;
     viewportState.scissorCount = 1;
 
-    VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
     VkPipelineDynamicStateCreateInfo dynamicState{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
     dynamicState.dynamicStateCount = static_cast<uint32_t>(std::size(dynamicStates));
     dynamicState.pDynamicStates = dynamicStates;
@@ -222,49 +229,48 @@ bool VulkanPipeline::InitializeGraphicsPipeline(const Shader* shader,
     VkPipelineDepthStencilStateCreateInfo depthStencil{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
     depthStencil.depthTestEnable = shader->IsDepthTestEnabled();
     depthStencil.depthWriteEnable = shader->IsDepthWriteEnabled();
-    depthStencil.depthCompareOp =  shader->IsDepthWriteEnabled() ? VK_COMPARE_OP_LESS : VK_COMPARE_OP_LESS_OR_EQUAL;
+    depthStencil.depthCompareOp = shader->IsDepthWriteEnabled() ? VK_COMPARE_OP_LESS : VK_COMPARE_OP_LESS_OR_EQUAL;
 
-    // Build the attachment format list — use shader-declared attachments or fall back to colorFormat
     std::vector<VkFormat> attachmentFormats = shader->GetAttachments();
     if (attachmentFormats.empty())
         attachmentFormats.push_back(colorFormat);
 
-    // One identical blend state per attachment (satisfies independentBlend=false requirement)
     VkPipelineColorBlendAttachmentState blendAttachment{};
     blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                     VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     blendAttachment.blendEnable = VK_FALSE;
 
     std::vector<VkPipelineColorBlendAttachmentState> blendAttachments(attachmentFormats.size(), blendAttachment);
 
     VkPipelineColorBlendStateCreateInfo colorBlending{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
     colorBlending.attachmentCount = static_cast<uint32_t>(blendAttachments.size());
-    colorBlending.pAttachments    = blendAttachments.data();
+    colorBlending.pAttachments = blendAttachments.data();
 
     VkPipelineRenderingCreateInfo pipelineRenderingInfo{};
-    pipelineRenderingInfo.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-    pipelineRenderingInfo.colorAttachmentCount    = static_cast<uint32_t>(attachmentFormats.size());
+    pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    pipelineRenderingInfo.colorAttachmentCount = static_cast<uint32_t>(attachmentFormats.size());
     pipelineRenderingInfo.pColorAttachmentFormats = attachmentFormats.data();
-    pipelineRenderingInfo.depthAttachmentFormat   = depthFormat;
+    pipelineRenderingInfo.depthAttachmentFormat = depthFormat;
     pipelineRenderingInfo.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
     VkGraphicsPipelineCreateInfo pipelineInfo{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
-    pipelineInfo.pNext             = &pipelineRenderingInfo;
-    pipelineInfo.stageCount        = 2;
-    pipelineInfo.pStages           = shaderStages;
+    pipelineInfo.pNext = &pipelineRenderingInfo;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shaderStages;
     pipelineInfo.pVertexInputState = &vertexInputInfo;
     pipelineInfo.pInputAssemblyState = &inputAssembly;
-    pipelineInfo.pViewportState    = &viewportState;
+    pipelineInfo.pViewportState = &viewportState;
     pipelineInfo.pRasterizationState = &rasterizer;
     pipelineInfo.pMultisampleState = &multisampling;
     pipelineInfo.pDepthStencilState = &depthStencil;
-    pipelineInfo.pColorBlendState  = &colorBlending;
-    pipelineInfo.pDynamicState     = &dynamicState;
-    pipelineInfo.layout            = m_pipelineLayout;
-    pipelineInfo.renderPass        = VK_NULL_HANDLE;
-    pipelineInfo.subpass           = 0;
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDynamicState = &dynamicState;
+    pipelineInfo.layout = m_pipelineLayout;
+    pipelineInfo.renderPass = VK_NULL_HANDLE;
+    pipelineInfo.subpass = 0;
 
-    VkResult result = vkCreateGraphicsPipelines(m_device->GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
+    VkResult result = vkCreateGraphicsPipelines(m_device->GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
+                                                &m_pipeline);
     return result == VK_SUCCESS;
 }
 
@@ -272,16 +278,17 @@ bool VulkanPipeline::InitializeGraphicsPipeline(const Shader* shader,
 bool VulkanPipeline::InitializeComputePipeline(const ComputeShader* computeShader)
 {
     VkComputePipelineCreateInfo pipelineInfo{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
-    
+
     // Shader Stage
     pipelineInfo.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     pipelineInfo.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
     pipelineInfo.stage.module = computeShader->GetBuffer()->GetModule();
     pipelineInfo.stage.pName = "main";
-    
+
     pipelineInfo.layout = m_pipelineLayout;
 
-    VkResult result = vkCreateComputePipelines(m_device->GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
+    VkResult result = vkCreateComputePipelines(m_device->GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
+                                               &m_pipeline);
     return result == VK_SUCCESS;
 }
 
@@ -289,9 +296,9 @@ void VulkanPipeline::Cleanup()
 {
     if (!m_device)
         return;
-        
+
     m_descriptorSetLayouts.clear();
-    
+
     if (m_pipeline != VK_NULL_HANDLE)
     {
         vkDestroyPipeline(m_device->GetDevice(), m_pipeline, nullptr);

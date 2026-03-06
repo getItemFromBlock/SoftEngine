@@ -65,7 +65,7 @@ void Scene::OnRender(VulkanRenderer* renderer)
 
     m_editorCamera->EndGeometry();
 
-    // ── Forward pass: skybox + transparent objects drawn on top ──────────────
+    // Forward pass: skybox + transparent objects (or forward shaders) drawn on top
     m_editorCamera->BeginForwardPass();
     m_editorCamera->RenderSkybox(renderer);
 
@@ -80,7 +80,7 @@ void Scene::OnRender(VulkanRenderer* renderer)
 
     m_editorCamera->EndForwardPass();
 
-    // Post-process blit (if active)
+    // Post-process
     m_editorCamera->End();
 
     renderer->ClearColor();

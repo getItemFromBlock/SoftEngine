@@ -5,7 +5,6 @@
 #include <galaxymath/Maths.h>
 
 #include "CubeMap.h"
-#include "CubeMap.h"
 #include "IResource.h"
 
 #include "Utils/Type.h"
@@ -25,7 +24,7 @@ template <typename T>
 struct Attribute
 {
     std::string uniformName;
-    int flag = 0;
+    int flag = 0; // flag for cubemap sending
     T value;
 
     Attribute() = default;
@@ -130,7 +129,6 @@ private:
 
     EventHandle m_shaderChangeEvent;
 
-    // Used with BakeWriteEntries() to build UBOs.
     std::map<std::pair<uint32_t, uint32_t>, std::vector<uint8_t>> m_uniformScratch;
     std::vector<UBOWriteEntry> m_writeEntries;
 };

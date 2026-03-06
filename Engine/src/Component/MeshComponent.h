@@ -22,6 +22,7 @@ public:
     void SetMaterial(size_t index, const SafePtr<Material>& material);
 
     std::vector<SafePtr<Material>> GetMaterials() const;
+    SafePtr<Material> GetMaterial(size_t index);
 
 private:
     std::vector<SafePtr<Material>> m_materials;

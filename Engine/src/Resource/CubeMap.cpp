@@ -237,9 +237,6 @@ bool CubeMap::GeneratePrefiltered(VulkanRenderer* renderer, uint32_t resolution,
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         vkBeginCommandBuffer(cmd, &beginInfo);
 
-        // No initBarrier needed — CreateCubemapWithMips already
-        // transitioned all mips+faces to VK_IMAGE_LAYOUT_GENERAL
-
         mat->GetPipeline()->Bind(cmd, VK_PIPELINE_BIND_POINT_COMPUTE);
 
         for (uint32_t mip = 0; mip < mipLevels; ++mip)
@@ -247,7 +244,6 @@ bool CubeMap::GeneratePrefiltered(VulkanRenderer* renderer, uint32_t resolution,
             float roughness = static_cast<float>(mip) / static_cast<float>(mipLevels - 1);
             uint32_t mipResolution = std::max(1u, resolution >> mip);
 
-            // Update descriptor BEFORE beginning the command buffer
             VkImageView mipView = m_prefilteredCubemap->GetMipLevelView(mip);
 
             VkDescriptorImageInfo imageInfo{};
@@ -265,13 +261,13 @@ bool CubeMap::GeneratePrefiltered(VulkanRenderer* renderer, uint32_t resolution,
             write.pImageInfo = &imageInfo;
             vkUpdateDescriptorSets(device->GetDevice(), 1, &write, 0, nullptr);
 
-            // Now record + submit for this mip
+            // record + submit for this mip
             allocInfo = {};
             allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
             allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
             allocInfo.commandPool = renderer->GetCommandPool()->GetCommandPool();
             allocInfo.commandBufferCount = 1;
-            
+
             vkAllocateCommandBuffers(device->GetDevice(), &allocInfo, &cmd);
 
             beginInfo = {};
@@ -314,7 +310,6 @@ bool CubeMap::GeneratePrefiltered(VulkanRenderer* renderer, uint32_t resolution,
                 }
             }
 
-            // Last mip: transition to SHADER_READ_ONLY, otherwise leave GENERAL for next mip's write
             if (mip == mipLevels - 1)
             {
                 VkImageMemoryBarrier finalBarrier{};
@@ -378,12 +373,12 @@ bool CubeMap::GenerateBRDFLut(VulkanRenderer* renderer, uint32_t resolution)
         auto device = renderer->GetDevice();
         VulkanMaterial* mat = m_brdfLutCompute->GetMaterial();
 
-        // Transition UNDEFINED → GENERAL before writing
+        // Transition
         {
             VkCommandBufferAllocateInfo allocInfo{};
-            allocInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-            allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-            allocInfo.commandPool        = renderer->GetCommandPool()->GetCommandPool();
+            allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+            allocInfo.commandPool = renderer->GetCommandPool()->GetCommandPool();
             allocInfo.commandBufferCount = 1;
 
             VkCommandBuffer transitionCmd;
@@ -395,15 +390,15 @@ bool CubeMap::GenerateBRDFLut(VulkanRenderer* renderer, uint32_t resolution)
             vkBeginCommandBuffer(transitionCmd, &beginInfo);
 
             VkImageMemoryBarrier initBarrier{};
-            initBarrier.sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-            initBarrier.oldLayout                       = VK_IMAGE_LAYOUT_UNDEFINED;
-            initBarrier.newLayout                       = VK_IMAGE_LAYOUT_GENERAL;
-            initBarrier.srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-            initBarrier.dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-            initBarrier.image                           = m_brdfLut->GetImage();
-            initBarrier.subresourceRange                = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-            initBarrier.srcAccessMask                   = 0;
-            initBarrier.dstAccessMask                   = VK_ACCESS_SHADER_WRITE_BIT;
+            initBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            initBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            initBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+            initBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            initBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            initBarrier.image = m_brdfLut->GetImage();
+            initBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            initBarrier.srcAccessMask = 0;
+            initBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 
             vkCmdPipelineBarrier(transitionCmd,
                                  VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -413,9 +408,9 @@ bool CubeMap::GenerateBRDFLut(VulkanRenderer* renderer, uint32_t resolution)
             vkEndCommandBuffer(transitionCmd);
 
             VkSubmitInfo submitInfo{};
-            submitInfo.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
             submitInfo.commandBufferCount = 1;
-            submitInfo.pCommandBuffers    = &transitionCmd;
+            submitInfo.pCommandBuffers = &transitionCmd;
 
             {
                 std::scoped_lock lock(*device->GetGraphicsQueue().mutex);
@@ -426,27 +421,27 @@ bool CubeMap::GenerateBRDFLut(VulkanRenderer* renderer, uint32_t resolution)
                                  renderer->GetCommandPool()->GetCommandPool(), 1, &transitionCmd);
         }
 
-        // Bind output LUT as storage image (set 0, binding 0)
+        // Bind output LUT as storage image
         VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-        imageInfo.imageView   = m_brdfLut->GetImageView();
-        imageInfo.sampler     = VK_NULL_HANDLE;
+        imageInfo.imageView = m_brdfLut->GetImageView();
+        imageInfo.sampler = VK_NULL_HANDLE;
 
         VkWriteDescriptorSet write{};
-        write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet          = mat->GetDescriptorSet(0)->GetDescriptorSet(renderer->GetFrameIndex());
-        write.dstBinding      = 0;
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = mat->GetDescriptorSet(0)->GetDescriptorSet(renderer->GetFrameIndex());
+        write.dstBinding = 0;
         write.dstArrayElement = 0;
-        write.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         write.descriptorCount = 1;
-        write.pImageInfo      = &imageInfo;
+        write.pImageInfo = &imageInfo;
         vkUpdateDescriptorSets(device->GetDevice(), 1, &write, 0, nullptr);
 
         // Record dispatch
         VkCommandBufferAllocateInfo allocInfo{};
-        allocInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandPool        = renderer->GetCommandPool()->GetCommandPool();
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandPool = renderer->GetCommandPool()->GetCommandPool();
         allocInfo.commandBufferCount = 1;
 
         VkCommandBuffer cmd;
@@ -463,17 +458,16 @@ bool CubeMap::GenerateBRDFLut(VulkanRenderer* renderer, uint32_t resolution)
         uint32_t groups = (resolution + 7) / 8;
         vkCmdDispatch(cmd, groups, groups, 1);
 
-        // GENERAL → SHADER_READ_ONLY
         VkImageMemoryBarrier finalBarrier{};
-        finalBarrier.sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        finalBarrier.oldLayout                       = VK_IMAGE_LAYOUT_GENERAL;
-        finalBarrier.newLayout                       = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        finalBarrier.srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-        finalBarrier.dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-        finalBarrier.image                           = m_brdfLut->GetImage();
-        finalBarrier.subresourceRange                = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        finalBarrier.srcAccessMask                   = VK_ACCESS_SHADER_WRITE_BIT;
-        finalBarrier.dstAccessMask                   = VK_ACCESS_SHADER_READ_BIT;
+        finalBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        finalBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+        finalBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        finalBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        finalBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        finalBarrier.image = m_brdfLut->GetImage();
+        finalBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        finalBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        finalBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
         vkCmdPipelineBarrier(cmd,
                              VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -483,9 +477,9 @@ bool CubeMap::GenerateBRDFLut(VulkanRenderer* renderer, uint32_t resolution)
         vkEndCommandBuffer(cmd);
 
         VkSubmitInfo submitInfo{};
-        submitInfo.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers    = &cmd;
+        submitInfo.pCommandBuffers = &cmd;
 
         {
             std::scoped_lock lock(*device->GetGraphicsQueue().mutex);
@@ -497,14 +491,14 @@ bool CubeMap::GenerateBRDFLut(VulkanRenderer* renderer, uint32_t resolution)
                              renderer->GetCommandPool()->GetCommandPool(), 1, &cmd);
 
         m_brdfLutReady = true;
-        
+
         m_brdfLutTexture = std::make_shared<Texture>("BRDF Temp");
         m_brdfLutTexture->CreateFromBuffer(
             GBufferAttachment{
-                .image     = m_brdfLut->GetImage(),
-                .memory    = m_brdfLut->GetImageMemory(),
+                .image = m_brdfLut->GetImage(),
+                .memory = m_brdfLut->GetImageMemory(),
                 .imageView = m_brdfLut->GetImageView(),
-                .format    = m_brdfLut->GetFormat()
+                .format = m_brdfLut->GetFormat()
             },
             m_brdfLut->GetSampler(),
             resolution,

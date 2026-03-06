@@ -47,7 +47,7 @@ void MeshComponent::OnRender(VulkanRenderer* renderer)
         return;
     
     auto queue = renderer->GetRenderQueueManager()->GetOpaqueQueue();
-    if (m_materials.size() > 0 && m_materials[0]->GetShader().getPtr() != Engine::Get()->GetResourceManager()->GetDefaultShader().get())
+    if (!m_materials.empty() && m_materials[0]->GetShader().getPtr() != Engine::Get()->GetResourceManager()->GetDefaultShader().get())
     {
         queue = renderer->GetRenderQueueManager()->GetTransparentQueue(); // Use transparent queue to render in forward pass
     }
@@ -84,5 +84,15 @@ void MeshComponent::SetMaterial(size_t index, const SafePtr<Material>& material)
 std::vector<SafePtr<Material>> MeshComponent::GetMaterials() const
 {
     return m_materials;
+}
+
+SafePtr<Material> MeshComponent::GetMaterial(size_t index)
+{
+    if (index >= m_materials.size())
+    {
+        PrintWarning("index is bigger than material list size");
+        return {};
+    }
+    return m_materials[index];
 }
 

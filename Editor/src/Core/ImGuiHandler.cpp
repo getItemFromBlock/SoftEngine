@@ -60,7 +60,6 @@ void ImGuiHandler::Initialize(Window* window, VulkanRenderer* renderer)
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-    
 
     ImGui::StyleColorsDark();
 
@@ -162,14 +161,14 @@ void ImGuiHandler::UpdateTextureID(const Texture* texture)
 
 ImTextureRef ImGuiHandler::GetTextureID(Texture* texture)
 {
-    VkDescriptorSet ID;
+    VkDescriptorSet ID = {};
     auto it = m_textureIDs.find(texture->GetUUID());
     if (it == m_textureIDs.end())
     {
         auto buffer = texture->GetBuffer();
-        if (!buffer)
+        if (!buffer && !m_textureIDs.empty())
         {
-            return m_textureIDs.begin()->second;
+            return ID;
         }
         ID = ImGui_ImplVulkan_AddTexture(
             buffer->GetSampler(),

@@ -32,22 +32,31 @@ void Material::Unload()
 void Material::Describe(ClassDescriptor& descriptor)
 {
     for (auto& [name, attrib] : m_attributes.floatAttributes)
+    {
         descriptor.AddFloat(name.c_str(), attrib.value);
+    }
     for (auto& [name, attrib] : m_attributes.intAttributes)
+    {
         descriptor.AddInt(name.c_str(), attrib.value);
+    }
     for (auto& [name, attrib] : m_attributes.vec2Attributes)
+    {
         descriptor.AddVec2f(name.c_str(), attrib.value);
+    }
     for (auto& [name, attrib] : m_attributes.vec3Attributes)
+    {
         descriptor.AddVec3f(name.c_str(), attrib.value);
+    }
     for (auto& [name, attrib] : m_attributes.vec4Attributes)
+    {
         descriptor.AddVec4f(name.c_str(), attrib.value);
-
+    }
     for (auto& [name, attrib] : m_attributes.samplerAttributes)
     {
         auto& prop = descriptor.AddTexture(name.c_str(), attrib.value);
         prop.setter = [this, prop](void* value)
         {
-            auto* texture = static_cast<SafePtr<Texture>*>(value);
+            SafePtr<Texture>* texture = static_cast<SafePtr<Texture>*>(value);
             SetAttribute(prop.name, *texture);
         };
     }
@@ -56,7 +65,7 @@ void Material::Describe(ClassDescriptor& descriptor)
         auto& prop = descriptor.AddCubeMap(name.c_str(), attrib.value);
         prop.setter = [this, prop](void* value)
         {
-            auto* cubeMap = static_cast<SafePtr<CubeMap>*>(value);
+            SafePtr<CubeMap>* cubeMap = static_cast<SafePtr<CubeMap>*>(value);
             SetAttribute(prop.name, *cubeMap);
         };
     }

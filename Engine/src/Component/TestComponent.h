@@ -21,8 +21,10 @@ public:
 private:
     float m_offset = 0.f;
     float m_speed = 1.f;
-    Vec3f m_startPosition;
-    float m_time = 0.f;
+    float m_colorSpeed = 25.f;
     
     bool m_attachToCamera = false;
+    
+    Vec3f m_startPosition = Vec3f::Zero();
+    float m_time = 0.f;
 };

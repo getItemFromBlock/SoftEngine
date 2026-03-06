@@ -71,8 +71,7 @@ public:
 
     VkDescriptorBufferInfo GetDescriptorInfo(size_t frame) const;
     VkDescriptorBufferInfo GetDescriptorInfo(size_t frame, VkDeviceSize offset, VkDeviceSize range) const;
-    void UpdateDataAtOffset(const void* data, size_t size,
-                                              uint32_t byteOffset, uint32_t frameIndex) const;
+    void UpdateDataAtOffset(const void* data, size_t size, uint32_t byteOffset, uint32_t frameIndex) const;
 
 private:
     VulkanDevice* m_device = nullptr;

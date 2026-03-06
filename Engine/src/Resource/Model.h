@@ -27,6 +27,7 @@ private:
     void ComputeBoundingBox(const std::vector<std::vector<Vec3f>>& positionVertices);
 private:
     friend class FBXLoader;
+    
     std::vector<SafePtr<Mesh>> m_meshes;
     
     std::vector<SafePtr<Material>> m_materials = {};
