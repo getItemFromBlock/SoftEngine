@@ -218,9 +218,19 @@ bool Model::Load(ResourceManager* resourceManager)
             }
             roughness->SetTextureParameters(linearParam);
             matResource->SetAttribute("roughnessSampler", roughness);
-
-            matResource->SetAttribute("aoSampler",
-                                      resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png"));
+            
+            SafePtr<Texture> ao;
+            if (mat.ao.has_value())
+            {
+                ao = resourceManager->Load<Texture>(p_path.parent_path() / mat.ao.value());
+                ao->SetTextureParameters(linearParam);
+                matResource->SetAttribute("material.aoFactor", 1.f);
+            }
+            else
+            {
+                matResource->SetAttribute("material.roughnessFactor", 0.f);
+            }
+            matResource->SetAttribute("aoSampler", ao);
 
             materials[matName] = matResource;
             index++;

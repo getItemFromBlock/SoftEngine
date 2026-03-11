@@ -92,6 +92,8 @@ public:
     
     void RenderSkybox(VulkanRenderer* renderer) const;
     void RenderPostProcess(VulkanRenderer* renderer);
+    
+    void BlitToSwapchain(VulkanRenderer* renderer);
 
     SafePtr<Material> GetGBufferMaterial() const { return m_gBufferMaterial; }
 public:

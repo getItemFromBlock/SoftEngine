@@ -26,6 +26,7 @@ public:
         std::optional<std::filesystem::path> normal;
         std::optional<std::filesystem::path> metallic;
         std::optional<std::filesystem::path> roughness;
+        std::optional<std::filesystem::path> ao;
     };
 
     struct Mesh

@@ -187,7 +187,6 @@ void VulkanSwapChain::CreateSwapChain(Window* window)
     VkPresentModeKHR presentMode = window->GetVSync() ? ChooseSwapPresentMode(swapChainSupport.presentModes) : VK_PRESENT_MODE_IMMEDIATE_KHR;
     VkExtent2D extent = ChooseSwapExtent(swapChainSupport.capabilities, window);
 
-    // Request one more than minimum to avoid waiting
     uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
     if (swapChainSupport.capabilities.maxImageCount > 0 &&
         imageCount > swapChainSupport.capabilities.maxImageCount)
@@ -203,7 +202,9 @@ void VulkanSwapChain::CreateSwapChain(Window* window)
     createInfo.imageColorSpace = surfaceFormat.colorSpace;
     createInfo.imageExtent = extent;
     createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                            VK_IMAGE_USAGE_TRANSFER_SRC_BIT     |
+                            VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
     auto indices = m_device->GetQueueFamilyIndices();
     uint32_t queueFamilyIndices[] = {
@@ -225,8 +226,7 @@ void VulkanSwapChain::CreateSwapChain(Window* window)
     }
 
     createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
-    
-    // Select composite alpha mode based on window transparency setting
+
     VkCompositeAlphaFlagBitsKHR compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     
     if (isWindowTransparent)
@@ -263,7 +263,6 @@ void VulkanSwapChain::CreateSwapChain(Window* window)
         }
         else
         {
-            // Fallback: use first available mode
             VkCompositeAlphaFlagBitsKHR allModes[] = {
                 VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
                 VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
@@ -293,7 +292,6 @@ void VulkanSwapChain::CreateSwapChain(Window* window)
         throw std::runtime_error("Failed to create swap chain! Error code: " + std::to_string(result));
     }
 
-    // Retrieve swap chain images
     vkGetSwapchainImagesKHR(m_device->GetDevice(), m_swapChain, &imageCount, nullptr);
     m_images.resize(imageCount);
     vkGetSwapchainImagesKHR(m_device->GetDevice(), m_swapChain, &imageCount, m_images.data());

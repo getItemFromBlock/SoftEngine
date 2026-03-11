@@ -242,6 +242,8 @@ void Camera::ResizeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32
     if (std::cmp_equal(p_renderTargetSize.x, width) && std::cmp_equal(p_renderTargetSize.y, height) || width == 0 ||
         height == 0)
         return;
+    
+    PrintLog("Resize render target %dx%d", width, height);
 
     if (!m_renderTarget)
     {
@@ -445,27 +447,103 @@ void Camera::RenderPostProcess(VulkanRenderer* renderer)
     if (!m_postProcessMaterial)
         return;
 
-    BeginRenderTarget(m_postProcessRenderTarget.getPtr());
-
     if (!m_postProcessMaterial.valid() || !m_quad.valid())
         return;
     if (!m_postProcessMaterial->SentToGPU() || !m_quad->SentToGPU())
         return;
-
     if (!renderer->BindShader(m_postProcessMaterial->GetShader().getPtr()))
         return;
+
+    BeginRenderTarget(m_postProcessRenderTarget.getPtr());
+
     if (!renderer->BindMaterial(m_postProcessMaterial.getPtr()))
+    {
+        EndRenderTarget(m_postProcessRenderTarget.getPtr()); // can't early-return without closing
         return;
+    }
+
     m_postProcessMaterial->SendAllValues(renderer);
     renderer->BindVertexBuffers(m_quad->GetVertexBuffer(), m_quad->GetIndexBuffer());
     uint32_t startIndex = m_quad->GetSubMeshes()[0].startIndex;
     uint32_t indexCount = m_quad->GetSubMeshes()[0].count;
-    renderer->DrawVertexSubMesh(m_quad->GetIndexBuffer(),
-                                startIndex,
-                                indexCount);
+    renderer->DrawVertexSubMesh(m_quad->GetIndexBuffer(), startIndex, indexCount);
+
     EndRenderTarget(m_postProcessRenderTarget.getPtr());
 }
 
+void Camera::BlitToSwapchain(VulkanRenderer* renderer)
+{
+    SafePtr<RenderTargetTexture> source = GetRenderTarget();
+    if (!source) return;
+
+    VkCommandBuffer cmd = renderer->GetCommandPool()->GetCommandBuffer(renderer->GetFrameIndex());
+    
+    renderer->GetRenderPass()->End(cmd);
+    renderer->SetBlittedToSwapchain(true);
+
+    VkImage srcImage = source->GetBuffer()->GetImage();
+    VkImage dstImage = renderer->GetSwapChain()->GetImages()[renderer->GetImageIndex()];
+
+    VkImageMemoryBarrier srcBarrier{};
+    srcBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    srcBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    srcBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    srcBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    srcBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    srcBarrier.image = srcImage;
+    srcBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    srcBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    srcBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+    VkImageMemoryBarrier dstBarrier{};
+    dstBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    dstBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    dstBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    dstBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    dstBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    dstBarrier.image = dstImage;
+    dstBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    dstBarrier.srcAccessMask = 0;
+    dstBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+    VkImageMemoryBarrier preBarriers[] = {srcBarrier, dstBarrier};
+    vkCmdPipelineBarrier(cmd,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         0, 0, nullptr, 0, nullptr, 2, preBarriers);
+
+    VkImageBlit blitRegion{};
+    blitRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blitRegion.srcOffsets[0] = {0, 0, 0};
+    blitRegion.srcOffsets[1] = {p_renderTargetSize.x, p_renderTargetSize.y, 1};
+    blitRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blitRegion.dstOffsets[0] = {0, 0, 0};
+    blitRegion.dstOffsets[1] = {
+        static_cast<int32_t>(renderer->GetSwapChain()->GetExtent().width),
+        static_cast<int32_t>(renderer->GetSwapChain()->GetExtent().height), 1
+    };
+
+    vkCmdBlitImage(cmd,
+                   srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                   dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                   1, &blitRegion, VK_FILTER_LINEAR);
+
+    srcBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    srcBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    srcBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    srcBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    dstBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    dstBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    dstBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    dstBarrier.dstAccessMask = 0;
+
+    VkImageMemoryBarrier postBarriers[] = {srcBarrier, dstBarrier};
+    vkCmdPipelineBarrier(cmd,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                         0, 0, nullptr, 0, nullptr, 2, postBarriers);
+}
 
 void Camera::BeginGBufferPass(RenderTargetTexture* rtt)
 {

@@ -28,8 +28,8 @@ void main() {
     vec3 tangentNormal = normalize(texture(normalSampler, vTexCoord).rgb * 2.0 - 1.0);
     vec3 worldNormal   = normalize(vTBN * tangentNormal);
 
-    float roughness = texture(roughnessSampler, vTexCoord).r * material.roughnessFactor;
-    float metalness = texture(metalnessSampler, vTexCoord).r * material.metalnessFactor;
+    float roughness = texture(roughnessSampler, vTexCoord).g * material.roughnessFactor;
+    float metalness = texture(metalnessSampler, vTexCoord).b * material.metalnessFactor;
     float bakedAO   = texture(aoSampler, vTexCoord).r * material.aoFactor;
 
     outPosition            = vec4(vWorldPos, 1.0);

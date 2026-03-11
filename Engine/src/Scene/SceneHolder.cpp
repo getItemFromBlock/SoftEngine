@@ -17,6 +17,14 @@ void SceneHolder::Initialize()
     m_currentScene = std::make_unique<Scene>();
 }
 
+void SceneHolder::PreFrame(VulkanRenderer* renderer)
+{
+    if (!m_currentScene)
+        return;
+    
+    m_currentScene->PreFrame(renderer);
+}
+
 void SceneHolder::Update(float deltaTime)
 {
     if (!m_currentScene)

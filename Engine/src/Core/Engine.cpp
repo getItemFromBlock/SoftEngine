@@ -89,6 +89,7 @@ bool Engine::Initialize(EngineDesc desc)
 bool Engine::BeginFrame() const
 {
     m_resourceManager->UpdateResourceToSend();
+    m_sceneHolder->PreFrame(m_renderer.get());
     m_renderer->WaitUntilFrameFinished();
     if (!m_renderer->BeginFrame())
         return false;

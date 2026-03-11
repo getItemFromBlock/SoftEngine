@@ -38,6 +38,7 @@ public:
     Scene(Scene&&) noexcept = delete;
     virtual ~Scene();
 
+    void PreFrame(VulkanRenderer* renderer);
     void OnRender(VulkanRenderer* renderer);
     void OnUpdate(float deltaTime);
 

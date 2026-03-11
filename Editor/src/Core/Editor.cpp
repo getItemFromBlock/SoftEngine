@@ -60,7 +60,7 @@ void Editor::Initialize()
     resourceManager->Load<CubeMap>(RESOURCE_PATH"/envMap/wooden_studio_09_4k.hdr");
     resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/inverted.pshader");
     
-    auto sponza = resourceManager->Load<Model>(RESOURCE_PATH"models/Test/Sponza.gltf");
+    auto sponza = resourceManager->Load<Model>(RESOURCE_PATH"models/Test/DamagedHelmet.gltf");
     sponza->EOnLoaded.Bind([this, currentScene, sponza]()
     {
         auto go = Model::CreateGameObject(sponza.getPtr(), currentScene);
@@ -119,8 +119,25 @@ void Editor::Initialize()
     });
 }
 
+
 void Editor::Run()
 {
+    bool renderImGui = false;
+
+    auto* camera = m_engine->GetSceneHolder()->GetCurrentScene()->GetEditorCamera();
+    auto* renderer = m_engine->GetRenderer();
+
+    camera->SetRenderTargetSize(renderer->GetSwapChain()->GetExtent().width,
+                                renderer->GetSwapChain()->GetExtent().height);
+
+    m_window->EResizeEvent.Bind([&](const Vec2i& size)
+    {
+        if (!renderImGui)
+        {
+            camera->SetRenderTargetSize(size.x, size.y);
+        }
+    });
+
     while (!m_window->ShouldClose())
     {
         if (!initialised && loadedA && loadedB)
@@ -136,21 +153,37 @@ void Editor::Run()
             soft->CreateFromMesh(
                 m_engine->GetResourceManager()->Load<Mesh>(RESOURCE_PATH"/models/Barrel.obj/Cylinder.mesh"));
         }
+
         m_window->PollEvents();
+
+        if (m_window->GetInput().IsKeyPressed(Key::F1))
+        {
+            renderImGui = !renderImGui;
+            if (!renderImGui)
+            {
+                auto windowSize = m_window->GetSize();
+                camera->SetRenderTargetSize(windowSize.x, windowSize.y);
+            }
+        }
 
         if (!m_engine->BeginFrame())
             continue;
 
         m_engine->Update();
-
         m_engine->Render();
 
-        m_imguiHandler->BeginFrame();
-        OnRender();
-        m_imguiHandler->EndFrame();
+        if (renderImGui)
+        {
+            m_imguiHandler->BeginFrame();
+            OnRender();
+            m_imguiHandler->EndFrame();
+        }
+        else
+        {
+            camera->BlitToSwapchain(renderer);
+        }
 
         m_engine->EndFrame();
-        //std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 }
 

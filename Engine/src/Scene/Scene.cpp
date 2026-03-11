@@ -41,6 +41,11 @@ Scene::~Scene()
     DestroyGameObject(root);
 }
 
+void Scene::PreFrame(VulkanRenderer* renderer)
+{
+    m_editorCamera->UpdateResizeRenderTarget(renderer);
+}
+
 void Scene::OnRender(VulkanRenderer* renderer)
 {
     m_editorCamera->Begin();
@@ -82,7 +87,7 @@ void Scene::OnRender(VulkanRenderer* renderer)
 
     // Post-process
     m_editorCamera->End();
-
+    
     renderer->ClearColor();
 }
 

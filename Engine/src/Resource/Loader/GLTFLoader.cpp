@@ -216,6 +216,9 @@ bool GLTFLoader::Load(const std::filesystem::path& fullPath, Model& model)
             if (matJson.contains("normalTexture"))
                 mat.normal = getImagePath(matJson.at("normalTexture").at("index").get<size_t>());
 
+            if (matJson.contains("occlusionTexture"))
+                mat.ao = getImagePath(matJson.at("occlusionTexture").at("index").get<size_t>());
+            
             if (matJson.contains("pbrMetallicRoughness"))
             {
                 const auto& pbr = matJson.at("pbrMetallicRoughness");
