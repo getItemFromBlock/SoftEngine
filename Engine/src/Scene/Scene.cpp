@@ -43,11 +43,11 @@ Scene::~Scene()
 
 void Scene::PreFrame(VulkanRenderer* renderer)
 {
-    m_editorCamera->UpdateResizeRenderTarget(renderer);
 }
 
 void Scene::OnRender(VulkanRenderer* renderer)
 {
+    m_editorCamera->HandleResize(renderer);
     m_editorCamera->Begin();
 
     {

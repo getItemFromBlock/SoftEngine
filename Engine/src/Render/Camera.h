@@ -69,12 +69,13 @@ public:
     SafePtr<CubeMap> GetSkybox() const;
     
     void SetPostProcessShader(const SafePtr<PostProcessShader>& shader);
+    void CleanupPostprocessRenderTarget();
     bool IsPostProcessActive() const;
     
     void InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height);
-    void ResizeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height);
     void CleanupRenderTarget();
-    
+    void HandleResize(VulkanRenderer* renderer);
+
     SafePtr<Texture> MakeGBufferTexture(SafePtr<Texture> texture, const GBufferAttachment& attachment, VkSampler sampler, uint32_t width, uint32_t height);
 
     SafePtr<RenderTargetTexture> GetRenderTarget() const;

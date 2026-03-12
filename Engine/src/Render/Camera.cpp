@@ -237,46 +237,6 @@ void Camera::InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, ui
     }
 }
 
-void Camera::ResizeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height)
-{
-    if (std::cmp_equal(p_renderTargetSize.x, width) && std::cmp_equal(p_renderTargetSize.y, height) || width == 0 ||
-        height == 0)
-        return;
-    
-    PrintLog("Resize render target %dx%d", width, height);
-
-    if (!m_renderTarget)
-    {
-        InitializeRenderTarget(renderer, width, height);
-        return;
-    }
-    renderer->WaitForGPU();
-    
-    m_renderTarget->Resize(renderer, width, height, VK_FILTER_NEAREST);
-    if (m_postProcessRenderTarget)
-    {
-        m_postProcessRenderTarget->Resize(renderer, width, height);
-    }
-
-    if (m_gBuffer)
-    {
-        m_gBuffer->Resize(width, height);
-
-        if (m_compositionMaterial.valid())
-        {
-            m_compositionMaterial->SetAttribute("gPosition", MakeGBufferTexture(m_positionTexture, m_gBuffer->GetPosition(), m_gBuffer->GetSampler(), width, height));
-            m_compositionMaterial->SetAttribute("gNormal", MakeGBufferTexture(m_normalTexture, m_gBuffer->GetNormal(), m_gBuffer->GetSampler(), width, height));
-            m_compositionMaterial->SetAttribute("gAlbedo", MakeGBufferTexture(m_albedoTexture, m_gBuffer->GetAlbedo(), m_gBuffer->GetSampler(), width, height));
-            m_compositionMaterial->SetAttribute("gMetallicRoughnessAO", MakeGBufferTexture(m_metallicRoughnessTexture, m_gBuffer->GetMetallicRoughness(), m_gBuffer->GetSampler(), width, height));
-        }
-    }
-
-    OnRenderTargetResized.Invoke(Vec2i(static_cast<int32_t>(width), static_cast<int32_t>(height)));
-    p_renderTargetSize = Vec2i(static_cast<int32_t>(width), static_cast<int32_t>(height));
-    p_requestedSize = p_renderTargetSize;
-    m_transform->SetDirty();
-}
-
 void Camera::CleanupRenderTarget()
 {
     if (!m_renderTarget)
@@ -291,6 +251,38 @@ void Camera::CleanupRenderTarget()
 
     Engine::Get()->GetResourceManager()->RemoveResource(m_renderTarget->GetUUID());
     m_renderTarget.reset();
+}
+
+void Camera::CleanupPostprocessRenderTarget()
+{
+    if (!m_postProcessRenderTarget && !m_postProcessMaterial)
+        return;
+    if (m_postProcessRenderTarget)
+        Engine::Get()->GetResourceManager()->RemoveResource(m_postProcessRenderTarget->GetUUID());
+    if (m_postProcessMaterial)
+        Engine::Get()->GetResourceManager()->RemoveResource(m_postProcessMaterial->GetUUID());
+    m_postProcessRenderTarget.reset();
+    m_postProcessMaterial.reset();
+}
+
+void Camera::HandleResize(VulkanRenderer* renderer)
+{
+    if (p_requestedSize == p_renderTargetSize || p_requestedSize == Vec2f::Zero() || !m_gBufferMaterial->SentToGPU())
+        return;
+
+    renderer->WaitForGPU();
+    bool hadPostprocess = m_postProcessRenderTarget.valid();
+    CleanupPostprocessRenderTarget();
+    CleanupRenderTarget();
+    
+    InitializeRenderTarget(renderer, p_requestedSize.x, p_requestedSize.y);
+    p_requestedSize = Vec2f::Zero();
+
+    if (hadPostprocess)
+    {
+        SetPostProcessShader(m_postProcessShader);
+    }
+    GetTransform()->SetDirty();
 }
 
 SafePtr<Texture> Camera::MakeGBufferTexture(SafePtr<Texture> texture, const GBufferAttachment& attachment,
@@ -332,11 +324,6 @@ void Camera::BeginForwardPass() const
 void Camera::EndForwardPass()
 {
     EndRenderTarget(m_renderTarget.getPtr());
-}
-
-void Camera::UpdateResizeRenderTarget(VulkanRenderer* renderer)
-{
-    ResizeRenderTarget(renderer, p_requestedSize.x, p_requestedSize.y);
 }
 
 void Camera::BeginRenderTarget(const RenderTargetTexture* rtt) const
