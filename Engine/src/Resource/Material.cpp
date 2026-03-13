@@ -87,7 +87,7 @@ void Material::SetAttribute(const std::string& name, float attribute, bool optio
 {
     if (m_attributes.floatAttributes.contains(name))
         m_attributes.floatAttributes[name].value = attribute;
-    else if (m_shader && !m_shader->SentToGPU())
+    else if (m_shader && !m_shader->HasBeenSent())
         m_temporaryAttributes.floatAttributes[name] = attribute;
     else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
@@ -97,7 +97,7 @@ void Material::SetAttribute(const std::string& name, int attribute, bool optiona
 {
     if (m_attributes.intAttributes.contains(name))
         m_attributes.intAttributes[name].value = attribute;
-    else if (m_shader && !m_shader->SentToGPU())
+    else if (m_shader && !m_shader->HasBeenSent())
         m_temporaryAttributes.intAttributes[name] = attribute;
     else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
@@ -107,7 +107,7 @@ void Material::SetAttribute(const std::string& name, const Vec2f& attribute, boo
 {
     if (m_attributes.vec2Attributes.contains(name))
         m_attributes.vec2Attributes[name].value = attribute;
-    else if (m_shader && !m_shader->SentToGPU())
+    else if (m_shader && !m_shader->HasBeenSent())
         m_temporaryAttributes.vec2Attributes[name] = attribute;
     else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
@@ -117,7 +117,7 @@ void Material::SetAttribute(const std::string& name, const Vec3f& attribute, boo
 {
     if (m_attributes.vec3Attributes.contains(name))
         m_attributes.vec3Attributes[name].value = attribute;
-    else if (m_shader && !m_shader->SentToGPU())
+    else if (m_shader && !m_shader->HasBeenSent())
         m_temporaryAttributes.vec3Attributes[name] = attribute;
     else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
@@ -127,7 +127,7 @@ void Material::SetAttribute(const std::string& name, const Vec4f& attribute, boo
 {
     if (m_attributes.vec4Attributes.contains(name))
         m_attributes.vec4Attributes[name].value = attribute;
-    else if (m_shader && !m_shader->SentToGPU())
+    else if (m_shader && !m_shader->HasBeenSent())
         m_temporaryAttributes.vec4Attributes[name] = attribute;
     else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
@@ -137,7 +137,7 @@ void Material::SetAttribute(const std::string& name, const Mat4& attribute, bool
 {
     if (m_attributes.matrixAttributes.contains(name))
         m_attributes.matrixAttributes[name].value = attribute;
-    else if (m_shader && !m_shader->SentToGPU())
+    else if (m_shader && !m_shader->HasBeenSent())
         m_temporaryAttributes.matrixAttributes[name] = attribute;
     else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
@@ -160,7 +160,7 @@ void Material::SetAttribute(const std::string& name, const SafePtr<Texture>& tex
             });
         });
     }
-    else if (m_shader && !m_shader->SentToGPU())
+    else if (m_shader && !m_shader->HasBeenSent())
     {
         m_temporaryAttributes.samplerAttributes[name] = texture;
     }
@@ -186,7 +186,7 @@ void Material::SetAttribute(const std::string& name, const SafePtr<CubeMap>& cub
             });
         });
     }
-    else if (m_shader && !m_shader->SentToGPU())
+    else if (m_shader && !m_shader->HasBeenSent())
     {
         m_temporaryAttributes.sampler3DAttributes[name] = cubeMap;
     }
@@ -281,7 +281,7 @@ void Material::BakeWriteEntries()
 
 void Material::SendAllValues(VulkanRenderer* renderer)
 {
-    if (!m_shader->IsLoaded() || !m_shader->SentToGPU())
+    if (!m_shader->IsLoaded() || !m_shader->HasBeenSent())
         return;
 
     for (const auto& entry : m_writeEntries)
@@ -299,7 +299,7 @@ void Material::SendAllValues(VulkanRenderer* renderer)
             {
                 texture = Engine::Get()->GetResourceManager()->GetBlankTexture();
             }
-            else if (!texture->SentToGPU())
+            else if (!texture->HasBeenSent())
             {
                 ++it;
                 continue; // Not sent to GPU yet, will try next frame
@@ -323,7 +323,7 @@ void Material::SendAllValues(VulkanRenderer* renderer)
             {
                 cubeMap = Engine::Get()->GetResourceManager()->GetBlankCubeMap();
             }
-            else if (!cubeMap->SentToGPU())
+            else if (!cubeMap->HasBeenSent())
             {
                 ++it;
                 continue; // Not sent to GPU yet, will try next frame
@@ -467,7 +467,7 @@ void Material::InitAttributes(const std::vector<UniformMember>& members, const s
 
 void Material::SendUBOValues(VulkanRenderer* renderer)
 {
-    if (!m_shader->IsLoaded() || !m_shader->SentToGPU())
+    if (!m_shader->IsLoaded() || !m_shader->HasBeenSent())
         return;
 
     for (const auto& entry : m_writeEntries)
@@ -484,7 +484,7 @@ void Material::SendUBOValues(VulkanRenderer* renderer)
 }
 void Material::OnShaderChanged()
 {
-    if (!m_shader || !m_shader->SentToGPU())
+    if (!m_shader || !m_shader->HasBeenSent())
     {
         PrintWarning("Invalid shader, probably change");
         return;

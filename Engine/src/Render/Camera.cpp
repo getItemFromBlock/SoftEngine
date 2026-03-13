@@ -110,6 +110,8 @@ void Camera::SetNear(float near)
 
 void Camera::SetRenderTargetSize(uint32_t width, uint32_t height)
 {
+    if (width == 0 || height == 0)
+        return;
     p_requestedSize = Vec2i(static_cast<int32_t>(width), static_cast<int32_t>(height));
 }
 
@@ -267,21 +269,36 @@ void Camera::CleanupPostprocessRenderTarget()
 
 void Camera::HandleResize(VulkanRenderer* renderer)
 {
-    if (p_requestedSize == p_renderTargetSize || p_requestedSize == Vec2f::Zero() || !m_gBufferMaterial->SentToGPU())
+    
+    if (p_requestedSize == p_renderTargetSize || p_requestedSize.x <= 0 || p_requestedSize.y <= 0)
+        return;
+    if (!m_gBufferMaterial || !m_gBufferMaterial->HasBeenSent())
         return;
 
     renderer->WaitForGPU();
-    bool hadPostprocess = m_postProcessRenderTarget.valid();
-    CleanupPostprocessRenderTarget();
-    CleanupRenderTarget();
-    
-    InitializeRenderTarget(renderer, p_requestedSize.x, p_requestedSize.y);
-    p_requestedSize = Vec2f::Zero();
 
-    if (hadPostprocess)
+    const uint32_t w = static_cast<uint32_t>(p_requestedSize.x);
+    const uint32_t h = static_cast<uint32_t>(p_requestedSize.y);
+
+    m_renderTarget->Resize(renderer, w, h);
+
+    m_gBuffer->Resize(w, h);
+    m_compositionMaterial->SetAttribute("gPosition",         MakeGBufferTexture(m_positionTexture,            m_gBuffer->GetPosition(),         m_gBuffer->GetSampler(), w, h));
+    m_compositionMaterial->SetAttribute("gNormal",           MakeGBufferTexture(m_normalTexture,              m_gBuffer->GetNormal(),           m_gBuffer->GetSampler(), w, h));
+    m_compositionMaterial->SetAttribute("gAlbedo",           MakeGBufferTexture(m_albedoTexture,              m_gBuffer->GetAlbedo(),           m_gBuffer->GetSampler(), w, h));
+    m_compositionMaterial->SetAttribute("gMetallicRoughnessAO", MakeGBufferTexture(m_metallicRoughnessTexture, m_gBuffer->GetMetallicRoughness(), m_gBuffer->GetSampler(), w, h));
+
+    if (m_postProcessRenderTarget)
     {
-        SetPostProcessShader(m_postProcessShader);
+        m_postProcessRenderTarget->Resize(renderer, w, h);
+        m_postProcessMaterial->SetAttribute("albedoSampler", m_renderTarget);
     }
+    
+    PrintWarning("Camera::HandleResize - Resized render targets to %dx%d", w, h);
+
+    p_renderTargetSize = p_requestedSize;
+    p_requestedSize = Vec2i::Zero();
+
     GetTransform()->SetDirty();
 }
 
@@ -436,7 +453,7 @@ void Camera::RenderPostProcess(VulkanRenderer* renderer)
 
     if (!m_postProcessMaterial.valid() || !m_quad.valid())
         return;
-    if (!m_postProcessMaterial->SentToGPU() || !m_quad->SentToGPU())
+    if (!m_postProcessMaterial->HasBeenSent() || !m_quad->HasBeenSent())
         return;
     if (!renderer->BindShader(m_postProcessMaterial->GetShader().getPtr()))
         return;

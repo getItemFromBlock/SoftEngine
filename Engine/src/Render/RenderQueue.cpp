@@ -46,7 +46,7 @@ void RenderQueue::Submit(const RenderCommand& command)
 void RenderQueue::SubmitMeshRenderer(GameObject* gameObject, Mesh* mesh,
                                      const std::vector<SafePtr<Material>>& materials)
 {
-    if (!mesh || !mesh->IsLoaded() || !mesh->SentToGPU() ||
+    if (!mesh || !mesh->IsLoaded() || !mesh->HasBeenSent() ||
         !mesh->GetVertexBuffer() || !mesh->GetIndexBuffer())
         return;
 
@@ -91,7 +91,7 @@ void RenderQueue::SubmitSoftBody(Mesh* mesh, Material* material, VkBuffer partic
                                  uint32_t particleCount, const Vec3i& gridSize,
                                  const Mat4& transform, bool isDebug)
 {
-    if (!mesh || !mesh->IsLoaded() || !mesh->SentToGPU()) return;
+    if (!mesh || !mesh->IsLoaded() || !mesh->HasBeenSent()) return;
     if (!material) return;
 
     RenderCommand cmd;
@@ -275,7 +275,7 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
     }
 
     auto blank = Engine::Get()->GetResourceManager()->GetBlankTexture();
-    if (!blank || !blank->SentToGPU())
+    if (!blank || !blank->HasBeenSent())
     {
         PrintError("ExecuteGBuffer: blank texture not ready");
         return;
@@ -334,7 +334,7 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
 
         auto PushTexture = [&](SafePtr<Texture>& tex, uint32_t binding)
         {
-            Texture* t = (tex && tex->SentToGPU()) ? tex.getPtr() : blank.get();
+            Texture* t = (tex && tex->HasBeenSent()) ? tex.getPtr() : blank.get();
             VkDescriptorImageInfo imgInfo{};
             imgInfo.sampler = t->GetBuffer()->GetSampler();
             imgInfo.imageView = t->GetBuffer()->GetImageView();

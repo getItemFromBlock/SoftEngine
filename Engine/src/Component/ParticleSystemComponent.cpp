@@ -292,7 +292,7 @@ void ParticleSystemComponent::OnUpdate(float deltaTime)
 
 void ParticleSystemComponent::OnRender(VulkanRenderer* renderer)
 {
-    if (!m_mesh || !m_mesh->IsLoaded() || !m_mesh->SentToGPU())
+    if (!m_mesh || !m_mesh->IsLoaded() || !m_mesh->HasBeenSent())
         return;
     
     if (!m_instanceBuffer || !m_material || !m_initialUploadComplete)

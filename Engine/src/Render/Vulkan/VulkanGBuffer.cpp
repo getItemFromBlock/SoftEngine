@@ -146,7 +146,8 @@ void VulkanGBuffer::DestroyAttachment(GBufferAttachment& attachment)
 
 void VulkanGBuffer::Cleanup()
 {
-    if (!m_device) return;
+    if (!m_device) 
+        return;
 
     if (m_sampler != VK_NULL_HANDLE)
     {

@@ -122,7 +122,7 @@ void Editor::Initialize()
 
 void Editor::Run()
 {
-    bool renderImGui = false;
+    bool renderImGui = true;
 
     auto* camera = m_engine->GetSceneHolder()->GetCurrentScene()->GetEditorCamera();
     auto* renderer = m_engine->GetRenderer();
