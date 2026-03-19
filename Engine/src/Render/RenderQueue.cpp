@@ -80,6 +80,7 @@ void RenderQueue::SubmitMeshRenderer(GameObject* gameObject, Mesh* mesh,
         cmd.roughnessTexture = material->GetTexture("roughnessSampler");
         cmd.metallicTexture = material->GetTexture("metalnessSampler");
         cmd.AOTexture = material->GetTexture("aoSampler");
+        cmd.heightTexture = material->GetTexture("heightSampler");
         cmd.GenerateSortKey();
 
         Submit(cmd);
@@ -212,6 +213,8 @@ void RenderQueue::Execute(VulkanRenderer* renderer)
 
 void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMaterial)
 {
+    const int NUM_TEXTURE = 6;
+    const int NUM_UBO = 2;
     if (!gBufferMaterial || !gBufferMaterial->GetShader()) return;
 
     auto* vulkanMaterial = gBufferMaterial->GetHandle();
@@ -227,8 +230,8 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
     {
         m_gBufferPools.resize(maxFrames);
         std::vector<VkDescriptorPoolSize> sizes = {
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 512 * 2},
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 512 * 5},
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 512 * NUM_UBO},
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 512 * NUM_TEXTURE},
         };
         for (uint32_t i = 0; i < maxFrames; ++i)
         {
@@ -265,6 +268,7 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
 
     auto* currentScene = Engine::Get()->GetSceneHolder()->GetCurrentScene();
     gBufferMaterial->SetAttribute("cameraUBO.viewProj", currentScene->GetCameraData().VP);
+    gBufferMaterial->SetAttribute("cameraUBO.cameraPos", currentScene->GetCameraData().position);
     gBufferMaterial->SendUBOValues(renderer);
 
     auto* camUBO = vulkanMaterial->GetUniformBuffer(0, 0);
@@ -277,7 +281,7 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
     auto blank = Engine::Get()->GetResourceManager()->GetBlankTexture();
     if (!blank || !blank->HasBeenSent())
     {
-        PrintError("ExecuteGBuffer: blank texture not ready");
+        // PrintError("ExecuteGBuffer: blank texture not ready");
         return;
     }
 
@@ -297,6 +301,7 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
         matData.roughnessFactor = cmd.material->GetFloatAttribute("material.roughnessFactor");
         matData.metalnessFactor = cmd.material->GetFloatAttribute("material.metalnessFactor");
         matData.aoFactor = cmd.material->GetFloatAttribute("material.aoFactor");
+        matData.heightScale = cmd.material->GetFloatAttribute("material.heightScale");
 
         uint32_t matOffset = matFrameBuffer.offset;
         matFrameBuffer.buffer->UpdateDataAtOffset(&matData, sizeof(MaterialData), matOffset, 0);
@@ -312,9 +317,9 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
         std::vector<VkWriteDescriptorSet> writes;
         std::vector<VkDescriptorBufferInfo> bufferInfos;
         std::vector<VkDescriptorImageInfo> imageInfos;
-        writes.reserve(7);
-        bufferInfos.reserve(2);
-        imageInfos.reserve(5);
+        writes.reserve(NUM_TEXTURE + NUM_UBO);
+        bufferInfos.reserve(NUM_UBO);
+        imageInfos.reserve(NUM_TEXTURE);
 
         auto PushUBO = [&](uint32_t binding, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize size)
         {
@@ -356,6 +361,7 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
         PushTexture(cmd.roughnessTexture, 4);
         PushTexture(cmd.metallicTexture, 5);
         PushTexture(cmd.AOTexture, 6);
+        PushTexture(cmd.heightTexture, 7);
 
         vkUpdateDescriptorSets(renderer->GetDevice()->GetDevice(),
                                static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);

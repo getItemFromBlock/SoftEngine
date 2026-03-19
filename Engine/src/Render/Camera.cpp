@@ -269,7 +269,8 @@ void Camera::CleanupPostprocessRenderTarget()
 
 void Camera::HandleResize(VulkanRenderer* renderer)
 {
-    
+    GetTransform()->SetDirty();
+    return; // To fix
     if (p_requestedSize == p_renderTargetSize || p_requestedSize.x <= 0 || p_requestedSize.y <= 0)
         return;
     if (!m_gBufferMaterial || !m_gBufferMaterial->HasBeenSent())
@@ -280,14 +281,13 @@ void Camera::HandleResize(VulkanRenderer* renderer)
     const uint32_t w = static_cast<uint32_t>(p_requestedSize.x);
     const uint32_t h = static_cast<uint32_t>(p_requestedSize.y);
 
-    m_renderTarget->Resize(renderer, w, h);
-
     m_gBuffer->Resize(w, h);
     m_compositionMaterial->SetAttribute("gPosition",         MakeGBufferTexture(m_positionTexture,            m_gBuffer->GetPosition(),         m_gBuffer->GetSampler(), w, h));
     m_compositionMaterial->SetAttribute("gNormal",           MakeGBufferTexture(m_normalTexture,              m_gBuffer->GetNormal(),           m_gBuffer->GetSampler(), w, h));
     m_compositionMaterial->SetAttribute("gAlbedo",           MakeGBufferTexture(m_albedoTexture,              m_gBuffer->GetAlbedo(),           m_gBuffer->GetSampler(), w, h));
     m_compositionMaterial->SetAttribute("gMetallicRoughnessAO", MakeGBufferTexture(m_metallicRoughnessTexture, m_gBuffer->GetMetallicRoughness(), m_gBuffer->GetSampler(), w, h));
 
+    m_renderTarget->Resize(renderer, w, h);
     if (m_postProcessRenderTarget)
     {
         m_postProcessRenderTarget->Resize(renderer, w, h);
