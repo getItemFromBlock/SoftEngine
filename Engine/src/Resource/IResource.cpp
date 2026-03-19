@@ -8,7 +8,7 @@ IResource::IResource(const std::filesystem::path& path)
 
 IResource::~IResource()
 {
-    PrintLog("Resource %s destroyed", p_path.generic_string().c_str());
+    // PrintLog("Resource %s destroyed", p_path.generic_string().c_str());
 }
 
 std::string IResource::GetName(bool extension) const

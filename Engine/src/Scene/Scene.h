@@ -20,6 +20,7 @@ class GameObject;
 struct CameraData
 {    
     Mat4 VP;
+    Mat4 view;
     Vec3f forward;
     Vec3f up;
     Vec3f right;
@@ -155,7 +156,8 @@ void Scene::RemoveComponent(GameObject* gameObject)
     std::scoped_lock lock(m_componentsMutex);
     
     auto it = m_components.find(ComponentRegister::GetComponentID<T>());
-    if (it == m_components.end()) return;
+    if (it == m_components.end()) 
+        return;
     
     auto& componentList = it->second;
     auto removeIt = std::find_if(componentList.begin(), componentList.end(),

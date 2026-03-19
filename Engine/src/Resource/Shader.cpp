@@ -165,15 +165,28 @@ bool Shader::Load(ResourceManager* resourceManager)
             }
         }
     }
-    auto topology = topology_from_string(parser["topology"].As<std::string>());
-    if (topology != Topology::None)
+    if (parser.HasKey("topology"))
     {
-        m_topology = topology;
+        auto topology = topology_from_string(parser["topology"].As<std::string>());
+        if (topology != Topology::None)
+        {
+            m_topology = topology;
+        }
     }
     if (parser.HasKey("depthTest"))
-        m_depthTestEnabled = parser["depthTest"].As<bool>();
+        m_depthTestEnabled = (parser["depthTest"].As<std::string>() == "true");
+    if (parser.HasKey("depthWrite"))
+        m_depthWriteEnabled = (parser["depthWrite"].As<std::string>() == "true");
     
-    
+    if (parser.HasKey("attachmentCount"))
+    {
+        size_t attachmentCount = parser["attachmentCount"].As<uint64_t>();
+        m_attachments.resize(attachmentCount);
+        for (size_t i = 0; i < attachmentCount; ++i)
+        {
+            m_attachments[i] = static_cast<VkFormat>(parser["attachment " + std::to_string(i)].As<int>());
+        }
+    }
     bool hasGraphics = (m_vertexShader && m_fragmentShader);
     bool hasCompute = (m_computeShader.valid());
 

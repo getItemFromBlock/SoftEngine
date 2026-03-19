@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <map>
 #include <set>
+#include <unordered_set>
+#include <shaderc/shaderc.hpp>
 
 #include "Debug/Log.h"
 
@@ -382,6 +384,7 @@ void SPV::ParseBlockVariable(const SpvReflectBlockVariable* var, UniformMember& 
 
     out.offset = var->offset;
     out.size = var->size;
+    out.stride = var->array.stride;
 
     if (var->type_description)
     {

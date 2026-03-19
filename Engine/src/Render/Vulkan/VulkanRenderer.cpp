@@ -136,6 +136,7 @@ void VulkanRenderer::WaitForGPU()
 
 void VulkanRenderer::Cleanup()
 {
+    m_renderQueueManager->Cleanup();
     m_lineRenderer.Cleanup();
     
     m_syncObjects.reset();
@@ -153,6 +154,14 @@ void VulkanRenderer::Cleanup()
 void VulkanRenderer::WaitUntilFrameFinished()
 {
     m_syncObjects->WaitForFence(m_currentFrame);
+}
+
+void VulkanRenderer::WaitForAllFrames()
+{
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        m_syncObjects->WaitForFence(i);
+    }
 }
 
 void VulkanRenderer::Update()
@@ -265,7 +274,8 @@ void VulkanRenderer::EndFrame()
 
     if (result != VK_SUCCESS)
     {
-        throw std::runtime_error("Failed to submit draw command buffer!");
+        PrintError("Failed to submit draw command buffer!");
+        return;
     }
 
     result = m_swapChain->PresentImage(m_device->GetPresentQueue(), m_imageIndex,
@@ -278,7 +288,8 @@ void VulkanRenderer::EndFrame()
     }
     else if (result != VK_SUCCESS)
     {
-        throw std::runtime_error("Failed to present swap chain image!");
+        PrintError("Failed to present swap chain image!");
+        return;
     }
 
     m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
@@ -522,10 +533,10 @@ bool VulkanRenderer::BindMaterial(Material* material)
     return true;
 }
 
-std::unique_ptr<VulkanTexture> VulkanRenderer::CreateTexture(const ImageLoader::Image& image)
+std::unique_ptr<VulkanTexture> VulkanRenderer::CreateTexture(const ImageLoader::Image& image, const TextureParam& param)
 {
     std::unique_ptr<VulkanTexture> texture = std::make_unique<VulkanTexture>();
-    texture->CreateFromImage(image, m_device.get(), m_commandPool.get(), m_device->GetGraphicsQueue());
+    texture->CreateFromImage(image, m_device.get(), m_commandPool.get(), m_device->GetGraphicsQueue(), param);
     return texture;
 }
 

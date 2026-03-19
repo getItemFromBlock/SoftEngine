@@ -4,5 +4,5 @@
 
 IComponent::~IComponent()
 {
-    PrintLog("Component %s destroyed", GetTypeName());
+    // PrintLog("Component %s destroyed", GetTypeName());
 }

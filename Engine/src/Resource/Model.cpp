@@ -9,6 +9,7 @@
 #include "Loader/OBJLoader.h"
 
 #include "Debug/Log.h"
+#include "Loader/FBXLoader.h"
 
 #include "Scene/GameObject.h"
 #include "Scene/Scene.h"
@@ -43,10 +44,53 @@ bool Model::Load(ResourceManager* resourceManager)
                 
                 if (mat.albedo.has_value())
                 {
-                    auto texture = resourceManager->Load<Texture>(p_path.parent_path() / mat.albedo.value());
+                    SafePtr<Texture> texture = resourceManager->Load<Texture>(p_path.parent_path() / mat.albedo.value());
                     matResource->SetAttribute("albedoSampler", texture);
                 }
-                matResource->SetAttribute("color", static_cast<Vec4f>(Color(mat.diffuse, mat.transparency)));
+                SafePtr<Texture> normal;
+                SafePtr<Texture> metallic;
+                SafePtr<Texture> roughness;
+                TextureParam param;
+                param.format = TextureFormat::UNORM;
+                if (mat.normal.has_value())
+                {
+                    normal = resourceManager->Load<Texture>(p_path.parent_path() / mat.normal.value());
+                    normal->SetTextureParameters(param);
+                }
+                else
+                {
+                    normal = resourceManager->GetDefaultNormal();
+                }
+                
+                if (mat.metallic.has_value())
+                {
+                    metallic = resourceManager->Load<Texture>(p_path.parent_path() / mat.metallic.value());
+                    matResource->SetAttribute("material.metalnessFactor", 1.f);
+                }
+                else
+                {
+                    metallic = resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png");
+                    matResource->SetAttribute("material.metalnessFactor", 0.f);
+                }
+                metallic->SetTextureParameters(param);
+                
+                if (mat.roughness.has_value())
+                {
+                    roughness = resourceManager->Load<Texture>(p_path.parent_path() / mat.roughness.value());
+                    matResource->SetAttribute("material.roughnessFactor", 1.f);
+                }
+                else
+                {
+                    roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png");
+                    matResource->SetAttribute("material.roughnessFactor", 0.f);
+                }
+                
+                roughness->SetTextureParameters(param);
+                matResource->SetAttribute("normalSampler", normal);
+                matResource->SetAttribute("metalnessSampler", metallic);
+                matResource->SetAttribute("roughnessSampler", roughness);
+                matResource->SetAttribute("aoSampler", resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png"));
+                matResource->SetAttribute("material.color", static_cast<Vec4f>(Color(mat.diffuse, mat.transparency)));
                 
                 materials[mat.name.generic_string()] = matResource;
             }
@@ -120,10 +164,10 @@ void Model::Unload()
 {
 }
 
-SafePtr<GameObject> Model::CreateGameObject(Model* model, Scene* scene)
+SafePtr<GameObject> Model::CreateGameObject(Model* model, Scene* scene, GameObject* parent)
 {
     auto resourceManager = Engine::Get()->GetResourceManager();
-    SafePtr<GameObject> go = scene->CreateGameObject();
+    SafePtr<GameObject> go = scene->CreateGameObject(parent);
     go->SetName(model->GetName());
 	size_t materialIndex = 0;
     for (size_t i = 0; i < model->m_meshes.size(); i++)

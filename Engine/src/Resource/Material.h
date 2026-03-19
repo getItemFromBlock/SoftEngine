@@ -1,8 +1,10 @@
 #pragma once
+#include <map>
 #include <memory>
 #include <set>
 #include <galaxymath/Maths.h>
 
+#include "CubeMap.h"
 #include "IResource.h"
 
 #include "Utils/Type.h"
@@ -22,6 +24,7 @@ template <typename T>
 struct Attribute
 {
     std::string uniformName;
+    int flag = 0; // flag for cubemap sending
     T value;
 
     Attribute() = default;
@@ -62,6 +65,13 @@ struct MaterialAttributes
     }
 };
 
+struct UBOWriteEntry
+{
+    const void* src; 
+    void* dst;
+    size_t size;
+};
+
 class Material : public IResource
 {
 public:
@@ -76,27 +86,37 @@ public:
     void SetShader(const SafePtr<Shader>& shader);
     SafePtr<Shader> GetShader() const { return m_shader; }
 
-    void SetAttribute(const std::string& name, float attribute);
-    void SetAttribute(const std::string& name, int attribute);
-    void SetAttribute(const std::string& name, const Vec2f& attribute);
-    void SetAttribute(const std::string& name, const Vec3f& attribute);
-    void SetAttribute(const std::string& name, const Vec4f& attribute);
-    void SetAttribute(const std::string& name, const SafePtr<Texture>& texture);
-    void SetAttribute(const std::string& name, const SafePtr<CubeMap>& cubeMap);
-    void SetAttribute(const std::string& name, const Mat4& attribute);
+    void SetAttribute(const std::string& name, float attribute, bool optional = false);
+    void SetAttribute(const std::string& name, int attribute, bool optional = false);
+    void SetAttribute(const std::string& name, const Vec2f& attribute, bool optional = false);
+    void SetAttribute(const std::string& name, const Vec3f& attribute, bool optional = false);
+    void SetAttribute(const std::string& name, const Vec4f& attribute, bool optional = false);
+    void SetAttribute(const std::string& name, const SafePtr<Texture>& texture, bool optional = false);
+    void SetAttribute(const std::string& name, const SafePtr<CubeMap>& cubeMap, bool optional = false, CubeMap::SampleMode samplerMode = CubeMap::SampleMode::Environment);
+    void SetAttribute(const std::string& name, const Mat4& attribute, bool optional = false);
 
     void SendAllValues(VulkanRenderer* renderer);
 
     bool Bind(VulkanRenderer* renderer);
 
     MaterialAttributes GetAttributes() const { return m_attributes; }
+    float GetFloatAttribute(const std::string& name) const;
+    int GetIntAttribute(const std::string& name) const;
+    Vec2f GetVec2Attribute(const std::string& name) const;
+    Vec3f GetVec3Attribute(const std::string& name) const;
+    Vec4f GetVec4Attribute(const std::string& name) const;
+
     VulkanMaterial* GetHandle() const { return m_handle.get(); }
 
+    SafePtr<Texture> GetTexture(const std::string& name) const;
+    void InitAttributes(const std::vector<UniformMember>& members, const std::string& uniformName, const std::string& rootName);
+    void SendUBOValues(VulkanRenderer* renderer);
 private:
     void OnShaderChanged();
-
     void SendTexture(Texture* texture, const Uniform& uniform) const;
     void SendCubeMap(CubeMap* cubeMap, const Uniform& uniform) const;
+
+    void BakeWriteEntries();
 
 private:
     std::unique_ptr<VulkanMaterial> m_handle;
@@ -108,4 +128,7 @@ private:
     std::unordered_map<std::string, uint32_t> m_attributesToSync;
 
     EventHandle m_shaderChangeEvent;
+
+    std::map<std::pair<uint32_t, uint32_t>, std::vector<uint8_t>> m_uniformScratch;
+    std::vector<UBOWriteEntry> m_writeEntries;
 };

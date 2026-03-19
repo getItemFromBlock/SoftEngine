@@ -23,6 +23,19 @@ Inspector::Inspector(Engine* engine, ImGuiHandler* handler) : EditorWindow(handl
 
 void Inspector::OnRender()
 {
+    if (m_selectedObject != UUID_INVALID)
+    {
+        Scene* scene = m_sceneHolder->GetCurrentScene();
+        auto object = scene->GetGameObject(m_selectedObject);
+        if (object)
+        {
+            auto renderer = Engine::Get()->GetRenderer();
+            auto pos = object->GetTransform()->GetWorldPosition();
+            renderer->AddLine(pos, pos + Vec3f::Right(), {Vec3f::Right(), 1});
+            renderer->AddLine(pos, pos + Vec3f::Up(), {Vec3f::Up(), 1});
+            renderer->AddLine(pos, pos + Vec3f::Forward(), {Vec3f::Forward() * -1, 1});
+        }
+    }
     if (ImGui::Begin("Inspector"))
     {
         if (m_selectedObject == UUID_INVALID)
@@ -771,19 +784,18 @@ void Inspector::RenderFVec4Property(const Property& property, const std::string&
 
 void Inspector::RenderQuatProperty(const Property& property, const std::string& id)
 {
-    const Quat* quatPtr = static_cast<const Quat*>(property.data);
-    Vec3f euler = quatPtr->ToEuler();
+    Quat quatPtr = *static_cast<const Quat*>(property.data);
+    Vec3f euler = quatPtr.ToEuler();
 
     if (ImGui::DragFloat3(id.c_str(), &euler.x, 0.5f))
     {
-        Quat newQuat = Quat::FromEuler(euler);
+        Quat newQuat = euler.ToQuaternion();
         UpdateProperty(property, &newQuat);
     }
 
     if (ImGui::IsItemHovered())
     {
-        ImGui::SetTooltip("Quat(%.3f, %.3f, %.3f, %.3f)",
-                          quatPtr->x, quatPtr->y, quatPtr->z, quatPtr->w);
+        ImGui::SetTooltip("Quat(%.3f, %.3f, %.3f, %.3f)", quatPtr.x, quatPtr.y, quatPtr.z, quatPtr.w);
     }
 }
 
@@ -841,9 +853,13 @@ void Inspector::RenderTextureProperty(const Property& property, const std::strin
         textureID = Editor::Get()->GetImGuiHandler()->GetTextureID(texture.getPtr());
     }
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2.f, 2.f));
-    if (ImGui::ImageButton(id.c_str(), textureID, ImVec2(64, 64)))
+    if (!property.readOnly && ImGui::ImageButton(id.c_str(), textureID, ImVec2(64, 64)))
     {
         ImGui::OpenPopup("Resource Popup");
+    }
+    else if (property.readOnly)
+    {
+        ImGui::Image(textureID, ImVec2(64, 64));
     }
     
     auto result = DisplayResourcePopup<Texture>();

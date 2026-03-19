@@ -302,3 +302,10 @@ VkDescriptorBufferInfo VulkanUniformBuffer::GetDescriptorInfo(size_t frame, VkDe
     return bufferInfo;
 }
 
+void VulkanUniformBuffer::UpdateDataAtOffset(const void* data, size_t size, uint32_t byteOffset,
+    uint32_t frameIndex) const
+{
+    uint8_t* dst = static_cast<uint8_t*>(m_mappedMemory[frameIndex]);
+    std::memcpy(dst + byteOffset, data, size);
+}
+

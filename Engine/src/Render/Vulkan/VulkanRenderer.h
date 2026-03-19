@@ -51,6 +51,7 @@ public:
     void Cleanup();
     
     void WaitUntilFrameFinished();
+    void WaitForAllFrames();
     bool BeginFrame();
     void Update();
     void EndFrame();
@@ -75,7 +76,7 @@ public:
     bool BindShader(Shader* shader);
     bool BindMaterial(Material* material);
     
-    std::unique_ptr<VulkanTexture> CreateTexture(const ImageLoader::Image& image);
+    std::unique_ptr<VulkanTexture> CreateTexture(const ImageLoader::Image& image, const TextureParam& param);
     std::unique_ptr<VulkanTexture> CreateCubeMap(const ImageLoader::HDRImage& image);
     std::unique_ptr<VulkanTexture> CreateCubeMapWithMips(int resolution, int mipLevels);
     std::unique_ptr<VulkanVertexBuffer> CreateVertexBuffer(const float* data, uint32_t size, uint32_t floatPerVertex);

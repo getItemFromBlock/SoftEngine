@@ -35,6 +35,7 @@ void EditorWindowManager::RenderMainDock()
     ImGui::SetNextWindowViewport(viewport->ID);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0, 0});
     window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
     window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
 
@@ -46,7 +47,7 @@ void EditorWindowManager::RenderMainDock()
     ImGui::Begin("DockSpace", nullptr, window_flags);
     ImGui::PopStyleColor();
 
-    ImGui::PopStyleVar(2);
+    ImGui::PopStyleVar(3);
 
     const ImGuiIO& io = ImGui::GetIO();
     if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
