@@ -270,7 +270,7 @@ void Camera::CleanupPostprocessRenderTarget()
 void Camera::HandleResize(VulkanRenderer* renderer)
 {
     GetTransform()->SetDirty();
-    return; // To fix
+    return; // To fix (Infinite Wait Idle until swapchain invalid ??)
     if (p_requestedSize == p_renderTargetSize || p_requestedSize.x <= 0 || p_requestedSize.y <= 0)
         return;
     if (!m_gBufferMaterial || !m_gBufferMaterial->HasBeenSent())
