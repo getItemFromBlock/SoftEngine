@@ -80,6 +80,28 @@ inline static std::unordered_map<std::string, ResourceType> extensionToResourceT
 
 #define DECLARE_RESOURCE_TYPE(T) DECLARE_RESOURCE_TYPE_PARENT(T, IResource)
 
+enum class ResourceState
+{
+    Unload = 0,
+    Loading,
+    Loaded,
+    SendingToGPU,
+    SentToGPU,
+};
+
+inline const char* to_string(ResourceState e)
+{
+    switch (e)
+    {
+    case ResourceState::Unload: return "Unload";
+    case ResourceState::Loading: return "Loading";
+    case ResourceState::Loaded: return "Loaded";
+    case ResourceState::SendingToGPU: return "SendingToGPU";
+    case ResourceState::SentToGPU: return "SentToGPU";
+    default: return "unknown";
+    }
+}
+
 class IResource : public IDescribe
 {
 public:
@@ -91,7 +113,7 @@ public:
 
     virtual bool Load(ResourceManager* resourceManager) = 0;
     virtual bool SendToGPU(VulkanRenderer* renderer) = 0;
-    virtual void Unload() = 0;
+    virtual void Unload();
 
     virtual void Describe(ClassDescriptor& descriptor) override
     {
@@ -104,20 +126,21 @@ public:
 
     virtual bool Exists() const { return File::Exist(p_path); }
     virtual std::string GetName(bool extension = false) const;
-    bool IsLoaded() const { return p_isLoaded; }
-    bool IsLoading() const { return p_isLoading; }
-    bool SentToGPU() const { return p_sendToGPU; }
+ 
+    bool IsLoading() const { return p_state == ResourceState::Loading; }
+    bool IsLoaded() const { return p_state >= ResourceState::Loaded; }
+    bool HasBeenSent() const { return p_state == ResourceState::SentToGPU; }
+    ResourceState GetState() const { return p_state; }
 
     void SetLoaded()
     {
-        p_isLoading = false;
-        p_isLoaded = true;
+        p_state = ResourceState::Loaded;
         EOnLoaded.Invoke();
     }
 
     void SetSentToGPU()
     {
-        p_sendToGPU = true;
+        p_state = ResourceState::SentToGPU;
         EOnSentToGPU.Invoke();
     }
 
@@ -131,7 +154,5 @@ protected:
     std::filesystem::path p_path;
     Core::UUID p_uuid;
 
-    std::atomic_bool p_isLoading;
-    std::atomic_bool p_isLoaded;
-    std::atomic_bool p_sendToGPU;
+    std::atomic<ResourceState> p_state{ResourceState::Unload};
 };

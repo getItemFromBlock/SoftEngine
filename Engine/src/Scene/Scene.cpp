@@ -13,13 +13,13 @@ Scene::Scene()
     SafePtr<GameObject> root = CreateGameObject();
     root->SetName("Root");
     m_rootUUID = root->GetUUID();
-    
-    m_lightManager = std::make_unique<LightManager>(this); 
+
+    m_lightManager = std::make_unique<LightManager>(this);
     m_editorCamera = std::make_unique<Camera>();
     m_editorCamera->GetTransform()->SetLocalPosition(Vec3f::Zero());
 
     m_editorCamera->GetTransform()->EOnUpdateModelMatrix += [this]()
-    {        
+    {
         m_editorCamera->UpdateFrustum();
 
         m_editorCameraData.frustum = m_editorCamera->GetFrustum();
@@ -30,7 +30,7 @@ Scene::Scene()
         m_editorCameraData.up = m_editorCamera->GetTransform()->GetUp();
         m_editorCameraData.position = m_editorCamera->GetTransform()->GetWorldPosition();
     };
-    
+
     auto size = Engine::Get()->GetWindow()->GetSize();
     m_editorCamera->InitializeRenderTarget(Engine::Get()->GetRenderer(), size.x, size.y);
 }
@@ -43,11 +43,11 @@ Scene::~Scene()
 
 void Scene::PreFrame(VulkanRenderer* renderer)
 {
+    m_editorCamera->HandleResize(renderer);
 }
 
 void Scene::OnRender(VulkanRenderer* renderer)
 {
-    m_editorCamera->HandleResize(renderer);
     m_editorCamera->Begin();
 
     {
@@ -80,14 +80,14 @@ void Scene::OnRender(VulkanRenderer* renderer)
     transparentQueue->Clear();
 
     auto lineRenderer = renderer->GetLineRenderer();
-    
+
     lineRenderer->Render(renderer, m_editorCameraData.VP);
 
     m_editorCamera->EndForwardPass();
 
     // Post-process
     m_editorCamera->End();
-    
+
     renderer->ClearColor();
 }
 
@@ -96,7 +96,7 @@ void Scene::OnUpdate(float deltaTime)
     UpdateCamera(deltaTime);
 
     std::scoped_lock lock(m_componentsMutex);
-    
+
     for (const std::vector<std::shared_ptr<IComponent>>& componentList : m_components | std::views::values)
     {
         for (const std::shared_ptr<IComponent>& component : componentList)
@@ -111,21 +111,21 @@ SafePtr<GameObject> Scene::CreateGameObject(GameObject* parent)
 {
     std::shared_ptr object = std::make_shared<GameObject>(*this);
     object->SetName("GameObject");
-    
+
     {
         std::scoped_lock lock(m_gameObjectsMutex);
         m_gameObjects.emplace(object->GetUUID(), object);
     }
-    
+
     SetParent(object.get(), parent ? parent : (m_rootUUID != UUID_INVALID ? GetRootObject().getPtr() : nullptr));
-    
+
     return object;
 }
 
 SafePtr<GameObject> Scene::GetGameObject(Core::UUID uuid) const
 {
     std::scoped_lock lock(m_gameObjectsMutex);
-    
+
     auto it = m_gameObjects.find(uuid);
     if (it != m_gameObjects.end())
         return it->second;
@@ -142,11 +142,11 @@ SafePtr<GameObject> Scene::GetRootObject() const
 void Scene::DestroyGameObject(GameObject* gameObject)
 {
     std::scoped_lock lock(m_gameObjectsMutex);
-    
+
     auto it = m_gameObjects.find(gameObject->GetUUID());
     if (it == m_gameObjects.end())
         return;
-    
+
     for (auto& childUUID : gameObject->m_childrenUUID)
     {
         GameObject* object = GetGameObject(childUUID).getPtr();
@@ -232,15 +232,15 @@ void Scene::RemoveComponent(Core::UUID compId)
     for (auto& componentList : m_components | std::views::values)
     {
         std::erase_if(componentList,
-            [compId](const std::shared_ptr<IComponent>& component)
-            {
-                if (component->GetUUID() == compId)
-                {
-                    component->OnDestroy();
-                    return true;
-                }
-                return false;
-            });
+                      [compId](const std::shared_ptr<IComponent>& component)
+                      {
+                          if (component->GetUUID() == compId)
+                          {
+                              component->OnDestroy();
+                              return true;
+                          }
+                          return false;
+                      });
     }
 }
 
@@ -254,31 +254,31 @@ void Scene::RemoveAllComponents(GameObject* gameObject)
     for (auto& componentList : m_components | std::views::values)
     {
         std::erase_if(componentList,
-            [gameObject](const std::shared_ptr<IComponent>& component)
-            {
-                if (component->GetGameObject() == gameObject)
-                {
-                    component->OnDestroy();
-                    return true;
-                }
-                return false;
-            });
+                      [gameObject](const std::shared_ptr<IComponent>& component)
+                      {
+                          if (component->GetGameObject() == gameObject)
+                          {
+                              component->OnDestroy();
+                              return true;
+                          }
+                          return false;
+                      });
     }
 }
 
-
 void Scene::UpdateCamera(float deltaTime) const
 {
+    static float speed = 10.f;
     static Vec2f startClickPos;
     static Vec2f prevMousePos = Vec2f::Zero();
     auto transform = m_editorCamera->GetTransform();
-    
+
     auto position = transform->GetLocalPosition();
     Window* window = Engine::Get()->GetWindow();
     Input& input = window->GetInput();
-    
+
     static bool isLooking = false;
-    
+
     auto stopLooking = [&]()
     {
         isLooking = false;
@@ -286,12 +286,12 @@ void Scene::UpdateCamera(float deltaTime) const
         window->SetMouseCursorMode(CursorMode::Normal);
         window->SetMouseCursorPosition(startClickPos);
     };
-    
+
     if (isLooking && input.IsMouseButtonReleased(MouseButton::BUTTON_2))
     {
         stopLooking();
     }
-    
+
     if (input.IsMouseButtonPressed(MouseButton::BUTTON_2))
     {
         isLooking = true;
@@ -299,42 +299,48 @@ void Scene::UpdateCamera(float deltaTime) const
         startClickPos = window->GetMouseCursorPosition();
         prevMousePos = startClickPos;
     }
-    
+
     if (!isLooking)
     {
         transform->OnUpdate(deltaTime);
         return;
     }
 
-    constexpr float speed = 10.f;
-    constexpr float freeLookSensitivity = 0.5f;
-    if (input.IsKeyDown(Key::W))
+    const float scroll = input.GetScrollY();
+    if (scroll != 0.f)
     {
-        position += transform->GetForward() * speed * deltaTime;
-    }
-    if (input.IsKeyDown(Key::S))
-    {
-        position -= transform->GetForward() * speed * deltaTime;
-    }
-    if (input.IsKeyDown(Key::A))
-    {
-        position -= transform->GetRight() * speed * deltaTime;
-    }
-    if (input.IsKeyDown(Key::D))
-    {
-        position += transform->GetRight() * speed * deltaTime;
-    }
-    if (input.IsKeyDown(Key::Q))
-    {
-        position -= transform->GetUp() * speed * deltaTime;
-    }
-    if (input.IsKeyDown(Key::E))
-    {
-        position += transform->GetUp() * speed * deltaTime;
+        constexpr float scrollSensitivity = 0.15f;
+        constexpr float minSpeed = 0.5f;
+        constexpr float maxSpeed = 500.f;
+        speed *= 1.f + scroll * scrollSensitivity;
+        speed = std::clamp(speed, minSpeed, maxSpeed);
     }
 
+    constexpr float freeLookSensitivity = 0.5f;
+
+    float speedMultiplier = 1.f;
+    if (input.IsKeyDown(Key::LEFT_SHIFT)) 
+        speedMultiplier = 3.f;
+    if (input.IsKeyDown(Key::LEFT_CONTROL)) 
+        speedMultiplier = 0.1f;
+
+    const float frameSpeed = speed * speedMultiplier * deltaTime;
+
+    if (input.IsKeyDown(Key::W)) 
+        position += transform->GetForward() * frameSpeed;
+    if (input.IsKeyDown(Key::S)) 
+        position -= transform->GetForward() * frameSpeed;
+    if (input.IsKeyDown(Key::A)) 
+        position -= transform->GetRight() * frameSpeed;
+    if (input.IsKeyDown(Key::D)) 
+        position += transform->GetRight() * frameSpeed;
+    if (input.IsKeyDown(Key::Q)) 
+        position -= transform->GetUp() * frameSpeed;
+    if (input.IsKeyDown(Key::E)) 
+        position += transform->GetUp() * frameSpeed;
+
     transform->SetLocalPosition(position);
-    
+
     const Vec2f mousePos = window->GetMouseCursorPosition();
     const Vec2f delta = mousePos - prevMousePos;
 
@@ -343,10 +349,7 @@ void Scene::UpdateCamera(float deltaTime) const
 
     prevMousePos = mousePos;
 
-    if (transform->GetUp().y < 0)
-    {
-        mouseX *= -1;
-    }
+    if (transform->GetUp().y < 0) mouseX *= -1;
 
     transform->Rotate(Vec3f::Up(), -mouseX, Space::World);
     transform->Rotate(Vec3f::Right(), -mouseY, Space::Local);

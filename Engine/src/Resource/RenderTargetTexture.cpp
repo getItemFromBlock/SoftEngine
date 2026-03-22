@@ -54,10 +54,8 @@ void RenderTargetTexture::CreateRenderTarget(VulkanRenderer* renderer, uint32_t 
         PrintError("Failed to create offscreen depth buffer");
     }
     
-    p_isLoaded = true;
-    p_sendToGPU = true;
-    EOnLoaded.Invoke();
-    EOnSentToGPU.Invoke();
+    SetLoaded();
+    SetSentToGPU();
 }
 
 void RenderTargetTexture::Resize(VulkanRenderer* renderer, uint32_t width, uint32_t height, VkFilter filter)

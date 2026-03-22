@@ -13,8 +13,7 @@ bool Mesh::Load(ResourceManager* resourceManager)
 
 void Mesh::CreateFrom(float *vertices, uint32_t verticeCount, uint32_t *indices, uint32_t indiceCount, bool isWeighted)
 {
-    p_isLoaded = false;
-    p_sendToGPU = true;
+    p_state = ResourceState::Loading;
     ASSERT(vertices != nullptr && verticeCount > 0 && (indiceCount == 0 || indices != nullptr));
     ASSERT(indiceCount % 3 == 0);
 
@@ -31,8 +30,9 @@ void Mesh::CreateFrom(float *vertices, uint32_t verticeCount, uint32_t *indices,
     }
 
     SendToGPU(Engine::Get()->GetRenderer());
-    p_isLoaded = true;
-    p_sendToGPU = true;
+    
+    SetLoaded();
+    SetSentToGPU();
 }
 
 bool Mesh::SendToGPU(VulkanRenderer* renderer)
@@ -77,6 +77,9 @@ bool Mesh::SendToGPU(VulkanRenderer* renderer)
 
 void Mesh::Unload()
 {
+    IResource::Unload();
+    m_vertexBuffer.reset();
+    m_indexBuffer.reset();
 }
 
 bool Mesh::Exists() const

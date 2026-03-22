@@ -37,7 +37,7 @@ struct RenderCommand
     uint32_t indexCount = 0;
     SafePtr<Texture> albedoTexture, normalTexture,
                      roughnessTexture, metallicTexture,
-                     AOTexture;
+                     AOTexture, heightTexture;
 
     // Soft body draw
     VkBuffer particleBuffer = VK_NULL_HANDLE;
@@ -98,7 +98,7 @@ private:
         float roughnessFactor;
         float metalnessFactor;
         float aoFactor;
-        float _pad1 = 0.f;
+        float heightScale;
     };
 
     QueueType m_type;

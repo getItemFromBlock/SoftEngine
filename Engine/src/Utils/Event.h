@@ -13,8 +13,9 @@
 
 using EventHandle = uint64_t;
 
-template<typename... Args>
-class ENGINE_API Event {
+template <typename... Args>
+class ENGINE_API Event
+{
 public:
     using Callback = std::function<void(Args...)>;
 
@@ -29,7 +30,7 @@ public:
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         EventHandle id = ++m_nextId;
-        m_callbacks.push_back({ id, std::move(callback) });
+        m_callbacks.push_back({id, std::move(callback)});
         return id;
     }
 
@@ -64,11 +65,12 @@ public:
 
     EventHandle operator+=(Callback callback)
     {
-        return Bind(callback);    
+        return Bind(callback);
     }
-    
+
 protected:
-    struct Entry {
+    struct Entry
+    {
         EventHandle id;
         Callback callback;
     };
@@ -78,28 +80,32 @@ protected:
     mutable std::mutex m_mutex;
 };
 
-// Event that run only once (when bind, call the method if already call)
-class ENGINE_API OnceEvent : public Event<> {
+class ENGINE_API OnceEvent : public Event<>
+{
 public:
     using Callback = std::function<void()>;
 
     EventHandle Bind(Callback callback) override
     {
-        bool callNow = false;
         EventHandle id = 0;
+        bool callNow = false;
 
         {
             std::lock_guard<std::mutex> lock(m_mutex);
-            if (!m_called) {
-                id = ++m_nextId;
-                m_callbacks.push_back({ id, std::move(callback) });
-            } else {
+            id = ++m_nextId;
+
+            m_callbacks.push_back({id, callback});
+
+            if (m_called)
+            {
                 callNow = true;
             }
         }
 
         if (callNow)
+        {
             callback();
+        }
 
         return id;
     }
@@ -112,19 +118,27 @@ public:
 
     void Invoke() override
     {
-        std::vector<Entry> copy;
+        std::vector<Callback> toCall;
         {
             std::lock_guard<std::mutex> lock(m_mutex);
             if (m_called)
+            {
                 return;
+            }
 
             m_called = true;
-            copy = m_callbacks;
-            m_callbacks.clear();
+
+            toCall.reserve(m_callbacks.size());
+            for (const auto& entry : m_callbacks)
+            {
+                toCall.push_back(entry.callback);
+            }
         }
 
-        for (auto& e : copy)
-            e.callback();
+        for (auto& cb : toCall)
+        {
+            cb();
+        }
     }
 
     void Reset()
@@ -134,5 +148,14 @@ public:
     }
 
 private:
+    struct Entry
+    {
+        EventHandle id;
+        Callback callback;
+    };
+
+    std::mutex m_mutex;
+    std::vector<Entry> m_callbacks;
+    EventHandle m_nextId = 0;
     bool m_called = false;
 };

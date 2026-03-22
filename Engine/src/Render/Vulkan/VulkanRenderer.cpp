@@ -706,8 +706,6 @@ void VulkanRenderer::RecreateSwapChain()
     // Cleanup old swap chain resources
     m_swapChain->Cleanup();
     m_depthBuffer->Cleanup();
-    
-    // Engine::Get()->GetSceneHolder()->GetCurrentScene()->GetEditorCamera()->SetRenderTargetSize(windowSize.x, windowSize.y);
 
     // Recreate swap chain
     if (!m_swapChain->Initialize(m_device.get(), m_context->GetSurface(), m_window))

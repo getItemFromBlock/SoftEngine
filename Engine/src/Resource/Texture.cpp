@@ -27,6 +27,8 @@ bool Texture::SendToGPU(VulkanRenderer* renderer)
 
 void Texture::Unload()
 {
+    IResource::Unload();
+    
     m_buffer.reset();
     if (m_image.data)
     {
@@ -45,17 +47,11 @@ void Texture::Describe(ClassDescriptor& descriptor)
 
 void Texture::CreateFromBuffer(const GBufferAttachment& attachment, VkSampler sampler, uint32_t width, uint32_t height)
 {
-    m_buffer.reset();
-    if (!m_buffer)
-        m_buffer = std::make_unique<VulkanTexture>();
-    
+    m_buffer = std::make_unique<VulkanTexture>();
     m_buffer->CreateFromGBuffer(attachment, sampler, width, height);
 
-    p_isLoaded = true;
-    EOnLoaded.Invoke();
-    
-    p_sendToGPU = true;
-    EOnSentToGPU.Invoke();
+    SetLoaded();
+    SetSentToGPU();
 }
 
 void Texture::CreateFromData(const ImageLoader::Image& image)
@@ -69,9 +65,9 @@ void Texture::SetTextureParameters(TextureParam param)
         return;
     m_parameters = param;
 
-    if (p_sendToGPU && m_buffer)
+    if (HasBeenSent() && m_buffer)
     {
-        p_sendToGPU = false;
+        p_state = ResourceState::Loading;
         EOnSentToGPU.Reset();
         
         m_buffer.reset();
@@ -83,6 +79,7 @@ void Texture::SetTextureParameters(TextureParam param)
             return;
         }
 
+        p_state = ResourceState::Loaded;
         auto resourceManager = Engine::Get()->GetResourceManager();
         resourceManager->AddResourceToSend(GetUUID());
     }

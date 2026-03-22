@@ -67,23 +67,25 @@ void Editor::Initialize()
         go->GetTransform()->SetLocalPosition({0, 0, -5});
     });
     // model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Sponza/sponza.obj");
-    model = resourceManager->Load<Model>(RESOURCE_PATH"models/Sphere.obj");
+    model = resourceManager->Load<Model>(RESOURCE_PATH"models/Plane.obj");
 
     model->EOnLoaded.Bind([model, this, currentScene, resourceManager]()
     {
         auto sphereMaterial = resourceManager->CreateMaterial("SphereMat", resourceManager->GetDefaultShader());
 
-        auto albedo = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/albedo.png");
-        auto normal = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/normal.png");
-        auto metallic = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/metallic.png");
-        auto roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/roughness.png");
-        auto ao = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/ao.png");
+        auto albedo = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/toy_box_diffuse.png");
+        auto normal = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/toy_box_normal.png");
+        auto metallic = resourceManager->Load<Texture>(RESOURCE_PATH"textures/blank.png");
+        auto roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/blank.png");
+        auto ao = resourceManager->Load<Texture>(RESOURCE_PATH"textures/blank.png");
+        auto height = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/toy_box_disp.png");
 
         auto unorm = TextureParam{.format = TextureFormat::UNORM};
         normal->SetTextureParameters(unorm);
         roughness->SetTextureParameters(unorm);
         metallic->SetTextureParameters(unorm);
         ao->SetTextureParameters(unorm);
+        height->SetTextureParameters(unorm);
 
         sphereMaterial->SetAttribute("material.color", Vec4f::One());
         sphereMaterial->SetAttribute("albedoSampler", albedo);
@@ -91,9 +93,11 @@ void Editor::Initialize()
         sphereMaterial->SetAttribute("roughnessSampler", roughness);
         sphereMaterial->SetAttribute("metalnessSampler", metallic);
         sphereMaterial->SetAttribute("aoSampler", ao);
+        sphereMaterial->SetAttribute("heightSampler", height);
         sphereMaterial->SetAttribute("material.roughnessFactor", 1.f);
         sphereMaterial->SetAttribute("material.metalnessFactor", 1.f);
         sphereMaterial->SetAttribute("material.aoFactor", 1.f);
+        sphereMaterial->SetAttribute("material.heightScale", 0.1f);
 
         Vec3f position = {-4, 0, 0};
         auto go = Model::CreateGameObject(model.getPtr(), currentScene);
@@ -122,7 +126,7 @@ void Editor::Initialize()
 
 void Editor::Run()
 {
-    bool renderImGui = false;
+    bool renderImGui = true;
 
     auto* camera = m_engine->GetSceneHolder()->GetCurrentScene()->GetEditorCamera();
     auto* renderer = m_engine->GetRenderer();

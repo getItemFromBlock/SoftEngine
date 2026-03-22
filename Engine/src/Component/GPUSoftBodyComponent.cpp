@@ -211,7 +211,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
 
 void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
 {
-    if (!m_mesh || !m_mesh->IsLoaded() || !m_mesh->SentToGPU()) 
+    if (!m_mesh || !m_mesh->IsLoaded() || !m_mesh->HasBeenSent()) 
         return;
     if (!m_particleBuffer || !m_material) 
         return;

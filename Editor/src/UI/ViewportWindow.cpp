@@ -63,6 +63,11 @@ void ViewportWindow::OnRender()
                 width = height * aspectRatio;
             }
         }
+        if (width <= 0 || height <= 0)
+        {
+            ImGui::End();
+            return;
+        }
         const float xPos = (ImGui::GetContentRegionAvail().x - width) * 0.5f;
         const float yPos = (ImGui::GetContentRegionAvail().y - height) * 0.5f;
 
@@ -77,7 +82,8 @@ void ViewportWindow::OnRender()
 
         auto renderTargetSize = m_camera->GetRenderTargetSize();
 
-        if (renderTargetSize != Vec2i(static_cast<int32_t>(width), static_cast<int32_t>(height)) && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+        if (renderTargetSize != Vec2i(static_cast<int32_t>(width), static_cast<int32_t>(height)) && !ImGui::IsMouseDown(
+            ImGuiMouseButton_Left))
         {
             m_camera->SetRenderTargetSize(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
         }

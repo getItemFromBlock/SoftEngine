@@ -203,8 +203,8 @@ bool Shader::Load(ResourceManager* resourceManager)
 
 bool Shader::SendToGPU(VulkanRenderer* renderer)
 {
-    if (m_graphic && (!m_vertexShader->SentToGPU() || !m_fragmentShader->SentToGPU()) 
-        || !m_graphic && (!m_computeShader->SentToGPU()))
+    if (m_graphic && (!m_vertexShader->HasBeenSent() || !m_fragmentShader->HasBeenSent()) 
+        || !m_graphic && (!m_computeShader->HasBeenSent()))
     {
         return false;
     }
@@ -217,6 +217,10 @@ bool Shader::SendToGPU(VulkanRenderer* renderer)
 
 void Shader::Unload()
 {
+    IResource::Unload();
+    m_vertexShader.reset();
+    m_fragmentShader.reset();
+    m_computeShader.reset();
 }
 
 void Shader::SendTexture(UBOBinding binding, Texture* texture, VulkanRenderer* renderer)
