@@ -66,6 +66,28 @@ std::vector<MTLLoader::Material> MTLLoader::Load(const std::filesystem::path& pa
             iss >> albedo;
             currentMaterial.albedo = albedo;
         }
+        else if (token == "map_Bump")
+        {
+            std::filesystem::path normal;
+            std::string arg;
+            float value;
+            iss >> arg;
+            iss >> value;
+            iss >> normal;
+            currentMaterial.normal = normal;
+        }
+        else if (token == "map_Pr")
+        {
+            std::filesystem::path roughness;
+            iss >> roughness;
+            currentMaterial.roughness = roughness;
+        }
+        else if (token == "map_Pm")
+        {
+            std::filesystem::path metallic;
+            iss >> metallic;
+            currentMaterial.metallic = metallic;
+        }
     }
     if (!currentMaterial.name.empty())
         materials.push_back(currentMaterial);

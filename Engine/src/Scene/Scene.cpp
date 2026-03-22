@@ -14,7 +14,7 @@ Scene::Scene()
     root->SetName("Root");
     m_rootUUID = root->GetUUID();
     
-    m_lightManager = std::make_unique<LightManager>(); 
+    m_lightManager = std::make_unique<LightManager>(this); 
     m_editorCamera = std::make_unique<Camera>();
     m_editorCamera->GetTransform()->SetLocalPosition(Vec3f::Zero());
 
@@ -24,6 +24,7 @@ Scene::Scene()
 
         m_editorCameraData.frustum = m_editorCamera->GetFrustum();
         m_editorCameraData.VP = m_editorCamera->GetViewProjectionMatrix();
+        m_editorCameraData.view = m_editorCamera->GetViewMatrix();
         m_editorCameraData.forward = m_editorCamera->GetTransform()->GetForward();
         m_editorCameraData.right = m_editorCamera->GetTransform()->GetRight();
         m_editorCameraData.up = m_editorCamera->GetTransform()->GetUp();
@@ -40,26 +41,51 @@ Scene::~Scene()
     DestroyGameObject(root);
 }
 
+void Scene::PreFrame(VulkanRenderer* renderer)
+{
+}
+
 void Scene::OnRender(VulkanRenderer* renderer)
 {
+    m_editorCamera->HandleResize(renderer);
     m_editorCamera->Begin();
-    m_editorCamera->RenderSkybox(renderer);
-    std::scoped_lock lock(m_componentsMutex);
-    
-    for (const std::vector<std::shared_ptr<IComponent>>& componentList : m_components | std::views::values)
+
     {
-        for (const std::shared_ptr<IComponent>& component : componentList)
+        std::scoped_lock lock(m_componentsMutex);
+        for (const std::vector<std::shared_ptr<IComponent>>& componentList : m_components | std::views::values)
         {
-            if (component->IsEnable())
-                component->OnRender(renderer);
+            for (const std::shared_ptr<IComponent>& component : componentList)
+            {
+                if (component->IsEnable())
+                    component->OnRender(renderer);
+            }
         }
     }
+
+    RenderQueueManager* renderQueueManager = renderer->GetRenderQueueManager();
+    RenderQueue* opaqueQueue = renderQueueManager->GetOpaqueQueue();
+    opaqueQueue->Sort();
+    opaqueQueue->ExecuteGBuffer(renderer, m_editorCamera->GetGBufferMaterial().getPtr());
+    opaqueQueue->Clear();
+
+    m_editorCamera->EndGeometry();
+
+    // Forward pass: skybox + transparent objects (or forward shaders) drawn on top
+    m_editorCamera->BeginForwardPass();
+    m_editorCamera->RenderSkybox(renderer);
+
+    RenderQueue* transparentQueue = renderQueueManager->GetTransparentQueue();
+    transparentQueue->Sort();
+    transparentQueue->Execute(renderer);
+    transparentQueue->Clear();
+
+    auto lineRenderer = renderer->GetLineRenderer();
     
-    auto renderQueueManager = renderer->GetRenderQueueManager();
-    renderQueueManager->SortAll();
-    renderQueueManager->ExecuteAll(renderer);
-    renderQueueManager->ClearAll();
-    renderer->GetLineRenderer()->Render(renderer, m_editorCameraData.VP);
+    lineRenderer->Render(renderer, m_editorCameraData.VP);
+
+    m_editorCamera->EndForwardPass();
+
+    // Post-process
     m_editorCamera->End();
     
     renderer->ClearColor();

@@ -10,8 +10,7 @@ VulkanDescriptorPool::~VulkanDescriptorPool()
     Cleanup();
 }
 
-bool VulkanDescriptorPool::Initialize(VulkanDevice* device, const std::vector<VkDescriptorPoolSize>& poolSizes,
-                                      uint32_t maxSets)
+bool VulkanDescriptorPool::Initialize(VulkanDevice* device, const std::vector<VkDescriptorPoolSize>& poolSizes, uint32_t maxSets, VkDescriptorPoolCreateFlags flags)
 {
     m_device = device;
 
@@ -20,7 +19,7 @@ bool VulkanDescriptorPool::Initialize(VulkanDevice* device, const std::vector<Vk
     poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     poolInfo.pPoolSizes = poolSizes.data();
     poolInfo.maxSets = maxSets;
-    poolInfo.flags = 0;
+    poolInfo.flags = flags;
 
     if (vkCreateDescriptorPool(m_device->GetDevice(), &poolInfo, nullptr, &m_descriptorPool) != VK_SUCCESS)
     {
@@ -30,6 +29,7 @@ bool VulkanDescriptorPool::Initialize(VulkanDevice* device, const std::vector<Vk
     return true;
 }
 
+
 void VulkanDescriptorPool::Cleanup()
 {
     if (m_descriptorPool != VK_NULL_HANDLE && m_device)
@@ -37,4 +37,27 @@ void VulkanDescriptorPool::Cleanup()
         vkDestroyDescriptorPool(m_device->GetDevice(), m_descriptorPool, nullptr);
         m_descriptorPool = VK_NULL_HANDLE;
     }
+}
+
+VkDescriptorSet VulkanDescriptorPool::Allocate(VkDescriptorSetLayout layout)
+{
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = m_descriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &layout;
+
+    VkDescriptorSet set = VK_NULL_HANDLE;
+    if (vkAllocateDescriptorSets(m_device->GetDevice(), &allocInfo, &set) != VK_SUCCESS)
+    {
+        PrintError("Failed to allocate descriptor set from pool!");
+        return VK_NULL_HANDLE;
+    }
+    return set;
+}
+
+void VulkanDescriptorPool::Reset()
+{
+    if (m_descriptorPool != VK_NULL_HANDLE && m_device)
+        vkResetDescriptorPool(m_device->GetDevice(), m_descriptorPool, 0);
 }

@@ -77,7 +77,7 @@ void ViewportWindow::OnRender()
 
         auto renderTargetSize = m_camera->GetRenderTargetSize();
 
-        if (renderTargetSize != Vec2i(static_cast<int32_t>(width), static_cast<int32_t>(height)))
+        if (renderTargetSize != Vec2i(static_cast<int32_t>(width), static_cast<int32_t>(height)) && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
         {
             m_camera->SetRenderTargetSize(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
         }

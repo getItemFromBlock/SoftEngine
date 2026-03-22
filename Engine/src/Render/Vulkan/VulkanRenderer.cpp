@@ -136,6 +136,7 @@ void VulkanRenderer::WaitForGPU()
 
 void VulkanRenderer::Cleanup()
 {
+    m_renderQueueManager->Cleanup();
     m_lineRenderer.Cleanup();
     
     m_syncObjects.reset();
@@ -155,6 +156,14 @@ void VulkanRenderer::WaitUntilFrameFinished()
     m_syncObjects->WaitForFence(m_currentFrame);
 }
 
+void VulkanRenderer::WaitForAllFrames()
+{
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        m_syncObjects->WaitForFence(i);
+    }
+}
+
 void VulkanRenderer::Update()
 {
 }
@@ -164,6 +173,7 @@ bool VulkanRenderer::BeginFrame()
     p_triangleCount = 0;
     p_vertexCount = 0;
     m_imageIndex = 0;
+    m_blittedToSwapchain = false;
     
     VkResult result = m_swapChain->AcquireNextImage(
         m_syncObjects->GetImageAvailableSemaphore(m_currentFrame),
@@ -207,39 +217,41 @@ bool VulkanRenderer::MultiThreadSendToGPU()
 void VulkanRenderer::EndFrame()
 {
     auto commandBuffer = m_commandPool->GetCommandBuffer(m_currentFrame);
-    
-    m_renderPass->End(commandBuffer);
-    
-    VkImageMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = m_swapChain->GetImages()[m_imageIndex];
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 1;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
-    barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    barrier.dstAccessMask = 0;
 
-    vkCmdPipelineBarrier(
-        commandBuffer,
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier
-    );
+    if (!m_blittedToSwapchain)
+    {
+        m_renderPass->End(commandBuffer);
+
+        VkImageMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = m_swapChain->GetImages()[m_imageIndex];
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+        barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        barrier.dstAccessMask = 0;
+
+        vkCmdPipelineBarrier(
+            commandBuffer,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &barrier
+        );
+    }
 
     auto& mutex = m_commandPool->GetMutex();
     mutex.unlock();
     m_commandPool->EndRecording(m_currentFrame);
 
-    // Submit command buffer
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
@@ -256,6 +268,7 @@ void VulkanRenderer::EndFrame()
     VkSemaphore signalSemaphores[] = {m_syncObjects->GetRenderFinishedSemaphore(m_imageIndex)};
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
+
     VkResult result;
     {
         std::scoped_lock lock(*m_device->GetGraphicsQueue().mutex);
@@ -265,7 +278,8 @@ void VulkanRenderer::EndFrame()
 
     if (result != VK_SUCCESS)
     {
-        throw std::runtime_error("Failed to submit draw command buffer!");
+        PrintError("Failed to submit draw command buffer!");
+        return;
     }
 
     result = m_swapChain->PresentImage(m_device->GetPresentQueue(), m_imageIndex,
@@ -278,7 +292,8 @@ void VulkanRenderer::EndFrame()
     }
     else if (result != VK_SUCCESS)
     {
-        throw std::runtime_error("Failed to present swap chain image!");
+        PrintError("Failed to present swap chain image!");
+        return;
     }
 
     m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
@@ -522,10 +537,10 @@ bool VulkanRenderer::BindMaterial(Material* material)
     return true;
 }
 
-std::unique_ptr<VulkanTexture> VulkanRenderer::CreateTexture(const ImageLoader::Image& image)
+std::unique_ptr<VulkanTexture> VulkanRenderer::CreateTexture(const ImageLoader::Image& image, const TextureParam& param)
 {
     std::unique_ptr<VulkanTexture> texture = std::make_unique<VulkanTexture>();
-    texture->CreateFromImage(image, m_device.get(), m_commandPool.get(), m_device->GetGraphicsQueue());
+    texture->CreateFromImage(image, m_device.get(), m_commandPool.get(), m_device->GetGraphicsQueue(), param);
     return texture;
 }
 

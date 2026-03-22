@@ -10,10 +10,12 @@ void LightComponent::OnCreate()
 
 void LightComponent::OnDestroy()
 {
-    IComponent::OnDestroy();
+    auto lightManager = p_gameObject->GetScene()->GetLightManager();
+    lightManager->RemoveLight(this);
 }
 
 void LightComponent::Describe(ClassDescriptor& d)
 {
-    d.AddVec4f("Color", m_color);
+    d.AddColor3("Color", m_color);
+    d.AddFloat("Intensity", m_intensity);
 }

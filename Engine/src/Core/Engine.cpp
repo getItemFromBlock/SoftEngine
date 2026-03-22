@@ -60,9 +60,10 @@ bool Engine::Initialize(EngineDesc desc)
     {
         m_resourceManager->LoadDefaultTexture(RESOURCE_PATH"/textures/debug.jpeg");
         m_resourceManager->LoadBlankTexture(RESOURCE_PATH"/textures/blank.png");
-        m_resourceManager->LoadDefaultCubeMap(RESOURCE_PATH"/envMap/clearNight.hdr");
+        m_resourceManager->LoadDefaultNormal(RESOURCE_PATH"/textures/defaultNormal.png");
+        m_resourceManager->LoadDefaultCubeMap(RESOURCE_PATH"/envMap/newport_loft.hdr");
         m_resourceManager->LoadBlankCubeMap(RESOURCE_PATH"/envMap/blank.hdr");
-        m_resourceManager->LoadDefaultShader(RESOURCE_PATH"/shaders/PBR/PBR.shader");
+        m_resourceManager->LoadDefaultShader(RESOURCE_PATH"/shaders/Deferred/gBuffer.shader");
         m_resourceManager->LoadDefaultMaterial(RESOURCE_PATH"/materials/pbr.mat");
 
         SafePtr<Shader> unlit = m_resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/Unlit/Unlit.shader");
@@ -85,9 +86,10 @@ bool Engine::Initialize(EngineDesc desc)
     return true;
 }
 
-bool Engine::BeginFrame()
+bool Engine::BeginFrame() const
 {
     m_resourceManager->UpdateResourceToSend();
+    m_sceneHolder->PreFrame(m_renderer.get());
     m_renderer->WaitUntilFrameFinished();
     if (!m_renderer->BeginFrame())
         return false;

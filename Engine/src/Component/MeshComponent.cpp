@@ -32,17 +32,12 @@ void MeshComponent::OnUpdate(float deltaTime)
     if (!m_visible)
         return;
     Mat4 VP = cameraData.VP;
-    auto lightManager = GetGameObject()->GetScene()->GetLightManager();
-    auto camera = GetGameObject()->GetScene()->GetEditorCamera();
 
     for (auto& material : m_materials)
     {
         if (!material)
             continue;
-        lightManager->SendLights(material.getPtr());
-        material->SetAttribute("debugCubemap", camera->GetSkybox());
-        material->SetAttribute("viewProj", VP);
-        material->SetAttribute("camPos", cameraData.position);
+        material->SetAttribute("cameraUBO.viewProj", VP);
     }
 }
 
@@ -50,40 +45,13 @@ void MeshComponent::OnRender(VulkanRenderer* renderer)
 {
     if (!m_visible)
         return;
-#ifdef RENDER_QUEUE
+    
     auto queue = renderer->GetRenderQueueManager()->GetOpaqueQueue();
-    queue->SubmitMeshRenderer(GetGameObject(), this->m_mesh.getPtr(), m_materials);
-#else
-    if (!m_mesh || !m_mesh->IsLoaded() || !m_mesh->SentToGPU() || !m_mesh->GetVertexBuffer() || !m_mesh->GetIndexBuffer())
-        return;
-
-    auto transformComponent = p_gameObject->GetComponent<TransformComponent>();
-    auto model = transformComponent->GetWorldMatrix();
-    // Render each submesh with its corresponding material
-    size_t materialCount = m_materials.size();
-        
-    auto subMeshes = m_mesh->GetSubMeshes();
-    for (size_t i = 0; i < subMeshes.size(); ++i)
+    if (!m_materials.empty() && m_materials[0]->GetShader().getPtr() != Engine::Get()->GetResourceManager()->GetDefaultShader().get())
     {
-        size_t materialIndex = i % materialCount;
-        auto& material = m_materials[materialIndex];
-            
-        auto shader = material->GetShader().getPtr();
-        if (!renderer->BindShader(shader))
-            continue;
-        if (!renderer->BindMaterial(material.getPtr()))
-            continue;
-
-        renderer->BindVertexBuffers(m_mesh->GetVertexBuffer(), m_mesh->GetIndexBuffer());
-
-        PushConstant pushConstant = shader->GetPushConstants()[ShaderType::Vertex];
-        renderer->SendPushConstants(&model, sizeof(model), shader, pushConstant);
-            
-        renderer->DrawVertexSubMesh(m_mesh->GetIndexBuffer(), 
-                                   subMeshes[i].startIndex, 
-                                   subMeshes[i].count);
+        queue = renderer->GetRenderQueueManager()->GetTransparentQueue(); // Use transparent queue to render in forward pass
     }
-#endif
+    queue->SubmitMeshRenderer(GetGameObject(), m_mesh.getPtr(), m_materials);
 }
 
 void MeshComponent::SetMesh(const SafePtr<Mesh>& mesh)
@@ -104,8 +72,27 @@ void MeshComponent::RemoveMaterial(const SafePtr<Material>& material)
     }));
 }
 
+void MeshComponent::SetMaterial(size_t index, const SafePtr<Material>& material)
+{
+    if (index >= m_materials.size())
+    {
+        m_materials.resize(index + 1);
+    }
+    m_materials[index] = material;
+}
+
 std::vector<SafePtr<Material>> MeshComponent::GetMaterials() const
 {
     return m_materials;
+}
+
+SafePtr<Material> MeshComponent::GetMaterial(size_t index)
+{
+    if (index >= m_materials.size())
+    {
+        PrintWarning("index is bigger than material list size");
+        return {};
+    }
+    return m_materials[index];
 }
 

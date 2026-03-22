@@ -44,7 +44,7 @@ public:
 
 private:
     void RebuildBuffers();
-    void UpdateCameraBuffer(VulkanRenderer* renderer, const Mat4& viewProj);
+    void UpdateCameraBuffer(VulkanRenderer* renderer, const Mat4& viewProj) const;
 
 private:
     VulkanRenderer* m_renderer = nullptr;

@@ -14,18 +14,17 @@ public:
     void OnCreate() override;
     void OnUpdate(float deltaTime) override;
 
-private:
-    bool m_bool = false;
-    float m_float = 60.f;
-    int m_int = 0;
-    Vec2f m_vec2f;
-    Vec3f m_vec3f;
-    Vec4f m_vec4f;
-    Quat m_quat;
-    Vec3f m_color3;
-    Vec4f m_color4;
-    SafePtr<Texture> m_texture;
-    SafePtr<CubeMap> m_cubeMap;
-    SafePtr<Mesh> m_mesh;
+    void SetOffset(float offset) { m_offset = offset; }
+    void SetSpeed(float speed) { m_speed = speed; }
     
+    void AttachToCamera(bool enable) { m_attachToCamera = enable;}
+private:
+    float m_offset = 0.f;
+    float m_speed = 1.f;
+    float m_colorSpeed = 25.f;
+    
+    bool m_attachToCamera = false;
+    
+    Vec3f m_startPosition = Vec3f::Zero();
+    float m_time = 0.f;
 };

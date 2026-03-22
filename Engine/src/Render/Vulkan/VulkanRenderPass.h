@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 
+class VulkanGBuffer;
 class VulkanDevice;
 
 class VulkanRenderPass
@@ -22,7 +23,9 @@ public:
     VkFormat GetColorFormat() const;
     VkFormat GetDepthFormat() const;
 
-    VkRenderPass GetRenderPass() const { return VK_NULL_HANDLE; }
+    void BeginGBuffer(VkCommandBuffer commandBuffer, VulkanGBuffer* gBuffer, VkImageView depthImageView, VkExtent2D extent);
+    void EndGBuffer(VkCommandBuffer commandBuffer, VulkanGBuffer* gBuffer);
+    void BeginComposition(VkCommandBuffer commandBuffer, VkImageView swapchainImageView, VkExtent2D extent);
 
 private:
     VulkanDevice* m_device = nullptr;

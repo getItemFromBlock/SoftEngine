@@ -119,9 +119,9 @@ void LineRenderer::RebuildBuffers()
 }
 
 
-void LineRenderer::UpdateCameraBuffer(VulkanRenderer* renderer, const Mat4& viewProj)
+void LineRenderer::UpdateCameraBuffer(VulkanRenderer* renderer, const Mat4& viewProj) const
 {
-    m_material->SetAttribute("viewProj", viewProj);
+    m_material->SetAttribute("cameraUBO.viewProj", viewProj);
 }
 
 void LineRenderer::Render(VulkanRenderer* renderer, const Mat4& viewProj)

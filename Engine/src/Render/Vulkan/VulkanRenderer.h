@@ -51,6 +51,7 @@ public:
     void Cleanup();
     
     void WaitUntilFrameFinished();
+    void WaitForAllFrames();
     bool BeginFrame();
     void Update();
     void EndFrame();
@@ -75,7 +76,7 @@ public:
     bool BindShader(Shader* shader);
     bool BindMaterial(Material* material);
     
-    std::unique_ptr<VulkanTexture> CreateTexture(const ImageLoader::Image& image);
+    std::unique_ptr<VulkanTexture> CreateTexture(const ImageLoader::Image& image, const TextureParam& param);
     std::unique_ptr<VulkanTexture> CreateCubeMap(const ImageLoader::HDRImage& image);
     std::unique_ptr<VulkanTexture> CreateCubeMapWithMips(int resolution, int mipLevels);
     std::unique_ptr<VulkanVertexBuffer> CreateVertexBuffer(const float* data, uint32_t size, uint32_t floatPerVertex);
@@ -99,6 +100,7 @@ public:
     VulkanSyncObjects* GetSyncObjects() const { return m_syncObjects.get(); }
     
     uint32_t GetMaxFramesInFlight() const { return MAX_FRAMES_IN_FLIGHT; }
+    uint32_t GetImageIndex() const { return m_imageIndex; }
     
     RenderQueueManager* GetRenderQueueManager() const { return m_renderQueueManager.get(); }
     uint64_t GetTriangleCount() const { return p_triangleCount; }
@@ -107,6 +109,8 @@ public:
     LineRenderer* GetLineRenderer() { return &m_lineRenderer; }
     SkyboxRenderer* GetSkyboxRenderer() { return &m_skyboxRenderer; }
     void AddLine(const Vec3f& start, const Vec3f& end, const Vec4f& color, float thickness = 1.f);
+    
+    void SetBlittedToSwapchain(bool value) { m_blittedToSwapchain = value; }
 private:
     void RecreateSwapChain();
     void TransitionImageForPresent() const;
@@ -138,4 +142,6 @@ private:
     
     LineRenderer m_lineRenderer;
     SkyboxRenderer m_skyboxRenderer;
+    
+    bool m_blittedToSwapchain = false;
 };

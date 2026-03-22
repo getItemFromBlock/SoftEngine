@@ -24,8 +24,8 @@ public:
 
     void SetUniformData(uint32_t set, uint32_t binding, const void* data, size_t size, VulkanRenderer* renderer);
 
-    void SetTexture(uint32_t set, uint32_t binding, Texture* texture, VulkanRenderer* renderer);
-    void SetTextureForFrame(uint32_t frameIndex, uint32_t set, uint32_t binding, Texture* texture);
+    void SetTexture(uint32_t set, uint32_t binding, VulkanTexture* texture, VulkanRenderer* renderer) const;
+    void SetTextureForFrame(uint32_t frameIndex, uint32_t set, uint32_t binding, VulkanTexture* texture) const;
 
     void SetCubemap(uint32_t set, uint32_t binding, CubeMap* cubemapTexture, VulkanRenderer* renderer) const;
     void SetCubemapForFrame(uint32_t frameIndex, uint32_t set, uint32_t binding, CubeMap* cubemapTexture) const;
@@ -51,6 +51,7 @@ public:
     void SetStorageBufferData(uint32_t set, uint32_t binding, const void* data, size_t size, VulkanRenderer* renderer);
     VulkanPipeline* GetPipeline() const { return m_pipeline; }
 
+    void BindWithTextureSet(VulkanRenderer* renderer, VkDescriptorSet textureSet, uint32_t textureSetIndex);
 private:
     VulkanPipeline* m_pipeline = nullptr;
     VulkanDevice* m_device = nullptr;
