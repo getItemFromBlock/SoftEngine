@@ -9,6 +9,7 @@ struct LightData
 {
     Vec4f position;
     Vec4f color;
+    Vec4f angles;
 };
 
 void LightManager::SendLights(Material* material) const
@@ -18,10 +19,14 @@ void LightManager::SendLights(Material* material) const
     
     material->SetAttribute("lightData.numLights", static_cast<int>(m_lights.size()));
     size_t i = 0;
+    Vec4f data[4];
     for (const auto& light : m_lights)
     {
-        material->SetAttribute("lightData.lights[" + std::to_string(i) + "].position", Vec4f(light->GetGameObject()->GetTransform()->GetWorldPosition()));
-        material->SetAttribute("lightData.lights[" + std::to_string(i) + "].color", Vec4f(light->GetColor(), light->GetIntensity()));
+        light->SerializeData(data);
+        material->SetAttribute("lightData.lights[" + std::to_string(i) + "].position", data[0]);
+        material->SetAttribute("lightData.lights[" + std::to_string(i) + "].direction", data[1]);
+        material->SetAttribute("lightData.lights[" + std::to_string(i) + "].angles", data[2]);
+        material->SetAttribute("lightData.lights[" + std::to_string(i) + "].color", data[3]);
         i++;
     }
 }

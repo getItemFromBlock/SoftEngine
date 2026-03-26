@@ -6,6 +6,8 @@ Property& ClassDescriptor::AddProperty(const char* name, PropertyType type, void
     property.name = name;
     property.type = type;
     property.data = data;
+    property.range.intRange.minInt = 0x3f800000;
+    property.range.intRange.maxInt = 0xbf800000;
     properties.push_back(property);
     return properties.back();
 }

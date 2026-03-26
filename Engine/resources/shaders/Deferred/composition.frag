@@ -13,7 +13,9 @@ layout(set = 0, binding = 6) uniform sampler2D   brdfLut;
 layout(set = 0, binding = 7) uniform samplerCube prefilteredSampler;
 
 struct Light {
-    vec4 position; // xyz = world pos, w unused
+    vec4 position; // xyz = world pos OR direction, w = dir or pos
+    vec4 direction; // xyz = light dir OR deltaPos, w = dir or dtpos
+    vec4 angles; // xy = spot light angles, z = attenuation
     vec4 color;    // xyz = linear RGB, w = intensity
 };
 
@@ -110,13 +112,19 @@ void main()
     vec3 Lo = vec3(0.0);
     for (int i = 0; i < lightData.numLights; ++i)
     {
-        vec3  L           = normalize(lightData.lights[i].position.xyz - fragPos);
+        vec3  AB          = lightData.lights[i].position.xyz - fragPos * lightData.lights[i].position.w;
+        vec3  L           = normalize(AB);
         vec3  H           = normalize(V + L);
-        float distance    = length(lightData.lights[i].position.xyz - fragPos);
-        float attenuation = 1.0 / (distance * distance);
+        float lensqr      = dot(AB,AB);
+        float attenP      = 1.0 / lensqr;
+        float factor      = lensqr * lightData.lights[i].angles.z;
+        float sFactor     = clamp(1.0 - factor * factor, 0, 1);
+        float SdotL       = dot(lightData.lights[i].direction.xyz, L);
+        float attenS      = clamp(SdotL * lightData.lights[i].angles.x + lightData.lights[i].angles.y, 0, 1);
         vec3  radiance    = lightData.lights[i].color.rgb *
-                            lightData.lights[i].color.w  *
-                            attenuation;
+                            (lightData.lights[i].color.w  *
+                            (attenS * attenS));
+                            //attenP * sFactor * sFactor * attenS * attenS);
 
         float NDF = DistributionGGX(N, H, roughness);
         float G   = GeometrySmith_Direct(N, V, L, roughness);

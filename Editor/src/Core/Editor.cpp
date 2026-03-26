@@ -60,7 +60,7 @@ void Editor::Initialize()
     resourceManager->Load<CubeMap>(RESOURCE_PATH"/envMap/wooden_studio_09_4k.hdr");
     resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/inverted.pshader");
     
-    auto sponza = resourceManager->Load<Model>(RESOURCE_PATH"models/Test/DamagedHelmet.gltf");
+    auto sponza = resourceManager->Load<Model>(RESOURCE_PATH"models/Cube.obj");
     sponza->EOnLoaded.Bind([this, currentScene, sponza]()
     {
         auto go = Model::CreateGameObject(sponza.getPtr(), currentScene);
@@ -107,7 +107,8 @@ void Editor::Initialize()
         auto light = currentScene->CreateGameObject();
         light->SetName("Light");
         light->AddComponent<LightComponent>()->SetIntensity(1.f);
-        light->AddComponent<TestComponent>()->AttachToCamera(true);
+        light->GetTransform()->SetLocalPosition(Vec3f(0,0,-6.5f));
+        //light->AddComponent<TestComponent>()->AttachToCamera(true);
         
     });
 
