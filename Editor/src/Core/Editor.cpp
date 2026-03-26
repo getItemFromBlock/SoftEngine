@@ -107,7 +107,7 @@ void Editor::Initialize()
         auto light = currentScene->CreateGameObject();
         light->SetName("Light");
         light->AddComponent<LightComponent>()->SetIntensity(1.f);
-        light->GetTransform()->SetLocalPosition(Vec3f(0,0,-6.5f));
+        light->GetTransform()->SetLocalPosition(Vec3f(0,0,-3.0f));
         //light->AddComponent<TestComponent>()->AttachToCamera(true);
         
     });

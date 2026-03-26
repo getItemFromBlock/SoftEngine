@@ -25,4 +25,20 @@ private:
     float m_attenuation = 10.0f;
     Vec3f m_otherPosition = Vec3f::Zero();
     Vec2f m_angleFactors = Vec2f(45.0f,40.0f);
+
+    struct LightType
+    {
+        enum Type : int32_t
+        {
+            Directional,
+            Point,
+            Spot,
+            Line
+        } type = Point;
+
+        static const char *to_cstr()
+        {
+            return "Directional\0Point\0Spot\0Line\0";
+        }
+    } m_lightType;
 };

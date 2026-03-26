@@ -13,10 +13,10 @@ layout(set = 0, binding = 6) uniform sampler2D   brdfLut;
 layout(set = 0, binding = 7) uniform samplerCube prefilteredSampler;
 
 struct Light {
-    vec4 position; // xyz = world pos OR direction, w = dir or pos
+    vec4 position;  // xyz = world pos OR direction, w = dir or pos
     vec4 direction; // xyz = light dir OR deltaPos, w = dir or dtpos
-    vec4 angles; // xy = spot light angles, z = attenuation
-    vec4 color;    // xyz = linear RGB, w = intensity
+    vec4 angles;    // xy = spot light angles, z = attenuation
+    vec4 color;     // xyz = linear RGB, w = intensity
 };
 
 layout(std430, set = 1, binding = 0) readonly buffer LightBuffer {
@@ -123,8 +123,7 @@ void main()
         float attenS      = clamp(SdotL * lightData.lights[i].angles.x + lightData.lights[i].angles.y, 0, 1);
         vec3  radiance    = lightData.lights[i].color.rgb *
                             (lightData.lights[i].color.w  *
-                            (attenS * attenS));
-                            //attenP * sFactor * sFactor * attenS * attenS);
+                            attenP * sFactor * sFactor * attenS * attenS);
 
         float NDF = DistributionGGX(N, H, roughness);
         float G   = GeometrySmith_Direct(N, V, L, roughness);
