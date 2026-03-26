@@ -351,13 +351,13 @@ void Camera::BeginRenderTarget(const RenderTargetTexture* rtt) const
     VulkanRenderer* renderer = Engine::Get()->GetRenderer();
     VkCommandBuffer commandBuffer = renderer->GetCommandPool()->GetCommandBuffer(renderer->GetFrameIndex());
 
-    if (m_renderTarget->GetDepthBuffer()->NeedsTransition())
+    if (rtt->GetDepthBuffer()->NeedsTransition())
     {
         VulkanUtils::TransitionImageLayout(renderer->GetCommandPool(), renderer->GetDevice()->GetGraphicsQueue(),
                                            VK_IMAGE_LAYOUT_UNDEFINED,
                                            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                                           renderer->GetDevice(), m_renderTarget->GetDepthBuffer()->GetImage());
-        m_renderTarget->GetDepthBuffer()->ValidateTransition();
+                                           renderer->GetDevice(), rtt->GetDepthBuffer()->GetImage());
+        rtt->GetDepthBuffer()->ValidateTransition();
     }
 
     VkImageMemoryBarrier barrier{};
