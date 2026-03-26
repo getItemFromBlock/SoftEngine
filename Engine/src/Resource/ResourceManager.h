@@ -2,6 +2,7 @@
 #include <memory>
 #include <ranges>
 #include <unordered_map>
+#include <queue>
 
 #include "Core/ThreadPool.h"
 

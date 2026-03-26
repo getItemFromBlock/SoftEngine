@@ -1,8 +1,7 @@
 ﻿#pragma once
 #include <memory>
 #include <future>
-
-#include <BS_thread_pool.hpp>
+#include <queue>
 
 #include "Debug/Log.h"
 
@@ -18,30 +17,27 @@ public:
     static void Initialize();
     static void WaitUntilAllTasksFinished();
     static void Terminate();
+    static float GetUsage();
     
     static bool IsMainThread() { return std::this_thread::get_id() == s_instance->m_mainThreadID; }
 
-    template <typename F, typename R = std::invoke_result_t<std::decay_t<F>>>
-    static std::future<R> Enqueue(F&& task)
+    static void Enqueue(std::function<void()> task)
     {
-#ifdef MULTI_THREAD
-        try
-        {
-            return s_instance->m_threadPool->submit_task(std::forward<F>(task));;
-        }
-        catch (const std::exception& e)
-        {
-            PrintError("ThreadPool: %s", e.what());
-            return std::future<R>();
-        }
-#else
-        task();
-        return std::future<R>();
-#endif
+        s_instance->m_queueMutex.lock();
+        s_instance->m_taskQueue.push(task);
+        s_instance->m_queueMutex.unlock();
     }
 
 private:
+    void threadFunc(uint32_t id);
+
+private:
     static std::unique_ptr<ThreadPool> s_instance;
-    std::unique_ptr<BS::thread_pool<>> m_threadPool;
+    std::thread *m_threadPool;
+    std::atomic_bool *m_threadStates;
+    std::atomic_bool m_threadExit = false;
+    uint32_t m_threadCount;
+    std::queue<std::function<void()>> m_taskQueue;
+    std::mutex m_queueMutex;
     std::thread::id m_mainThreadID;
 };

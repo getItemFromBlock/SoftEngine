@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include <iostream>
+#include <thread>
 
 namespace Platform
 {
@@ -38,4 +39,5 @@ namespace Platform
     void Break();
     
     void SetThreadName(uint32_t threadId, const char* name);
+    void SetThreadName(std::thread::native_handle_type threadId, const char* name);
 };
