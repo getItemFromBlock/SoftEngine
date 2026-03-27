@@ -2,6 +2,7 @@
 #include <memory>
 #include <ranges>
 #include <unordered_map>
+#include <queue>
 
 #include "Core/ThreadPool.h"
 
@@ -66,15 +67,17 @@ public:
     void LoadDefaultShader(const std::filesystem::path& shaderPath);
     void LoadDefaultTexture(const std::filesystem::path& texturePath);
     void LoadBlankTexture(const std::filesystem::path& texturePath);
+    void LoadDefaultNormal(const std::filesystem::path& texturePath);
     void LoadDefaultMaterial(const std::filesystem::path& materialPath);
     void LoadDefaultCubeMap(const std::filesystem::path& cubeMapPath);
     void LoadBlankCubeMap(const std::filesystem::path& cubeMapPath);
 
-    SafePtr<Material> CreateMaterial(std::filesystem::path path);
+    SafePtr<Material> CreateMaterial(std::filesystem::path path, SafePtr<Shader> shader = {});
 
     std::shared_ptr<Shader> GetDefaultShader() const;
     std::shared_ptr<Texture> GetDefaultTexture() const;
     std::shared_ptr<Texture> GetBlankTexture() const;
+    std::shared_ptr<Texture> GetDefaultNormal() const;
     std::shared_ptr<Material> GetDefaultMaterial() const;
     std::shared_ptr<CubeMap> GetDefaultCubeMap() const;
     std::shared_ptr<CubeMap> GetBlankCubeMap() const;
@@ -103,6 +106,7 @@ private:
 
     Core::UUID m_defaultTexture;
     Core::UUID m_blankTexture;
+    Core::UUID m_defaultNormal;
     Core::UUID m_defaultShader;
     Core::UUID m_defaultMaterial;
     Core::UUID m_defaultCubeMap;
@@ -215,7 +219,7 @@ SafePtr<T> ResourceManager::Load(const std::filesystem::path& resourcePath, bool
             {
                 return;
             }
-            resource->p_isLoading.store(true);
+            resource->p_state = ResourceState::Loading;
             if (resource->Load(this))
             {
                 PrintLog("Resource loaded %s", resource->GetPath().generic_string().c_str());
@@ -226,7 +230,7 @@ SafePtr<T> ResourceManager::Load(const std::filesystem::path& resourcePath, bool
     }
     else
     {
-        resource->p_isLoading.store(true);
+        resource->p_state = ResourceState::Loading;
         if (resource->Load(this))
         {
             PrintLog("Resource loaded %s", resource->GetPath().generic_string().c_str());

@@ -17,6 +17,10 @@ public:
         Vec4f emissive;
         float transparency;
         std::optional<std::filesystem::path> albedo;
+        std::optional<std::filesystem::path> normal;
+        std::optional<std::filesystem::path> metallic;
+        std::optional<std::filesystem::path> roughness;
+        
     };
 
     static std::vector<Material> Load(const std::filesystem::path& path);

@@ -118,7 +118,7 @@ void ResourceManager::UpdateResourceToSend()
     auto it = m_resources.find(uuid);
     if (it != m_resources.end())
     {
-        if (it->second->IsLoaded() && !it->second->SentToGPU())
+        if (it->second->IsLoaded() && !it->second->HasBeenSent())
         {
             if (it->second->SendToGPU(m_renderer))
             {
@@ -137,10 +137,10 @@ void ResourceManager::AddResourceToSend(Core::UUID uuid)
 {
     if (m_renderer->MultiThreadSendToGPU())
     {
-        ThreadPool::Enqueue([uuid, this]()
+        ThreadPool::Enqueue([this, uuid]()
         {
             std::shared_ptr<IResource> resource = GetResource<IResource>(uuid);
-            if (resource && !resource->SentToGPU() && resource->SendToGPU(m_renderer))
+            if (resource && !resource->HasBeenSent() && resource->SendToGPU(m_renderer))
             {
                 resource->SetSentToGPU();
             }
@@ -197,14 +197,26 @@ void ResourceManager::LoadBlankTexture(const std::filesystem::path& texturePath)
     m_blankTexture = texture->GetUUID();
 }
 
+void ResourceManager::LoadDefaultNormal(const std::filesystem::path& texturePath)
+{
+    SafePtr<Texture> texture = Load<Texture>(texturePath, false);
+    
+    texture->SetTextureParameters(TextureParam{.format = TextureFormat::UNORM});
+
+    m_defaultNormal = texture->GetUUID();
+}
+
 void ResourceManager::LoadDefaultMaterial(const std::filesystem::path& materialPath)
 {
     SafePtr<Material> material = CreateMaterial(materialPath);
 
     m_defaultMaterial = material->GetUUID();
 
-    material->SetAttribute("color", Vec4f::One());
+    material->SetAttribute("material.color", Vec4f::One());
     material->SetAttribute("albedoSampler", GetBlankTexture());
+    material->SetAttribute("normalSampler", GetDefaultNormal());
+    material->SetAttribute("material.roughnessFactor", 0.f);
+    material->SetAttribute("material.metalnessFactor", 0.f);
 }
 
 void ResourceManager::LoadDefaultCubeMap(const std::filesystem::path& cubeMapPath)
@@ -221,14 +233,16 @@ void ResourceManager::LoadBlankCubeMap(const std::filesystem::path& cubeMapPath)
     m_blankCubeMap = cubeMap->GetUUID();
 }
 
-SafePtr<Material> ResourceManager::CreateMaterial(std::filesystem::path path)
+SafePtr<Material> ResourceManager::CreateMaterial(std::filesystem::path path, SafePtr<Shader> shader)
 {
     if (path.extension() != ".mat")
     {
         path = std::filesystem::path(path.generic_string() + ".mat");
     }
     std::shared_ptr<Material> material = std::make_shared<Material>(path);
-    std::shared_ptr<Shader> shader = GetDefaultShader();
+    
+    if (!shader)
+        shader = GetDefaultShader();
 
     material->SetLoaded();
     material->SetSentToGPU();
@@ -253,6 +267,11 @@ std::shared_ptr<Texture> ResourceManager::GetDefaultTexture() const
 std::shared_ptr<Texture> ResourceManager::GetBlankTexture() const
 {
     return GetResource<Texture>(m_blankTexture);
+}
+
+std::shared_ptr<Texture> ResourceManager::GetDefaultNormal() const
+{
+    return GetResource<Texture>(m_defaultNormal);
 }
 
 std::shared_ptr<Material> ResourceManager::GetDefaultMaterial() const

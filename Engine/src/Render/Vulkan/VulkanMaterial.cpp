@@ -274,7 +274,7 @@ void VulkanMaterial::SetUniformData(uint32_t set, uint32_t binding, const void* 
     }
 }
 
-void VulkanMaterial::SetTexture(uint32_t set, uint32_t binding, Texture* texture, VulkanRenderer* renderer)
+void VulkanMaterial::SetTexture(uint32_t set, uint32_t binding, VulkanTexture* texture, VulkanRenderer* renderer) const
 {
     for (uint32_t frameIndex = 0; frameIndex < renderer->GetMaxFramesInFlight(); ++frameIndex)
     {
@@ -282,7 +282,7 @@ void VulkanMaterial::SetTexture(uint32_t set, uint32_t binding, Texture* texture
     }
 }
 
-void VulkanMaterial::SetTextureForFrame(uint32_t frameIndex, uint32_t set, uint32_t binding, Texture* texture)
+void VulkanMaterial::SetTextureForFrame(uint32_t frameIndex, uint32_t set, uint32_t binding, VulkanTexture* texture) const
 {
     if (!texture || set >= m_descriptorSets.size())
     {
@@ -290,18 +290,10 @@ void VulkanMaterial::SetTextureForFrame(uint32_t frameIndex, uint32_t set, uint3
         return;
     }
 
-    auto* vulkanTexture = texture->GetBuffer();
-
-    if (!vulkanTexture)
-    {
-        PrintError("Invalid texture");
-        return;
-    }
-
     VkDescriptorImageInfo imageInfo{};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageInfo.imageView = vulkanTexture->GetImageView();
-    imageInfo.sampler = vulkanTexture->GetSampler();
+    imageInfo.imageView = texture->GetImageView();
+    imageInfo.sampler = texture->GetSampler();
 
     VkWriteDescriptorSet write{};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -369,7 +361,7 @@ void VulkanMaterial::SetCombinedImageSampler(uint32_t set, uint32_t binding,
 
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrite.dstSet = m_descriptorSets[renderer->GetFrameIndex()]->GetDescriptorSet(set); // Use 'set' parameter
+    descriptorWrite.dstSet = m_descriptorSets[set]->GetDescriptorSet(renderer->GetFrameIndex());
     descriptorWrite.dstBinding = binding;
     descriptorWrite.dstArrayElement = 0;
     descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -450,7 +442,7 @@ void VulkanMaterial::SetStorageImage(uint32_t set, uint32_t binding,
 
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrite.dstSet = m_descriptorSets[renderer->GetFrameIndex()]->GetDescriptorSet(set); // Use 'set' parameter
+    descriptorWrite.dstSet = m_descriptorSets[set]->GetDescriptorSet(renderer->GetFrameIndex());
     descriptorWrite.dstBinding = binding;
     descriptorWrite.dstArrayElement = 0;
     descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -575,4 +567,24 @@ void VulkanMaterial::SetStorageBufferData(uint32_t set, uint32_t binding, const 
     {
         PrintError("Storage buffer not found for set %u binding %u", set, binding);
     }
+}
+
+void VulkanMaterial::BindWithTextureSet(VulkanRenderer* renderer, VkDescriptorSet textureSet, uint32_t textureSetIndex)
+{
+    VkCommandBuffer cmd = renderer->GetCommandBuffer();
+    uint32_t frameIndex = renderer->GetFrameIndex();
+
+    for (uint32_t i = 0; i < m_descriptorSets.size(); ++i)
+    {
+        if (i == textureSetIndex) continue;
+
+        VkDescriptorSet set = m_descriptorSets[i]->GetDescriptorSet(frameIndex);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                m_pipeline->GetPipelineLayout(),
+                                i, 1, &set, 0, nullptr);
+    }
+
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            m_pipeline->GetPipelineLayout(),
+                            textureSetIndex, 1, &textureSet, 0, nullptr);
 }

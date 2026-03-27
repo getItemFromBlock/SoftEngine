@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include <unordered_map>
+#include <galaxymath/Maths.h>
 
 enum class KeyEvent
 {
@@ -339,6 +340,11 @@ public:
         m_mouseButtons[button] = event;
     }
     
+    void OnScrollCallback(Vec2f offset)
+    {
+        m_scrollOffset = offset;
+    }
+    
     void UpdateStates();
     
     KeyEvent GetKeyState(Key key) const;
@@ -354,7 +360,11 @@ public:
     bool IsMouseButtonReleased(MouseButton button) const;
     bool IsMouseButtonUp(MouseButton button) const;
 
+    Vec2f GetScrollOffset() const { return m_scrollOffset; }
+    float GetScrollY() const { return m_scrollOffset.y; }
+    float GetScrollX() const { return m_scrollOffset.x; }
 private:
     std::unordered_map<Key, KeyEvent> m_keys;
     std::unordered_map<MouseButton, KeyEvent> m_mouseButtons;
+    Vec2f m_scrollOffset;
 };

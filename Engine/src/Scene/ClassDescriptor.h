@@ -130,19 +130,19 @@ struct Property
     {
     }
 
-    Property &SetRangeFloat(float minF, float maxF)
+    Property &SetRangeFloat(float minF, float maxF, bool setRange = false)
     {
         range.floatRange.minFloat = minF;
         range.floatRange.maxFloat = maxF;
-        hasRange = true;
+        hasRange = setRange;
         return *this;
     }
 
-    Property &SetRangeInt(int minI, int maxI)
+    Property &SetRangeInt(int minI, int maxI, bool setRange = false)
     {
         range.intRange.minInt = minI;
         range.intRange.maxInt = maxI;
-        hasRange = true;
+        hasRange = setRange;
         return *this;
     }
 };

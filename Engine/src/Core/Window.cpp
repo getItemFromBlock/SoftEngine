@@ -47,6 +47,11 @@ void Window::InitializeInputs()
     {
         p_input.OnMouseButtonCallback(button, state);
     });
+    
+    EScrollCallback.Bind([this](double offsetX, double offsetY)
+    {
+        p_input.OnScrollCallback(Vec2f(static_cast<float>(offsetX), static_cast<float>(offsetY)));
+    });
 }
 
 void Window::SetMouseCursorPosition(const Vec2i& position, CoordinateSpace space)

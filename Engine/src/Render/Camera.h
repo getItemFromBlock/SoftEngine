@@ -5,6 +5,7 @@
 #include "Component/TransformComponent.h"
 #include "Physic/Frustum.h"
 #include "Vulkan/VulkanDepthBuffer.h"
+#include "Vulkan/VulkanGBuffer.h"
 #include "Vulkan/VulkanTexture.h"
 
 class PostProcessShader;
@@ -57,7 +58,7 @@ public:
     Vec4f GetClearColor() const;
     
     ViewMode::Type GetViewMode() const { return p_viewMode; }
-    void SetViewMode(ViewMode::Type viewMode) { p_viewMode = viewMode; }
+    void SetViewMode(ViewMode::Type viewMode);
 
     virtual TransformComponent* GetTransform() const;
 
@@ -68,26 +69,42 @@ public:
     SafePtr<CubeMap> GetSkybox() const;
     
     void SetPostProcessShader(const SafePtr<PostProcessShader>& shader);
+    void CleanupPostprocessRenderTarget();
     bool IsPostProcessActive() const;
     
     void InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height);
-    void ResizeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height);
     void CleanupRenderTarget();
+    void HandleResize(VulkanRenderer* renderer);
+
+    SafePtr<Texture> MakeGBufferTexture(SafePtr<Texture> texture, const GBufferAttachment& attachment, VkSampler sampler, uint32_t width, uint32_t height);
 
     SafePtr<RenderTargetTexture> GetRenderTarget() const;
     
     void Begin();
+    void EndGeometry();
     void End();
 
+    void BeginForwardPass() const;
+    void EndForwardPass();
+
     void UpdateResizeRenderTarget(VulkanRenderer* renderer);
-    void BeginRenderTarget(RenderTargetTexture* rtt);
+    void BeginRenderTarget(const RenderTargetTexture* rtt) const;
     void EndRenderTarget(RenderTargetTexture* rtt);
     
     void RenderSkybox(VulkanRenderer* renderer) const;
     void RenderPostProcess(VulkanRenderer* renderer);
+    
+    void BlitToSwapchain(VulkanRenderer* renderer);
 
+    SafePtr<Material> GetGBufferMaterial() const { return m_gBufferMaterial; }
+public:
     Event<Vec2i> OnRenderTargetResized;
-
+private:
+    void BeginGBufferPass(RenderTargetTexture* rtt);
+    void EndGBufferPass();
+    void BeginCompositionPass(RenderTargetTexture* rtt);
+    void EndCompositionPass(RenderTargetTexture* rtt);
+    void DrawComposition(VulkanRenderer* renderer) const;
 protected:
     float p_fov = 70.f;
     float p_far = 1000.f;
@@ -113,7 +130,13 @@ protected:
     Vec2i p_renderTargetSize;
     SafePtr<RenderTargetTexture> m_renderTarget;
 
+    std::unique_ptr<VulkanGBuffer> m_gBuffer = nullptr;
+    SafePtr<Material> m_gBufferMaterial;
+    SafePtr<Material> m_compositionMaterial;
+    SafePtr<Texture> m_positionTexture;
+    SafePtr<Texture> m_normalTexture;
+    SafePtr<Texture> m_albedoTexture;
+    SafePtr<Texture> m_metallicRoughnessTexture;
 private:
     std::shared_ptr<TransformComponent> m_transform;
-    bool m_firstFrame = true;
 };

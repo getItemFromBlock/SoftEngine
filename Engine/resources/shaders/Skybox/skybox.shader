@@ -1,5 +1,6 @@
  ------------- Shader ------------- 
 [vert] : skybox.vert
 [frag] : skybox.frag
-[depthTest] : false
+[depthTest] : true
+[depthWrite] : false
  ============= Shader ============= 

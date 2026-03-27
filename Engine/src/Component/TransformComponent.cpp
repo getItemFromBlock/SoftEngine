@@ -12,9 +12,9 @@ void TransformComponent::Describe(ClassDescriptor& d)
 
     Property rotation;
     rotation.name = "Rotation";
-    rotation.data = &m_localRotation;
-    rotation.type = PropertyType::Quat;
-    rotation.setter = [this](void* data) { SetLocalRotation(*static_cast<Quat*>(data)); };
+    rotation.data = &m_localEulerAngles;
+    rotation.type = PropertyType::Vec3f;
+    rotation.setter = [this](void* data) { SetLocalRotation(*static_cast<Vec3f*>(data)); };
     d.AddProperty(rotation);
     
     Property scale;
@@ -91,6 +91,14 @@ Vec3f TransformComponent::GetWorldPosition() const
 void TransformComponent::SetLocalRotation(const Quat& rotation)
 {
     m_localRotation = rotation;
+    m_localEulerAngles = m_localRotation.ToEuler();
+    SetDirty();
+}
+
+void TransformComponent::SetLocalRotation(const Vec3f &rotation)
+{
+    m_localEulerAngles = rotation;
+    m_localRotation = Quat::FromEuler(m_localEulerAngles);
     SetDirty();
 }
 

@@ -12,6 +12,7 @@ public:
 
     Scene* GetCurrentScene() const { return m_currentScene.get(); }
     
+    void PreFrame(VulkanRenderer* renderer);
     void Update(float deltaTime);
     void Render(VulkanRenderer* renderer);
     

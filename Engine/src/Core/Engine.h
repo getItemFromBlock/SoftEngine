@@ -19,7 +19,7 @@ public:
     static Engine* Create();
     
     bool Initialize(EngineDesc desc);
-    bool BeginFrame();
+    bool BeginFrame() const;
     void Update();
     void Render();
     void EndFrame();

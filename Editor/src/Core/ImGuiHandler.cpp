@@ -159,23 +159,43 @@ void ImGuiHandler::UpdateTextureID(const Texture* texture)
     m_textureIDs[texture->GetUUID()] = ID;
 }
 
+void ImGuiHandler::RemoveTextureID(const Texture* texture)
+{
+    auto it = m_textureIDs.find(texture->GetUUID());
+    if (it != m_textureIDs.end())
+    {
+        ImGui_ImplVulkan_RemoveTexture(it->second);
+        m_textureIDs.erase(it);
+    }
+}
+
 ImTextureRef ImGuiHandler::GetTextureID(Texture* texture)
 {
-    VkDescriptorSet ID;
+    VkDescriptorSet ID = {};
     auto it = m_textureIDs.find(texture->GetUUID());
     if (it == m_textureIDs.end())
     {
+        m_eventHandles[texture->GetUUID()] = texture->EOnSentToGPU.Bind([this, texture]()
+        {
+            RemoveTextureID(texture);
+        });
+        
         auto buffer = texture->GetBuffer();
-        ID = ImGui_ImplVulkan_AddTexture(
+        if (!buffer)
+            return {};
+
+        VkDescriptorSet newID = ImGui_ImplVulkan_AddTexture(
             buffer->GetSampler(),
             buffer->GetImageView(),
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         );
-        m_textureIDs[texture->GetUUID()] = ID;
+        m_textureIDs[texture->GetUUID()] = newID;
+        
+        return {newID};
     }
     else
     {
         ID = it->second;
     }
-    return ImTextureRef(reinterpret_cast<ImTextureID>(ID));
+    return {reinterpret_cast<ImTextureID>(ID)};
 }

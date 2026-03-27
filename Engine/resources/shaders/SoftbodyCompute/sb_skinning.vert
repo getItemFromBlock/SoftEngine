@@ -3,7 +3,7 @@
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec2 inTexCoord;
 layout(location = 2) in vec3 inNormal;
-layout(location = 3) in vec3 inTangent;
+layout(location = 3) in vec4 inTangent;
 layout(location = 4) in ivec4 inIndices;
 layout(location = 5) in vec4 inWeights;
 
@@ -38,6 +38,7 @@ void main() {
 	{
 		if (inIndices[i] < 0)
 			break;
+		
 		int id = inIndices[i];
 		pos += (particles[id].position - particles[id].originalPos) * inWeights[i];
 	}
@@ -47,5 +48,5 @@ void main() {
     gl_Position = cameraUBO.viewProj * worldPos;
     vTexCoord = inTexCoord;
 	
-    fragColor = vec4(inTangent, 1);
+    fragColor = vec4(inTangent.xyz, 1);
 }

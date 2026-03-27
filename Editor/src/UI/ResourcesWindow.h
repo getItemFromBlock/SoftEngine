@@ -11,4 +11,5 @@ public:
     
 private:
     ResourceType m_resourceTypeFilter = ResourceType::None; 
+    SafePtr<IResource> m_selectedResource;
 };

@@ -15,9 +15,9 @@ void SkyboxRenderer::RenderSkybox(VulkanRenderer* renderer, const SafePtr<Materi
 {
     if (!material.valid() || !m_cubeMesh.valid())
         return;
-    if (!material->SentToGPU() || !m_cubeMesh->SentToGPU())
+    if (!material->HasBeenSent() || !m_cubeMesh->HasBeenSent())
         return;
-    material->SetAttribute("viewProj", viewProjection);
+    material->SetAttribute("cameraUBO.viewProj", viewProjection);
     
     if (!renderer->BindShader(material->GetShader().getPtr()))
         return;
