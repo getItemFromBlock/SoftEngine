@@ -33,7 +33,12 @@ void LightComponent::SerializeData(Vec4f dataOut[4]) const
         dataOut[0] = Vec4f(-GetGameObject()->GetTransform()->GetForward(), 0.0f);
     else
         dataOut[0] = Vec4f(GetGameObject()->GetTransform()->GetWorldPosition(), 1.0f);
-    dataOut[1] = Vec4f(-GetGameObject()->GetTransform()->GetForward());
+
+    if (m_lightType.type == LightType::Line)
+        dataOut[1] = Vec4f(m_otherPosition, 1.0f);
+    else
+        dataOut[1] = Vec4f(-GetGameObject()->GetTransform()->GetForward(), 0.0f);
+
     if (m_lightType.type == LightType::Spot)
     {
         float cosOuterAngle = cosf(DegToRad * m_angleFactors.x);
@@ -45,5 +50,6 @@ void LightComponent::SerializeData(Vec4f dataOut[4]) const
         dataOut[2] = Vec4f(0, 1, 1 / (m_attenuation * m_attenuation), 0);
     else
         dataOut[2] = Vec4f(0, 1, 0, 0);
+
     dataOut[3] = Vec4f(GetColor(), GetIntensity());
 }
