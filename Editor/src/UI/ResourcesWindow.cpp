@@ -9,6 +9,7 @@ void ResourcesWindow::OnRender()
     {
         auto engine = Engine::Get();
         ImGui::Text("FPS: %f", ImGui::GetIO().Framerate);
+        ImGui::Text("Thread Pool usage: %.2f%%", ThreadPool::GetUsage() * 100.0f);
         ImGui::Text("Triangle Count: %llu", engine->GetRenderer()->GetTriangleCount());
         ImGui::Text("Vertex Count: %llu", engine->GetRenderer()->GetVertexCount());
 

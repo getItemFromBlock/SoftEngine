@@ -13,8 +13,10 @@ layout(set = 0, binding = 6) uniform sampler2D   brdfLut;
 layout(set = 0, binding = 7) uniform samplerCube prefilteredSampler;
 
 struct Light {
-    vec4 position; // xyz = world pos, w unused
-    vec4 color;    // xyz = linear RGB, w = intensity
+    vec4 position;  // xyz = world pos OR direction, w = dir or pos
+    vec4 direction; // xyz = light dir OR deltaPos, w = dir or dtpos
+    vec4 angles;    // xy = spot light angles, z = attenuation
+    vec4 color;     // xyz = linear RGB, w = intensity
 };
 
 layout(std430, set = 1, binding = 0) readonly buffer LightBuffer {
@@ -110,13 +112,36 @@ void main()
     vec3 Lo = vec3(0.0);
     for (int i = 0; i < lightData.numLights; ++i)
     {
-        vec3  L           = normalize(lightData.lights[i].position.xyz - fragPos);
+        vec3  AB          = lightData.lights[i].position.xyz - fragPos * lightData.lights[i].position.w;
+        
+        vec3  pa          = -AB;
+        vec3  ba          = lightData.lights[i].direction.xyz;
+        float bas         = max(dot(ba,ba), 0.001);
+        float height      = clamp( dot(pa,ba)/bas, 0.0, 1.0 );
+        vec3  distV       = pa - ba*height*lightData.lights[i].direction.w;
+        float lensqr      = dot(distV, distV);
+        
+        vec3  L           = normalize(-distV);
+        float fact        = dot(L, N);
+        if (fact < 0.5 && lightData.lights[i].direction.w > 0.)
+        {
+            vec3 L1 = normalize(AB);
+            vec3 L2 = normalize(AB + ba);
+            if (dot(L2, N) > dot(L1, N))
+                L1 = L2;
+            if (dot(L1, N) > fact)
+                L = mix(L1, L, smoothstep(0.0, 0.5, fact));
+        }
         vec3  H           = normalize(V + L);
-        float distance    = length(lightData.lights[i].position.xyz - fragPos);
-        float attenuation = 1.0 / (distance * distance);
+        float attenP      = 1.0 / lensqr;
+        float factor      = lensqr * lightData.lights[i].angles.z;
+        float sFactor     = clamp(1.0 - factor * factor, 0, 1);
+        float SdotL       = dot(lightData.lights[i].direction.xyz, L);
+        float attenS      = clamp(SdotL * lightData.lights[i].angles.x + lightData.lights[i].angles.y, 0, 1);
+        
         vec3  radiance    = lightData.lights[i].color.rgb *
-                            lightData.lights[i].color.w  *
-                            attenuation;
+                            (lightData.lights[i].color.w  *
+                            attenP * sFactor * sFactor * attenS * attenS);
 
         float NDF = DistributionGGX(N, H, roughness);
         float G   = GeometrySmith_Direct(N, V, L, roughness);

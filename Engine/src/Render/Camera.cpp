@@ -483,8 +483,8 @@ void Camera::BeginRenderTarget(const RenderTargetTexture* rtt, bool clearAttachm
         VulkanUtils::TransitionImageLayout(renderer->GetCommandPool(), renderer->GetDevice()->GetGraphicsQueue(),
                                            VK_IMAGE_LAYOUT_UNDEFINED,
                                            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                                           renderer->GetDevice(), m_renderTarget->GetDepthBuffer()->GetImage());
-        m_renderTarget->GetDepthBuffer()->ValidateTransition();
+                                           renderer->GetDevice(), rtt->GetDepthBuffer()->GetImage());
+        rtt->GetDepthBuffer()->ValidateTransition();
     }
 
     // transition from SHADER_READ_ONLY to COLOR_ATTACHMENT

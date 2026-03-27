@@ -163,5 +163,17 @@ void Platform::SetThreadName(uint32_t threadId, const char* name)
 #endif
 }
 
+void Platform::SetThreadName(std::thread::native_handle_type threadId, const char *name)
+{
+#if defined(_MSC_VER) || defined(__MINGW32__)
+    // Will not work for non ascii stuff but eh it'll be fine
+    std::string str = name;
+    std::wstring stemp = std::wstring(str.begin(), str.end());
+    SetThreadDescription(threadId, stemp.c_str());
+#elif defined(__linux__) || defined(__APPLE__)
+    SetThreadNameImpl(name);
+#endif
+}
+
 #pragma endregion
 

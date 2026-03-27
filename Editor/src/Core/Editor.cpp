@@ -66,7 +66,7 @@ void Editor::Initialize()
     resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/cellShadingEdgeDetection.pshader");
     resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/pixelate.pshader");
     
-    auto sponza = resourceManager->Load<Model>(RESOURCE_PATH"models/Test/DamagedHelmet.gltf");
+    auto sponza = resourceManager->Load<Model>(RESOURCE_PATH"models/Cube.obj");
     sponza->EOnLoaded.Bind([this, currentScene, sponza]()
     {
         auto go = Model::CreateGameObject(sponza.getPtr(), currentScene);
@@ -113,7 +113,8 @@ void Editor::Initialize()
         auto light = currentScene->CreateGameObject();
         light->SetName("Light");
         light->AddComponent<LightComponent>()->SetIntensity(1.f);
-        light->AddComponent<TestComponent>()->AttachToCamera(true);
+        light->GetTransform()->SetLocalPosition(Vec3f(0,0,-3.0f));
+        //light->AddComponent<TestComponent>()->AttachToCamera(true);
         
     });
 

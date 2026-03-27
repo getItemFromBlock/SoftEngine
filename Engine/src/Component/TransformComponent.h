@@ -34,6 +34,7 @@ public:
     Vec3f GetWorldPosition() const;
     
     void SetLocalRotation(const Quat& rotation);
+    void SetLocalRotation(const Vec3f& rotation);
     Quat GetLocalRotation() const { return m_localRotation; }
     
     void SetWorldRotation(const Quat& rotation);
@@ -64,6 +65,7 @@ private:
     
     Vec3f m_localPosition = Vec3f::Zero();
     Quat m_localRotation = Quat::Identity();
+    Vec3f m_localEulerAngles = Vec3f::Zero();
     Vec3f m_localScale = Vec3f::One();
     
     bool m_dirty = true;

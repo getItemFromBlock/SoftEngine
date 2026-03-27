@@ -38,6 +38,7 @@ void main() {
 	{
 		if (inIndices[i] < 0)
 			break;
+		
 		int id = inIndices[i];
 		pos += (particles[id].position - particles[id].originalPos) * inWeights[i];
 	}
