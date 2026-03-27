@@ -35,7 +35,7 @@ void LightComponent::SerializeData(Vec4f dataOut[4]) const
         dataOut[0] = Vec4f(GetGameObject()->GetTransform()->GetWorldPosition(), 1.0f);
 
     if (m_lightType.type == LightType::Line)
-        dataOut[1] = Vec4f(m_otherPosition, 1.0f);
+        dataOut[1] = Vec4f(GetGameObject()->GetTransform()->GetWorldRotation() * m_otherPosition, 1.0f);
     else
         dataOut[1] = Vec4f(-GetGameObject()->GetTransform()->GetForward(), 0.0f);
 
