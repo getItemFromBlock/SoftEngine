@@ -23,9 +23,13 @@ public:
 
     static void Enqueue(std::function<void()> task)
     {
+#ifdef MULTI_THREAD
         s_instance->m_queueMutex.lock();
         s_instance->m_taskQueue.push(task);
         s_instance->m_queueMutex.unlock();
+#else
+        task();
+#endif
     }
 
 private:

@@ -19,27 +19,42 @@ layout(push_constant) uniform Push {
     ivec3 size;
 } pc;
 
-layout(set = 0, binding = 2) readonly buffer Particles {
+layout(set = 0, binding = 8) readonly buffer Particles {
     ParticleData particles[];
 };
 
 layout(std140, set = 0, binding = 0) uniform CameraUBO {
     mat4 viewProj;
+	vec3 cameraPos;
 } cameraUBO;
 
-layout(location = 0) out vec4 fragColor;
+layout(location = 0) out vec3 vWorldPos;
 layout(location = 1) out vec2 vTexCoord;
+layout(location = 2) out mat3 vTBN;
+layout(location = 6) out vec3 vTangentViewDir;
 
 void main() {
     vec4 worldPos = vec4(inPosition * 0.025 + particles[gl_InstanceIndex].position, 1.0);
 	worldPos = worldPos * pc.transform;
+	
     gl_Position = cameraUBO.viewProj * worldPos;
+    vWorldPos = worldPos.xyz;
+	
     vTexCoord = inTexCoord;
-	int a = gl_InstanceIndex / (pc.size.x * pc.size.z);
-	int b = gl_InstanceIndex % (pc.size.x * pc.size.z);
+	vTexCoord.y = 1.0 - vTexCoord.y;
 	
-	int c = b / pc.size.x;
-	b -= c * pc.size.x;
-	
-    fragColor = vec4(vec3(a,b,c)/vec3(pc.size), 1);
+	mat3 normalMatrix = transpose(inverse(mat3(pc.transform)));
+
+    vec3 N = normalize(normalMatrix * inNormal);
+    vec3 T = normalize(normalMatrix * inTangent.xyz);
+
+    T = normalize(T - dot(T, N) * N);
+
+    vec3 B = cross(N, T) * inTangent.w;
+
+    vTBN = mat3(T, B, N);
+
+    mat3 tbnInverse = transpose(vTBN);
+    vec3 viewDir = cameraUBO.cameraPos - vWorldPos;
+    vTangentViewDir = tbnInverse * viewDir;
 }

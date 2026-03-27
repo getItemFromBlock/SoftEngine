@@ -184,7 +184,7 @@ void RenderQueue::Execute(VulkanRenderer* renderer)
             {
                 // Per-draw: bind the specific particle buffer for this object
                 cmd.material->GetHandle()->SetStorageBuffer(
-                    0, 2, cmd.particleBuffer, 0, cmd.particleBufferSize, renderer);
+                    0, 8, cmd.particleBuffer, 0, cmd.particleBufferSize, renderer);
 
                 struct SoftBodyPush
                 {
@@ -265,6 +265,8 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
     m_materialDataBuffers[frameIndex].offset = 0;
 
     if (!renderer->BindShader(gBufferMaterial->GetShader().getPtr())) return;
+    Shader* lastShader = gBufferMaterial->GetShader().getPtr();
+    Material* lastMaterial = gBufferMaterial;
 
     auto* currentScene = Engine::Get()->GetSceneHolder()->GetCurrentScene();
     gBufferMaterial->SetAttribute("cameraUBO.viewProj", currentScene->GetCameraData().VP);
@@ -292,9 +294,16 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
 
     for (auto& cmd : m_commands)
     {
-        // GBuffer only handles standard mesh draws
-        if (cmd.type != RenderCommand::Type::Mesh)
-            continue;
+        if (cmd.shader && cmd.shader != lastShader)
+        {
+            lastShader = cmd.shader;
+            if (!renderer->BindShader(lastShader)) continue;
+        }
+        else if (!cmd.shader && lastShader != gBufferMaterial->GetShader().getPtr())
+        {
+            lastShader = gBufferMaterial->GetShader().getPtr();
+            if (!renderer->BindShader(lastShader)) return;
+        }
 
         MaterialData matData{};
         matData.color = cmd.material->GetVec4Attribute("material.color");
@@ -370,19 +379,55 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
                                 VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetPipelineLayout(),
                                 TEXTURE_SET_INDEX, 1, &drawSet, 0, nullptr);
 
-        if (cmd.mesh != lastMesh)
+        switch (cmd.type)
         {
-            renderer->BindVertexBuffers(cmd.mesh->GetVertexBuffer(),
-                                        cmd.mesh->GetIndexBuffer());
-            lastMesh = cmd.mesh;
+        case RenderCommand::Type::Mesh:
+        {
+            if (cmd.mesh != lastMesh)
+            {
+                renderer->BindVertexBuffers(cmd.mesh->GetVertexBuffer(),
+                    cmd.mesh->GetIndexBuffer());
+                lastMesh = cmd.mesh;
+            }
+
+            PushConstant pc = gBufferMaterial->GetShader()->GetPushConstants()[ShaderType::Vertex];
+            renderer->SendPushConstants(&cmd.modelMatrix, sizeof(Mat4),
+                gBufferMaterial->GetShader().getPtr(), pc);
+
+            renderer->DrawVertexSubMesh(cmd.mesh->GetIndexBuffer(),
+                cmd.startIndex, cmd.indexCount);
+            break;
         }
 
-        PushConstant pc = gBufferMaterial->GetShader()->GetPushConstants()[ShaderType::Vertex];
-        renderer->SendPushConstants(&cmd.modelMatrix, sizeof(Mat4),
-                                    gBufferMaterial->GetShader().getPtr(), pc);
+        case RenderCommand::Type::SoftBody:
+        case RenderCommand::Type::SoftBodyDebug:
+        {
+            // Per-draw: bind the specific particle buffer for this object
+            cmd.material->GetHandle()->SetStorageBuffer(
+                0, 8, cmd.particleBuffer, 0, cmd.particleBufferSize, renderer);
 
-        renderer->DrawVertexSubMesh(cmd.mesh->GetIndexBuffer(),
-                                    cmd.startIndex, cmd.indexCount);
+            struct SoftBodyPush
+            {
+                Mat4 transform;
+                Vec3i size;
+            } push;
+            push.transform = cmd.modelMatrix;
+            push.size = cmd.particleGridSize;
+
+            vkCmdPushConstants(renderer->GetCommandBuffer(),
+                cmd.material->GetHandle()->GetPipeline()->GetPipelineLayout(),
+                VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(SoftBodyPush), &push);
+
+            uint32_t instanceCount = (cmd.type == RenderCommand::Type::SoftBodyDebug)
+                ? cmd.particleCount
+                : 1;
+            renderer->DrawInstanced(cmd.mesh->GetIndexBuffer(),
+                cmd.mesh->GetVertexBuffer(), instanceCount);
+
+            lastMesh = nullptr; // soft body doesn't go through BindVertexBuffers, invalidate
+            break;
+        }
+        }
     }
 }
 

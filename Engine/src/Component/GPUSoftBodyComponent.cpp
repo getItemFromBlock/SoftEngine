@@ -217,7 +217,7 @@ void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
         return;
 
     auto* rqm = Engine::Get()->GetRenderer()->GetRenderQueueManager();
-    auto* queue = rqm->GetTransparentQueue();
+    auto* queue = rqm->GetOpaqueQueue();
 
     const Mat4 transform = GetGameObject()->GetTransform()
                                ->GetWorldMatrix().GetTranspose();
