@@ -4,6 +4,7 @@
 
 void Input::UpdateStates()
 {
+    m_scrollOffset = Vec2f::Zero();
     for (auto& state : m_keys | std::views::values)
     {
         if (state == KeyEvent::Pressed)

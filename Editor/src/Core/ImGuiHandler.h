@@ -8,6 +8,8 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
 
+#include "Utils/Event.h"
+
 class CubeMap;
 class Texture;
 class Window;
@@ -24,6 +26,7 @@ public:
     void EndFrame();
 
     void UpdateTextureID(const Texture* texture);
+    void RemoveTextureID(const Texture* texture);
     ImTextureRef GetTextureID(Texture* texture);
 
 private:
@@ -32,4 +35,5 @@ private:
     VulkanRenderer* m_renderer;
     
     std::unordered_map<Core::UUID, VkDescriptorSet> m_textureIDs;
+    std::unordered_map<Core::UUID, EventHandle> m_eventHandles;
 };

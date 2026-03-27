@@ -118,7 +118,7 @@ void ResourceManager::UpdateResourceToSend()
     auto it = m_resources.find(uuid);
     if (it != m_resources.end())
     {
-        if (it->second->IsLoaded() && !it->second->SentToGPU())
+        if (it->second->IsLoaded() && !it->second->HasBeenSent())
         {
             if (it->second->SendToGPU(m_renderer))
             {
@@ -137,10 +137,10 @@ void ResourceManager::AddResourceToSend(Core::UUID uuid)
 {
     if (m_renderer->MultiThreadSendToGPU())
     {
-        ThreadPool::Enqueue([uuid, this]()
+        ThreadPool::Enqueue([this, uuid]()
         {
             std::shared_ptr<IResource> resource = GetResource<IResource>(uuid);
-            if (resource && !resource->SentToGPU() && resource->SendToGPU(m_renderer))
+            if (resource && !resource->HasBeenSent() && resource->SendToGPU(m_renderer))
             {
                 resource->SetSentToGPU();
             }

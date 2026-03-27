@@ -2,6 +2,7 @@
 #include <memory>
 #include <ranges>
 #include <unordered_map>
+#include <queue>
 
 #include "Core/ThreadPool.h"
 
@@ -218,7 +219,7 @@ SafePtr<T> ResourceManager::Load(const std::filesystem::path& resourcePath, bool
             {
                 return;
             }
-            resource->p_isLoading.store(true);
+            resource->p_state = ResourceState::Loading;
             if (resource->Load(this))
             {
                 PrintLog("Resource loaded %s", resource->GetPath().generic_string().c_str());
@@ -229,7 +230,7 @@ SafePtr<T> ResourceManager::Load(const std::filesystem::path& resourcePath, bool
     }
     else
     {
-        resource->p_isLoading.store(true);
+        resource->p_state = ResourceState::Loading;
         if (resource->Load(this))
         {
             PrintLog("Resource loaded %s", resource->GetPath().generic_string().c_str());

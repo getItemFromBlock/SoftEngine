@@ -110,6 +110,8 @@ void Camera::SetNear(float near)
 
 void Camera::SetRenderTargetSize(uint32_t width, uint32_t height)
 {
+    if (width == 0 || height == 0)
+        return;
     p_requestedSize = Vec2i(static_cast<int32_t>(width), static_cast<int32_t>(height));
 }
 
@@ -237,44 +239,6 @@ void Camera::InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, ui
     }
 }
 
-void Camera::ResizeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height)
-{
-    if (std::cmp_equal(p_renderTargetSize.x, width) && std::cmp_equal(p_renderTargetSize.y, height) || width == 0 ||
-        height == 0)
-        return;
-
-    if (!m_renderTarget)
-    {
-        InitializeRenderTarget(renderer, width, height);
-        return;
-    }
-    renderer->WaitForGPU();
-    
-    m_renderTarget->Resize(renderer, width, height, VK_FILTER_NEAREST);
-    if (m_postProcessRenderTarget)
-    {
-        m_postProcessRenderTarget->Resize(renderer, width, height);
-    }
-
-    if (m_gBuffer)
-    {
-        m_gBuffer->Resize(width, height);
-
-        if (m_compositionMaterial.valid())
-        {
-            m_compositionMaterial->SetAttribute("gPosition", MakeGBufferTexture(m_positionTexture, m_gBuffer->GetPosition(), m_gBuffer->GetSampler(), width, height));
-            m_compositionMaterial->SetAttribute("gNormal", MakeGBufferTexture(m_normalTexture, m_gBuffer->GetNormal(), m_gBuffer->GetSampler(), width, height));
-            m_compositionMaterial->SetAttribute("gAlbedo", MakeGBufferTexture(m_albedoTexture, m_gBuffer->GetAlbedo(), m_gBuffer->GetSampler(), width, height));
-            m_compositionMaterial->SetAttribute("gMetallicRoughnessAO", MakeGBufferTexture(m_metallicRoughnessTexture, m_gBuffer->GetMetallicRoughness(), m_gBuffer->GetSampler(), width, height));
-        }
-    }
-
-    OnRenderTargetResized.Invoke(Vec2i(static_cast<int32_t>(width), static_cast<int32_t>(height)));
-    p_renderTargetSize = Vec2i(static_cast<int32_t>(width), static_cast<int32_t>(height));
-    p_requestedSize = p_renderTargetSize;
-    m_transform->SetDirty();
-}
-
 void Camera::CleanupRenderTarget()
 {
     if (!m_renderTarget)
@@ -289,6 +253,53 @@ void Camera::CleanupRenderTarget()
 
     Engine::Get()->GetResourceManager()->RemoveResource(m_renderTarget->GetUUID());
     m_renderTarget.reset();
+}
+
+void Camera::CleanupPostprocessRenderTarget()
+{
+    if (!m_postProcessRenderTarget && !m_postProcessMaterial)
+        return;
+    if (m_postProcessRenderTarget)
+        Engine::Get()->GetResourceManager()->RemoveResource(m_postProcessRenderTarget->GetUUID());
+    if (m_postProcessMaterial)
+        Engine::Get()->GetResourceManager()->RemoveResource(m_postProcessMaterial->GetUUID());
+    m_postProcessRenderTarget.reset();
+    m_postProcessMaterial.reset();
+}
+
+void Camera::HandleResize(VulkanRenderer* renderer)
+{
+    GetTransform()->SetDirty();
+    return; // To fix (Infinite Wait Idle until swapchain invalid ??)
+    if (p_requestedSize == p_renderTargetSize || p_requestedSize.x <= 0 || p_requestedSize.y <= 0)
+        return;
+    if (!m_gBufferMaterial || !m_gBufferMaterial->HasBeenSent())
+        return;
+
+    renderer->WaitForGPU();
+
+    const uint32_t w = static_cast<uint32_t>(p_requestedSize.x);
+    const uint32_t h = static_cast<uint32_t>(p_requestedSize.y);
+
+    m_gBuffer->Resize(w, h);
+    m_compositionMaterial->SetAttribute("gPosition",         MakeGBufferTexture(m_positionTexture,            m_gBuffer->GetPosition(),         m_gBuffer->GetSampler(), w, h));
+    m_compositionMaterial->SetAttribute("gNormal",           MakeGBufferTexture(m_normalTexture,              m_gBuffer->GetNormal(),           m_gBuffer->GetSampler(), w, h));
+    m_compositionMaterial->SetAttribute("gAlbedo",           MakeGBufferTexture(m_albedoTexture,              m_gBuffer->GetAlbedo(),           m_gBuffer->GetSampler(), w, h));
+    m_compositionMaterial->SetAttribute("gMetallicRoughnessAO", MakeGBufferTexture(m_metallicRoughnessTexture, m_gBuffer->GetMetallicRoughness(), m_gBuffer->GetSampler(), w, h));
+
+    m_renderTarget->Resize(renderer, w, h);
+    if (m_postProcessRenderTarget)
+    {
+        m_postProcessRenderTarget->Resize(renderer, w, h);
+        m_postProcessMaterial->SetAttribute("albedoSampler", m_renderTarget);
+    }
+    
+    PrintWarning("Camera::HandleResize - Resized render targets to %dx%d", w, h);
+
+    p_renderTargetSize = p_requestedSize;
+    p_requestedSize = Vec2i::Zero();
+
+    GetTransform()->SetDirty();
 }
 
 SafePtr<Texture> Camera::MakeGBufferTexture(SafePtr<Texture> texture, const GBufferAttachment& attachment,
@@ -332,11 +343,6 @@ void Camera::EndForwardPass()
     EndRenderTarget(m_renderTarget.getPtr());
 }
 
-void Camera::UpdateResizeRenderTarget(VulkanRenderer* renderer)
-{
-    ResizeRenderTarget(renderer, p_requestedSize.x, p_requestedSize.y);
-}
-
 void Camera::BeginRenderTarget(const RenderTargetTexture* rtt) const
 {
     if (!rtt)
@@ -345,13 +351,13 @@ void Camera::BeginRenderTarget(const RenderTargetTexture* rtt) const
     VulkanRenderer* renderer = Engine::Get()->GetRenderer();
     VkCommandBuffer commandBuffer = renderer->GetCommandPool()->GetCommandBuffer(renderer->GetFrameIndex());
 
-    if (m_renderTarget->GetDepthBuffer()->NeedsTransition())
+    if (rtt->GetDepthBuffer()->NeedsTransition())
     {
         VulkanUtils::TransitionImageLayout(renderer->GetCommandPool(), renderer->GetDevice()->GetGraphicsQueue(),
                                            VK_IMAGE_LAYOUT_UNDEFINED,
                                            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                                           renderer->GetDevice(), m_renderTarget->GetDepthBuffer()->GetImage());
-        m_renderTarget->GetDepthBuffer()->ValidateTransition();
+                                           renderer->GetDevice(), rtt->GetDepthBuffer()->GetImage());
+        rtt->GetDepthBuffer()->ValidateTransition();
     }
 
     VkImageMemoryBarrier barrier{};
@@ -445,27 +451,103 @@ void Camera::RenderPostProcess(VulkanRenderer* renderer)
     if (!m_postProcessMaterial)
         return;
 
-    BeginRenderTarget(m_postProcessRenderTarget.getPtr());
-
     if (!m_postProcessMaterial.valid() || !m_quad.valid())
         return;
-    if (!m_postProcessMaterial->SentToGPU() || !m_quad->SentToGPU())
+    if (!m_postProcessMaterial->HasBeenSent() || !m_quad->HasBeenSent())
         return;
-
     if (!renderer->BindShader(m_postProcessMaterial->GetShader().getPtr()))
         return;
+
+    BeginRenderTarget(m_postProcessRenderTarget.getPtr());
+
     if (!renderer->BindMaterial(m_postProcessMaterial.getPtr()))
+    {
+        EndRenderTarget(m_postProcessRenderTarget.getPtr()); // can't early-return without closing
         return;
+    }
+
     m_postProcessMaterial->SendAllValues(renderer);
     renderer->BindVertexBuffers(m_quad->GetVertexBuffer(), m_quad->GetIndexBuffer());
     uint32_t startIndex = m_quad->GetSubMeshes()[0].startIndex;
     uint32_t indexCount = m_quad->GetSubMeshes()[0].count;
-    renderer->DrawVertexSubMesh(m_quad->GetIndexBuffer(),
-                                startIndex,
-                                indexCount);
+    renderer->DrawVertexSubMesh(m_quad->GetIndexBuffer(), startIndex, indexCount);
+
     EndRenderTarget(m_postProcessRenderTarget.getPtr());
 }
 
+void Camera::BlitToSwapchain(VulkanRenderer* renderer)
+{
+    SafePtr<RenderTargetTexture> source = GetRenderTarget();
+    if (!source) return;
+
+    VkCommandBuffer cmd = renderer->GetCommandPool()->GetCommandBuffer(renderer->GetFrameIndex());
+    
+    renderer->GetRenderPass()->End(cmd);
+    renderer->SetBlittedToSwapchain(true);
+
+    VkImage srcImage = source->GetBuffer()->GetImage();
+    VkImage dstImage = renderer->GetSwapChain()->GetImages()[renderer->GetImageIndex()];
+
+    VkImageMemoryBarrier srcBarrier{};
+    srcBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    srcBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    srcBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    srcBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    srcBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    srcBarrier.image = srcImage;
+    srcBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    srcBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    srcBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+    VkImageMemoryBarrier dstBarrier{};
+    dstBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    dstBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    dstBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    dstBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    dstBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    dstBarrier.image = dstImage;
+    dstBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    dstBarrier.srcAccessMask = 0;
+    dstBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+    VkImageMemoryBarrier preBarriers[] = {srcBarrier, dstBarrier};
+    vkCmdPipelineBarrier(cmd,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         0, 0, nullptr, 0, nullptr, 2, preBarriers);
+
+    VkImageBlit blitRegion{};
+    blitRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blitRegion.srcOffsets[0] = {0, 0, 0};
+    blitRegion.srcOffsets[1] = {p_renderTargetSize.x, p_renderTargetSize.y, 1};
+    blitRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blitRegion.dstOffsets[0] = {0, 0, 0};
+    blitRegion.dstOffsets[1] = {
+        static_cast<int32_t>(renderer->GetSwapChain()->GetExtent().width),
+        static_cast<int32_t>(renderer->GetSwapChain()->GetExtent().height), 1
+    };
+
+    vkCmdBlitImage(cmd,
+                   srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                   dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                   1, &blitRegion, VK_FILTER_LINEAR);
+
+    srcBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    srcBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    srcBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    srcBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    dstBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    dstBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    dstBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    dstBarrier.dstAccessMask = 0;
+
+    VkImageMemoryBarrier postBarriers[] = {srcBarrier, dstBarrier};
+    vkCmdPipelineBarrier(cmd,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                         0, 0, nullptr, 0, nullptr, 2, postBarriers);
+}
 
 void Camera::BeginGBufferPass(RenderTargetTexture* rtt)
 {

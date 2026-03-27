@@ -211,7 +211,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
 
 void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
 {
-    if (!m_mesh || !m_mesh->IsLoaded() || !m_mesh->SentToGPU()) 
+    if (!m_mesh || !m_mesh->IsLoaded() || !m_mesh->HasBeenSent()) 
         return;
     if (!m_particleBuffer || !m_material) 
         return;
@@ -433,6 +433,7 @@ void GPUSoftBodyComponent::MapMeshToParticles(std::vector<WeightedVertex> &verti
     {
         struct ParticleDist
         {
+            Vec3f pos;
             uint32_t id;
             float dist;
         };
@@ -443,12 +444,14 @@ void GPUSoftBodyComponent::MapMeshToParticles(std::vector<WeightedVertex> &verti
         uint32_t count = 0;
         for (uint32_t l = 0; l < m_particles.size(); l++)
         {
-            float d = m_particles[l].position.Distance(pos);
+            Vec3f pos2 = m_particles[l].position;
+            float d = pos2.Distance(pos);
             if (count < closests.size())
             {
                 ParticleDist p;
                 p.id = l;
                 p.dist = d;
+                p.pos = pos2;
                 closests[count] = p;
                 count++;
                 continue;
@@ -463,11 +466,39 @@ void GPUSoftBodyComponent::MapMeshToParticles(std::vector<WeightedVertex> &verti
                     }
                     closests[m].id = l;
                     closests[m].dist = d;
+                    closests[m].pos = pos2;
                     break;
                 }
             }
         }
-        vertices[i].weights = Vec4f(1, 0, 0, 0);
+
+        Vec3f weights = Vec3f();
+        Vec3f normal = (closests[1].pos - closests[0].pos).Cross(closests[2].pos - closests[0].pos);
+        float area = normal.Length();
+        area = std::copysign(area, normal.x * normal.y * normal.z);
+        if (std::abs(area) > 0.001f)
+        {
+            normal = normal.GetNormalize();
+            Vec3f pos2 = pos - normal * normal.Dot(pos - closests[0].pos);
+
+            for (uint32_t l = 0; l < 3; l++)
+            {
+                Vec3f normal1 = (closests[(l+1)%3].pos - pos2).Cross(closests[(l+2)%3].pos - pos2);
+                float area1 = normal1.Length();
+                area1 = std::copysign(area1, normal1.x * normal1.y * normal1.z);
+                float w = std::max(area1 / area, 0.0f);
+                weights[l] = w;
+            }
+        }
+        else
+        {
+            weights = Vec4f(1.0f, 0, 0, 0);
+        }
+        float l = weights[0] + weights[1] + weights[2];
+        if (l <= 0.0001f)
+            vertices[i].weights = Vec4f(1.0f, 0.0f, 0.0f, 0.0f);
+        else
+            vertices[i].weights = Vec4f(weights / l, 0.0f);
         vertices[i].indices = Vec4i(closests[0].id, closests[1].id, closests[2].id, -1);
     }
 }
@@ -671,7 +702,7 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
     for (int i = 0; i < m_particles.size(); i++)
     {
         m_particles[i].connectionsOffset = static_cast<uint32_t>(m_connections.size());
-        if (m_particles[i].position.y <= BBox.min.y + 0.1f) continue;
+        if (m_particles[i].position.y <= BBox.min.y + 0.2f) continue;
 
         for (int j = 0; j < m_particles.size(); j++)
         {

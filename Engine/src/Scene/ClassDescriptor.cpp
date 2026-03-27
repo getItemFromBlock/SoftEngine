@@ -6,6 +6,9 @@ Property& ClassDescriptor::AddProperty(const char* name, PropertyType type, void
     property.name = name;
     property.type = type;
     property.data = data;
+    // This makes it so that the float ranges is [1; -1] so minValue > maxValue with both int and float
+    property.range.intRange.minInt = 0x3f800000;
+    property.range.intRange.maxInt = 0xbf800000;
     properties.push_back(property);
     return properties.back();
 }

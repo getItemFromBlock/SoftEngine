@@ -1,11 +1,13 @@
 #include <iostream>
 
 #include "Core/Editor.h"
+#include <Utils/Platform.h>
 
 int Run(int argc, char** argv, char** envp)
 {
     (void)argc; (void)argv; (void)envp;
 
+    Platform::SetThreadName(-1, "Main Thread");
     Editor* editor = Editor::Create();
     editor->Initialize();
     editor->Run();
