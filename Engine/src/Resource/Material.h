@@ -127,8 +127,9 @@ private:
 
     std::unordered_map<std::string, uint32_t> m_attributesToSync;
 
-    EventHandle m_shaderChangeEvent;
 
     std::map<std::pair<uint32_t, uint32_t>, std::vector<uint8_t>> m_uniformScratch;
     std::vector<UBOWriteEntry> m_writeEntries;
+    
+    std::atomic_bool m_shaderComputed = true;
 };

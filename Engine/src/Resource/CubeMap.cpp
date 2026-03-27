@@ -352,164 +352,364 @@ bool CubeMap::GeneratePrefiltered(VulkanRenderer* renderer, uint32_t resolution,
     return true;
 }
 
+static std::map<uint32_t, std::vector<CubeMap*>> s_brdfWaiters;
+
 bool CubeMap::GenerateBRDFLut(VulkanRenderer* renderer, uint32_t resolution)
 {
     auto resourceManager = Engine::Get()->GetResourceManager();
-    SafePtr<Shader> brdfShader = resourceManager->Load<Shader>(
-        RESOURCE_PATH"shaders/BRDFLutCompute/brdf_lut.shader");
+    std::string textureName = "BRDF_" + std::to_string(resolution);
+
+    if (std::shared_ptr<Texture> tex = resourceManager->GetResource<Texture>(textureName))
+    {
+        m_brdfLutTexture = tex;
+        m_brdfLutReady = true;
+        return true;
+    }
+
+    std::filesystem::path cachePath = ResourceManager::GetCacheDir() / "brdf";
+    std::filesystem::create_directories(cachePath);
+    auto fileCachePath = cachePath / (textureName + ".cache");
+
+    if (std::filesystem::exists(fileCachePath))
+    {
+        if (LoadBRDFLutFromCache(renderer, resolution, fileCachePath, textureName))
+            return true;
+
+        PrintError("CubeMap: Failed to load BRDF LUT from cache, recomputing");
+    }
+
+    if (s_brdfWaiters.contains(resolution))
+    {
+        s_brdfWaiters[resolution].push_back(this);
+        return true;
+    }
+
+    s_brdfWaiters[resolution] = {};
 
     m_brdfLut = std::make_unique<VulkanTexture>();
     if (!m_brdfLut->Create(renderer->GetDevice(), resolution, resolution,
                            VK_FORMAT_R16G16_SFLOAT,
-                           VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT))
+                           VK_IMAGE_USAGE_STORAGE_BIT |
+                           VK_IMAGE_USAGE_SAMPLED_BIT |
+                           VK_IMAGE_USAGE_TRANSFER_SRC_BIT))
     {
         PrintError("CubeMap: Failed to create BRDF LUT texture");
+        s_brdfWaiters.erase(resolution);
         return false;
     }
 
-    brdfShader->EOnSentToGPU.Bind([this, renderer, resolution, brdfShader]()
+    SafePtr<Shader> brdfShader = resourceManager->Load<Shader>(
+        RESOURCE_PATH"shaders/BRDFLutCompute/brdf_lut.shader");
+
+    brdfShader->EOnSentToGPU.Bind([this, renderer, resolution, brdfShader, textureName, fileCachePath]()
     {
         m_brdfLutCompute = brdfShader->CreateDispatch(renderer);
-        auto device = renderer->GetDevice();
-        VulkanMaterial* mat = m_brdfLutCompute->GetMaterial();
+        DispatchBRDFLutCompute(renderer, resolution, fileCachePath, textureName);
+    });
 
-        // Transition
-        {
-            VkCommandBufferAllocateInfo allocInfo{};
-            allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-            allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-            allocInfo.commandPool = renderer->GetCommandPool()->GetCommandPool();
-            allocInfo.commandBufferCount = 1;
+    return true;
+}
 
-            VkCommandBuffer transitionCmd;
-            vkAllocateCommandBuffers(device->GetDevice(), &allocInfo, &transitionCmd);
+bool CubeMap::LoadBRDFLutFromCache(VulkanRenderer* renderer, uint32_t resolution,
+                                   const std::filesystem::path& fileCachePath,
+                                   const std::string& textureName)
+{
+    const VkDeviceSize dataSize = resolution * resolution * 4;
 
-            VkCommandBufferBeginInfo beginInfo{};
-            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-            beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-            vkBeginCommandBuffer(transitionCmd, &beginInfo);
+    std::ifstream file(fileCachePath, std::ios::binary);
+    if (!file)
+        return false;
 
-            VkImageMemoryBarrier initBarrier{};
-            initBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-            initBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            initBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-            initBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            initBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            initBarrier.image = m_brdfLut->GetImage();
-            initBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-            initBarrier.srcAccessMask = 0;
-            initBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    std::vector<uint8_t> pixels(dataSize);
+    file.read(reinterpret_cast<char*>(pixels.data()), dataSize);
+    if (!file)
+        return false;
 
-            vkCmdPipelineBarrier(transitionCmd,
-                                 VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                                 0, 0, nullptr, 0, nullptr, 1, &initBarrier);
+    m_brdfLut = std::make_unique<VulkanTexture>();
+    if (!m_brdfLut->Create(renderer->GetDevice(), resolution, resolution,
+                           VK_FORMAT_R16G16_SFLOAT,
+                           VK_IMAGE_USAGE_STORAGE_BIT |
+                           VK_IMAGE_USAGE_SAMPLED_BIT |
+                           VK_IMAGE_USAGE_TRANSFER_DST_BIT))
+        return false;
 
-            vkEndCommandBuffer(transitionCmd);
+    auto device = renderer->GetDevice();
 
-            VkSubmitInfo submitInfo{};
-            submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-            submitInfo.commandBufferCount = 1;
-            submitInfo.pCommandBuffers = &transitionCmd;
+    VulkanBuffer stagingBuffer;
+    stagingBuffer.Initialize(device, dataSize,
+                             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-            {
-                std::scoped_lock lock(*device->GetGraphicsQueue().mutex);
-                vkQueueSubmit(device->GetGraphicsQueue().handle, 1, &submitInfo, VK_NULL_HANDLE);
-            }
-            vkQueueWaitIdle(device->GetGraphicsQueue().handle);
-            vkFreeCommandBuffers(device->GetDevice(),
-                                 renderer->GetCommandPool()->GetCommandPool(), 1, &transitionCmd);
-        }
+    void* mapped;
+    vkMapMemory(device->GetDevice(), stagingBuffer.GetBufferMemory(), 0, dataSize, 0, &mapped);
+    memcpy(mapped, pixels.data(), dataSize);
+    vkUnmapMemory(device->GetDevice(), stagingBuffer.GetBufferMemory());
 
-        // Bind output LUT as storage image
-        VkDescriptorImageInfo imageInfo{};
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-        imageInfo.imageView = m_brdfLut->GetImageView();
-        imageInfo.sampler = VK_NULL_HANDLE;
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = renderer->GetCommandPool()->GetCommandPool();
+    allocInfo.commandBufferCount = 1;
 
-        VkWriteDescriptorSet write{};
-        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet = mat->GetDescriptorSet(0)->GetDescriptorSet(renderer->GetFrameIndex());
-        write.dstBinding = 0;
-        write.dstArrayElement = 0;
-        write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        write.descriptorCount = 1;
-        write.pImageInfo = &imageInfo;
-        vkUpdateDescriptorSets(device->GetDevice(), 1, &write, 0, nullptr);
+    VkCommandBuffer cmd;
+    vkAllocateCommandBuffers(device->GetDevice(), &allocInfo, &cmd);
 
-        // Record dispatch
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(cmd, &beginInfo);
+
+    VkImageMemoryBarrier toTransfer{};
+    toTransfer.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    toTransfer.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    toTransfer.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    toTransfer.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toTransfer.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toTransfer.image = m_brdfLut->GetImage();
+    toTransfer.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    toTransfer.srcAccessMask = 0;
+    toTransfer.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    vkCmdPipelineBarrier(cmd,
+                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         0, 0, nullptr, 0, nullptr, 1, &toTransfer);
+
+    VkBufferImageCopy region{};
+    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region.imageExtent = {resolution, resolution, 1};
+    vkCmdCopyBufferToImage(cmd, stagingBuffer.GetBuffer(), m_brdfLut->GetImage(),
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+    VkImageMemoryBarrier toReadOnly{};
+    toReadOnly.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    toReadOnly.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    toReadOnly.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    toReadOnly.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toReadOnly.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toReadOnly.image = m_brdfLut->GetImage();
+    toReadOnly.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    toReadOnly.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    toReadOnly.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    vkCmdPipelineBarrier(cmd,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                         0, 0, nullptr, 0, nullptr, 1, &toReadOnly);
+
+    vkEndCommandBuffer(cmd);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &cmd;
+    {
+        std::scoped_lock lock(*device->GetGraphicsQueue().mutex);
+        vkQueueSubmit(device->GetGraphicsQueue().handle, 1, &submitInfo, VK_NULL_HANDLE);
+    }
+    vkQueueWaitIdle(device->GetGraphicsQueue().handle);
+    vkFreeCommandBuffers(device->GetDevice(),
+                         renderer->GetCommandPool()->GetCommandPool(), 1, &cmd);
+
+    RegisterBRDFLutTexture(textureName, resolution);
+    return true;
+}
+
+void CubeMap::DispatchBRDFLutCompute(VulkanRenderer* renderer, uint32_t resolution,
+                                     const std::filesystem::path& fileCachePath,
+                                     const std::string& textureName)
+{
+    auto device = renderer->GetDevice();
+    VulkanMaterial* mat = m_brdfLutCompute->GetMaterial();
+
+    // Transition
+    {
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocInfo.commandPool = renderer->GetCommandPool()->GetCommandPool();
         allocInfo.commandBufferCount = 1;
 
-        VkCommandBuffer cmd;
-        vkAllocateCommandBuffers(device->GetDevice(), &allocInfo, &cmd);
+        VkCommandBuffer transitionCmd;
+        vkAllocateCommandBuffers(device->GetDevice(), &allocInfo, &transitionCmd);
 
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-        vkBeginCommandBuffer(cmd, &beginInfo);
+        vkBeginCommandBuffer(transitionCmd, &beginInfo);
 
-        mat->GetPipeline()->Bind(cmd, VK_PIPELINE_BIND_POINT_COMPUTE);
-        mat->BindForCompute(cmd, renderer->GetFrameIndex());
+        VkImageMemoryBarrier initBarrier{};
+        initBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        initBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        initBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        initBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        initBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        initBarrier.image = m_brdfLut->GetImage();
+        initBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        initBarrier.srcAccessMask = 0;
+        initBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 
-        uint32_t groups = (resolution + 7) / 8;
-        vkCmdDispatch(cmd, groups, groups, 1);
-
-        VkImageMemoryBarrier finalBarrier{};
-        finalBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        finalBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-        finalBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        finalBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        finalBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        finalBarrier.image = m_brdfLut->GetImage();
-        finalBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        finalBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-        finalBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-        vkCmdPipelineBarrier(cmd,
+        vkCmdPipelineBarrier(transitionCmd,
+                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                              VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                             0, 0, nullptr, 0, nullptr, 1, &finalBarrier);
+                             0, 0, nullptr, 0, nullptr, 1, &initBarrier);
 
-        vkEndCommandBuffer(cmd);
+        vkEndCommandBuffer(transitionCmd);
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &cmd;
+        submitInfo.pCommandBuffers = &transitionCmd;
 
         {
             std::scoped_lock lock(*device->GetGraphicsQueue().mutex);
             vkQueueSubmit(device->GetGraphicsQueue().handle, 1, &submitInfo, VK_NULL_HANDLE);
         }
         vkQueueWaitIdle(device->GetGraphicsQueue().handle);
-
         vkFreeCommandBuffers(device->GetDevice(),
-                             renderer->GetCommandPool()->GetCommandPool(), 1, &cmd);
+                             renderer->GetCommandPool()->GetCommandPool(), 1, &transitionCmd);
+    }
 
-        m_brdfLutReady = true;
+    // Bind output LUT as storage image
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imageInfo.imageView = m_brdfLut->GetImageView();
+    imageInfo.sampler = VK_NULL_HANDLE;
 
-        m_brdfLutTexture = std::make_shared<Texture>("BRDF Temp");
-        m_brdfLutTexture->CreateFromBuffer(
-            GBufferAttachment{
-                .image = m_brdfLut->GetImage(),
-                .memory = m_brdfLut->GetImageMemory(),
-                .imageView = m_brdfLut->GetImageView(),
-                .format = m_brdfLut->GetFormat()
-            },
-            m_brdfLut->GetSampler(),
-            resolution,
-            resolution
-        );
-        m_brdfLutTexture->SetLoaded();
-        m_brdfLutTexture->SetSentToGPU();
-    });
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = mat->GetDescriptorSet(0)->GetDescriptorSet(renderer->GetFrameIndex());
+    write.dstBinding = 0;
+    write.dstArrayElement = 0;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    write.descriptorCount = 1;
+    write.pImageInfo = &imageInfo;
+    vkUpdateDescriptorSets(device->GetDevice(), 1, &write, 0, nullptr);
 
-    return true;
+    // Record dispatch
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = renderer->GetCommandPool()->GetCommandPool();
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer cmd;
+    vkAllocateCommandBuffers(device->GetDevice(), &allocInfo, &cmd);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(cmd, &beginInfo);
+
+    mat->GetPipeline()->Bind(cmd, VK_PIPELINE_BIND_POINT_COMPUTE);
+    mat->BindForCompute(cmd, renderer->GetFrameIndex());
+
+    uint32_t groups = (resolution + 7) / 8;
+    vkCmdDispatch(cmd, groups, groups, 1);
+
+    VkImageMemoryBarrier toTransfer{};
+    toTransfer.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    toTransfer.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    toTransfer.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    toTransfer.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toTransfer.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toTransfer.image = m_brdfLut->GetImage();
+    toTransfer.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    toTransfer.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    toTransfer.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    vkCmdPipelineBarrier(cmd,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         0, 0, nullptr, 0, nullptr, 1, &toTransfer);
+
+    const VkDeviceSize dataSize = resolution * resolution * 4;
+    VulkanBuffer stagingBuffer;
+    stagingBuffer.Initialize(device, dataSize,
+                             VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    VkBufferImageCopy region{};
+    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region.imageExtent = {resolution, resolution, 1};
+    vkCmdCopyImageToBuffer(cmd, m_brdfLut->GetImage(),
+                           VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                           stagingBuffer.GetBuffer(), 1, &region);
+
+    VkImageMemoryBarrier finalBarrier{};
+    finalBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    finalBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    finalBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    finalBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    finalBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    finalBarrier.image = m_brdfLut->GetImage();
+    finalBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    finalBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    finalBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    vkCmdPipelineBarrier(cmd,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                         0, 0, nullptr, 0, nullptr, 1, &finalBarrier);
+
+    vkEndCommandBuffer(cmd);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &cmd;
+    {
+        std::scoped_lock lock(*device->GetGraphicsQueue().mutex);
+        vkQueueSubmit(device->GetGraphicsQueue().handle, 1, &submitInfo, VK_NULL_HANDLE);
+    }
+    vkQueueWaitIdle(device->GetGraphicsQueue().handle);
+    vkFreeCommandBuffers(device->GetDevice(),
+                         renderer->GetCommandPool()->GetCommandPool(), 1, &cmd);
+
+    void* mapped;
+    vkMapMemory(device->GetDevice(), stagingBuffer.GetBufferMemory(), 0, dataSize, 0, &mapped);
+    std::ofstream file(fileCachePath, std::ios::binary | std::ios::trunc);
+    if (file)
+    {
+        file.write(static_cast<const char*>(mapped), dataSize);
+    }
+    else
+    {
+        PrintError("CubeMap: Failed to write BRDF LUT cache to %s",
+               fileCachePath.generic_string().c_str());
+    }
+    vkUnmapMemory(device->GetDevice(), stagingBuffer.GetBufferMemory());
+
+    RegisterBRDFLutTexture(textureName, resolution);
 }
+
+void CubeMap::RegisterBRDFLutTexture(const std::string& textureName, uint32_t resolution)
+{
+    m_brdfLutTexture = std::make_shared<Texture>(textureName);
+    m_brdfLutTexture->CreateFromBuffer(
+        GBufferAttachment{
+            .image = m_brdfLut->GetImage(),
+            .memory = m_brdfLut->GetImageMemory(),
+            .imageView = m_brdfLut->GetImageView(),
+            .format = m_brdfLut->GetFormat()
+        },
+        m_brdfLut->GetSampler(),
+        resolution, resolution);
+    m_brdfLutTexture->SetLoaded();
+    m_brdfLutTexture->SetSentToGPU();
+
+    ResourceManager* rm = Engine::Get()->GetResourceManager();
+    rm->AddResource(m_brdfLutTexture);
+    m_brdfLutReady = true;
+
+    auto it = s_brdfWaiters.find(resolution);
+    if (it != s_brdfWaiters.end())
+    {
+        for (CubeMap* waiter : it->second)
+        {
+            waiter->m_brdfLutTexture = m_brdfLutTexture;
+            waiter->m_brdfLutReady = true;
+        }
+        s_brdfWaiters.erase(it);
+    }
+}
+
 
 VulkanTexture* CubeMap::GetPrefilteredCubemap() const
 {

@@ -1,5 +1,5 @@
  ------------- Shader ------------- 
 [vert] : postprocess.vert
-[frag] : inverted.frag
+[frag] : cellShadingEdgeDetection.frag
 [depthTest] : false
  ============= Shader ============= 

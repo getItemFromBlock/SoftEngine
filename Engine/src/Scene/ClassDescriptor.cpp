@@ -1,5 +1,24 @@
 #include "ClassDescriptor.h"
 
+#include "Core/UUID.h"
+
+Property& ClassDescriptor::PushID(std::string id)
+{
+    Property property;
+    property.name = id;
+    property.type = PropertyType::PushID;
+    properties.push_back(property);
+    return properties.back();
+}
+
+Property& ClassDescriptor::PopID()
+{
+    Property property;
+    property.type = PropertyType::PopID;
+    properties.push_back(property);
+    return properties.back();
+}
+
 Property& ClassDescriptor::AddProperty(const char* name, PropertyType type, void* data)
 {
     Property property;

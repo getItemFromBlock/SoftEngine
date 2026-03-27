@@ -18,6 +18,22 @@ void MeshComponent::Describe(ClassDescriptor& d)
     property.type = PropertyType::Material;
     property.name = "Materials";
     property.isList = true;
+    property.addElement = [this]()
+    {
+        auto resourceManager = Engine::Get()->GetResourceManager();
+        AddMaterial(resourceManager->GetDefaultMaterial());  
+    };
+    property.removeElement = [this](int index)
+    {
+        auto material = m_materials[index];
+        RemoveMaterial(material);
+    };
+    property.setElement = [this](size_t index, void* materialData)
+    {
+        SafePtr<Material> material = *static_cast<SafePtr<Material>*>(materialData);
+        SetMaterial(index, material);
+    };
+    
     d.AddProperty(property);
 }
 

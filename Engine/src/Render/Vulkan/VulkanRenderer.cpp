@@ -170,6 +170,16 @@ void VulkanRenderer::Update()
 
 bool VulkanRenderer::BeginFrame()
 {
+    // Callbacks
+    std::unordered_map<Core::UUID, std::function<void()>> callbacks;
+    {
+        std::scoped_lock lock(m_beforeRenderMutex);
+        callbacks.swap(m_beforeRender);
+    }
+
+    for (auto& [id, method] : callbacks)
+        method();
+    
     p_triangleCount = 0;
     p_vertexCount = 0;
     m_imageIndex = 0;
@@ -297,6 +307,16 @@ void VulkanRenderer::EndFrame()
     }
 
     m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+    
+    // Callbacks
+    std::unordered_map<Core::UUID, std::function<void()>> callbacks;
+    {
+        std::scoped_lock lock(m_afterRenderMutex);
+        callbacks.swap(m_afterRender);
+    }
+
+    for (auto& [id, method] : callbacks)
+        method();
 }
 
 void VulkanRenderer::SendPushConstants(void* data, uint32_t size, Shader* shader, PushConstant pushConstant) const
@@ -679,15 +699,35 @@ void VulkanRenderer::ClearColor() const
     }
 
     m_renderPass->Begin(commandBuffer, 
-                       m_swapChain->GetImageViews()[imageIndex], 
-                       m_depthBuffer->GetImageView(), 
-                       m_swapChain->GetExtent(), 
-                       clearValues);
+                        m_swapChain->GetImageViews()[imageIndex], 
+                        m_depthBuffer->GetImageView(), 
+                        m_swapChain->GetExtent(), 
+                        clearValues);
 }
 
 void VulkanRenderer::AddLine(const Vec3f& start, const Vec3f& end, const Vec4f& color, float thickness)
 {
     m_lineRenderer.AddLine(start, end, color, thickness);
+}
+
+Core::UUID VulkanRenderer::AddBeforeRenderCallback(const std::function<void()>& method, Core::UUID uuid)
+{
+    if (uuid == UUID_INVALID)
+        uuid = {};
+    m_beforeRenderMutex.lock();
+    m_beforeRender[uuid] = method;
+    m_beforeRenderMutex.unlock();
+    return uuid;
+}
+
+Core::UUID VulkanRenderer::AddAfterRenderCallback(const std::function<void()>& method, Core::UUID uuid)
+{
+    if (uuid == UUID_INVALID)
+        uuid = {};
+    m_afterRenderMutex.lock();
+    m_afterRender[uuid] = method;
+    m_afterRenderMutex.unlock();
+    return uuid;
 }
 
 void VulkanRenderer::RecreateSwapChain()

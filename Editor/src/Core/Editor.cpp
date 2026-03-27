@@ -59,6 +59,12 @@ void Editor::Initialize()
     resourceManager->Load<Model>(RESOURCE_PATH"/models/Plane.obj");
     resourceManager->Load<CubeMap>(RESOURCE_PATH"/envMap/wooden_studio_09_4k.hdr");
     resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/inverted.pshader");
+    resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/gammaCorrection.pshader");
+    resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/grayscale.pshader");
+    resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/vignette.pshader");
+    resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/gaussianBlur.pshader");
+    resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/cellShadingEdgeDetection.pshader");
+    resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/pixelate.pshader");
     
     auto sponza = resourceManager->Load<Model>(RESOURCE_PATH"models/Test/DamagedHelmet.gltf");
     sponza->EOnLoaded.Bind([this, currentScene, sponza]()
@@ -66,7 +72,7 @@ void Editor::Initialize()
         auto go = Model::CreateGameObject(sponza.getPtr(), currentScene);
         go->GetTransform()->SetLocalPosition({0, 0, -5});
     });
-    // model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Sponza/sponza.obj");
+    
     model = resourceManager->Load<Model>(RESOURCE_PATH"models/Plane.obj");
 
     model->EOnLoaded.Bind([model, this, currentScene, resourceManager]()
