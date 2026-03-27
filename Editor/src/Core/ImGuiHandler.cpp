@@ -146,8 +146,15 @@ void ImGuiHandler::Initialize(Window* window, VulkanRenderer* renderer)
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
-    // SetupStyle();
-    ImGui::StyleColorsDark();
+    SetupStyle();
+    ImGuiStyle& style = ImGui::GetStyle();
+    for (int i = 0; i < ImGuiCol_COUNT; i++)
+    {
+        ImVec4& col = style.Colors[i];
+        col.x = powf(col.x, 2.2f);
+        col.y = powf(col.y, 2.2f);
+        col.z = powf(col.z, 2.2f);
+    }
 
     ImGui_ImplGlfw_InitForVulkan(glfwWindow, true);
 

@@ -77,18 +77,17 @@ void Material::Describe(ClassDescriptor& descriptor)
 
 void Material::SetShader(const SafePtr<Shader>& shader)
 {
+    p_state = ResourceState::SendingToGPU;
     m_shaderComputed = false;
     m_shader = shader;
     m_shader->EOnSentToGPU.Bind([this]()
     {
         auto renderer = Engine::Get()->GetRenderer();
-        
-        PrintLog("Before Add %s : %lld", p_path.generic_string().c_str(), std::to_string(GetUUID()).c_str());
         renderer->AddAfterRenderCallback([this, renderer]()
         {
-            PrintLog("On Shader changed %s 3", p_path.generic_string().c_str());
             OnShaderChanged();
             m_shaderComputed = true;
+            p_state = ResourceState::SentToGPU;
         }, GetUUID());
     });
 }

@@ -705,9 +705,37 @@ void VulkanRenderer::ClearColor() const
                         clearValues);
 }
 
-void VulkanRenderer::AddLine(const Vec3f& start, const Vec3f& end, const Vec4f& color, float thickness)
+void VulkanRenderer::DrawLine(const Vec3f& start, const Vec3f& end, const Vec4f& color, float thickness)
 {
     m_lineRenderer.AddLine(start, end, color, thickness);
+}
+
+void VulkanRenderer::DrawWireCube(const Vec3f& center, const Vec3f& size, const Vec4f& color, float thickness)
+{
+    // Define the eight vertices of the cube
+    Vec3f vertices[8];
+    vertices[0] = center + Vec3f(-size.x, -size.y, -size.z);
+    vertices[1] = center + Vec3f(size.x, -size.y, -size.z);
+    vertices[2] = center + Vec3f(size.x, size.y, -size.z);
+    vertices[3] = center + Vec3f(-size.x, size.y, -size.z);
+    vertices[4] = center + Vec3f(-size.x, -size.y, size.z);
+    vertices[5] = center + Vec3f(size.x, -size.y, size.z);
+    vertices[6] = center + Vec3f(size.x, size.y, size.z);
+    vertices[7] = center + Vec3f(-size.x, size.y, size.z);
+
+    // Draw the edges of the cube
+    DrawLine(vertices[0], vertices[1], color, thickness);
+    DrawLine(vertices[1], vertices[2], color, thickness);
+    DrawLine(vertices[2], vertices[3], color, thickness);
+    DrawLine(vertices[3], vertices[0], color, thickness);
+    DrawLine(vertices[4], vertices[5], color, thickness);
+    DrawLine(vertices[5], vertices[6], color, thickness);
+    DrawLine(vertices[6], vertices[7], color, thickness);
+    DrawLine(vertices[7], vertices[4], color, thickness);
+    DrawLine(vertices[0], vertices[4], color, thickness);
+    DrawLine(vertices[1], vertices[5], color, thickness);
+    DrawLine(vertices[2], vertices[6], color, thickness);
+    DrawLine(vertices[3], vertices[7], color, thickness);
 }
 
 Core::UUID VulkanRenderer::AddBeforeRenderCallback(const std::function<void()>& method, Core::UUID uuid)

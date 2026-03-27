@@ -108,7 +108,9 @@ public:
 
     LineRenderer* GetLineRenderer() { return &m_lineRenderer; }
     SkyboxRenderer* GetSkyboxRenderer() { return &m_skyboxRenderer; }
-    void AddLine(const Vec3f& start, const Vec3f& end, const Vec4f& color, float thickness = 1.f);
+    
+    void DrawLine(const Vec3f& start, const Vec3f& end, const Vec4f& color, float thickness = 1.f);
+    void DrawWireCube(const Vec3f& center, const Vec3f& size, const Vec4f& color, float thickness = 1.f);
     
     void SetBlittedToSwapchain(bool value) { m_blittedToSwapchain = value; }
 
