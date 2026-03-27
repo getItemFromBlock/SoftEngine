@@ -654,51 +654,32 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
 
     Vertex* vertices = reinterpret_cast<Vertex*>(m_initializerMesh->m_vertices.data());
 
-    float invDensity = 1 / density;
-
-    // Place point inside mesh
-    for (float currY = BBox.min.y; currY <= BBox.max.y; currY += invDensity)
+    // Convert mesh into convex meshes
     {
-        for (float currZ = BBox.min.z; currZ <= BBox.max.z; currZ += invDensity)
+        std::vector<Vertex> resConvex {};
+
+        struct Triangle
         {
-            for (float currX = BBox.min.x; currX <= BBox.max.x; currX += invDensity)
-            {
+            Vec3f a, b, c;
+        };
 
-                Vec3f pos = { currX, currY, currZ };
-
-                bool shouldDiscard = false;
-                for (int i = 0; i < pointCount / 3; i++)
-                {
-                    Vec3f a = vertices[i * 3    ].position;
-                    Vec3f b = vertices[i * 3 + 1].position;
-                    Vec3f c = vertices[i * 3 + 2].position;
-
-                    Vec3f n = (b - a).Cross(c - a);
-
-                    Vec3f offset = pos - a;
-
-                    if (n.Dot(offset) > 0)
-                    {
-                        shouldDiscard = true;
-                        break;
-                    }
-                }
-                
-                if (shouldDiscard)
-                    continue;
-
-                SBParticleData data = { };
-
-                data.position = pos;
-                data.originalPos = pos;
-                data.velocity = { 0 , 0 , 0 };
-                data.connectionsCount = 0;
-                m_particles.push_back(data);
-            }
-        }
+        // Initial triangle
+        Triangle initTri{
+            vertices[0].position,
+            vertices[1].position,
+            vertices[2].position
+        };
     }
 
-    // Generate connection
+    PlacePointInConvex(BBox, vertices, pointCount, density);
+
+    GenerateConnection(BBox, maxDistToConnect);
+
+    m_totalParticleCount = uint32_t(m_particles.size());
+}
+
+void GPUSoftBodyComponent::GenerateConnection(BoundingBox BBox, float maxDistToConnect)
+{
     for (int i = 0; i < m_particles.size(); i++)
     {
         m_particles[i].connectionsOffset = static_cast<uint32_t>(m_connections.size());
@@ -723,6 +704,51 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
 
         m_particles[i].connectionsCount = static_cast<uint32_t>(m_connections.size() - m_particles[i].connectionsOffset);
     }
-
+    
     m_totalParticleCount = static_cast<uint32_t>(m_particles.size());
+}
+
+void GPUSoftBodyComponent::PlacePointInConvex(BoundingBox BBox, Vertex* vertices, int pointCount, float density)
+{
+    float invDensity = 1 / density;
+
+    for (float currY = BBox.min.y; currY <= BBox.max.y; currY += invDensity)
+    {
+        for (float currZ = BBox.min.z; currZ <= BBox.max.z; currZ += invDensity)
+        {
+            for (float currX = BBox.min.x; currX <= BBox.max.x; currX += invDensity)
+            {
+
+                Vec3f pos = { currX, currY, currZ };
+
+                bool shouldDiscard = false;
+                for (int i = 0; i < pointCount / 3; i++)
+                {
+                    Vec3f a = vertices[i * 3].position;
+                    Vec3f b = vertices[i * 3 + 1].position;
+                    Vec3f c = vertices[i * 3 + 2].position;
+
+                    Vec3f n = (b - a).Cross(c - a);
+
+                    Vec3f offset = pos - a;
+
+                    if (n.Dot(offset) > 0)
+                    {
+                        shouldDiscard = true;
+                        break;
+                    }
+                }
+
+                if (shouldDiscard)
+                    continue;
+
+                SBParticleData data = { };
+
+                data.position = pos;
+                data.velocity = { 0 , 0 , 0 };
+                data.connectionsCount = 0;
+                m_particles.push_back(data);
+            }
+        }
+    }
 }

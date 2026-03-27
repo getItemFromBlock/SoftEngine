@@ -95,6 +95,12 @@ private:
     // Pwease dwo not caww at wuntiwe, i am a sweepy method OwO
     void InitializeParticleDataFromMesh(float density, float maxDistToConnect);
 
+    // Generation from meshes methods
+
+    void PlacePointInConvex(BoundingBox BBox, Vertex* vertices, int pointCount, float density);
+
+    void GenerateConnection(BoundingBox BBox, float maxDistToConnect);
+
 private:
     bool m_loadedFromMesh = false;
     SafePtr<Mesh> m_initializerMesh;
