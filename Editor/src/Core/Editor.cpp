@@ -60,24 +60,60 @@ void Editor::Initialize()
     resourceManager->Load<CubeMap>(RESOURCE_PATH"/envMap/wooden_studio_09_4k.hdr");
     resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/inverted.pshader");
     resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/gammaCorrection.pshader");
-    resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/grayscale.pshader");
-    resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/vignette.pshader");
     resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/gaussianBlur.pshader");
-    resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/cellShadingEdgeDetection.pshader");
     resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/pixelate.pshader");
     
-    model = resourceManager->Load<Model>(RESOURCE_PATH"models/Sponza/Sponza.gltf");
+    
+    auto sponza = resourceManager->Load<Model>(RESOURCE_PATH"models/Cube.obj");
+    sponza->EOnLoaded.Bind([this, currentScene, sponza]()
+    {
+        auto go = Model::CreateGameObject(sponza.getPtr(), currentScene);
+        go->GetTransform()->SetLocalPosition({0, 0, -5});
+    });
+    // model = resourceManager->Load<Model>(RESOURCE_PATH"/models/Sponza/sponza.obj");
+    model = resourceManager->Load<Model>(RESOURCE_PATH"models/Plane.obj");
 
     model->EOnLoaded.Bind([model, this, currentScene, resourceManager]()
     {
-        Vec3f position = {0, 0, 0};
+        auto sphereMaterial = resourceManager->CreateMaterial("SphereMat", resourceManager->GetDefaultShader());
+
+        auto albedo = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/toy_box_diffuse.png");
+        auto normal = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/toy_box_normal.png");
+        auto metallic = resourceManager->Load<Texture>(RESOURCE_PATH"textures/blank.png");
+        auto roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/blank.png");
+        auto ao = resourceManager->Load<Texture>(RESOURCE_PATH"textures/blank.png");
+        auto height = resourceManager->Load<Texture>(RESOURCE_PATH"textures/pbr/toy_box_disp.png");
+
+        auto unorm = TextureParam{.format = TextureFormat::UNORM};
+        normal->SetTextureParameters(unorm);
+        roughness->SetTextureParameters(unorm);
+        metallic->SetTextureParameters(unorm);
+        ao->SetTextureParameters(unorm);
+        height->SetTextureParameters(unorm);
+
+        sphereMaterial->SetAttribute("material.color", Vec4f::One());
+        sphereMaterial->SetAttribute("albedoSampler", albedo);
+        sphereMaterial->SetAttribute("normalSampler", normal);
+        sphereMaterial->SetAttribute("roughnessSampler", roughness);
+        sphereMaterial->SetAttribute("metalnessSampler", metallic);
+        sphereMaterial->SetAttribute("aoSampler", ao);
+        sphereMaterial->SetAttribute("heightSampler", height);
+        sphereMaterial->SetAttribute("material.roughnessFactor", 1.f);
+        sphereMaterial->SetAttribute("material.metalnessFactor", 1.f);
+        sphereMaterial->SetAttribute("material.aoFactor", 1.f);
+        sphereMaterial->SetAttribute("material.heightScale", 0.1f);
+
+        Vec3f position = {-4, 0, 0};
         auto go = Model::CreateGameObject(model.getPtr(), currentScene);
         go->GetTransform()->SetLocalPosition(position);
+        go->GetComponent<MeshComponent>()->SetMaterial(0, sphereMaterial);
         
         auto light = currentScene->CreateGameObject();
         light->SetName("Light");
         light->AddComponent<LightComponent>()->SetIntensity(1.f);
-        light->GetTransform()->SetLocalPosition(Vec3f(0,0,-3.0f));        
+        light->GetTransform()->SetLocalPosition(Vec3f(0,0,-3.0f));
+        //light->AddComponent<TestComponent>()->AttachToCamera(true);
+        
     });
 
     model->EOnLoaded.Bind([model, this, currentScene]()

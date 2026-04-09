@@ -422,6 +422,7 @@ void Camera::HandleResize(VulkanRenderer* renderer)
     p_renderTargetSize = p_requestedSize;
     p_requestedSize = Vec2i::Zero();
     */
+    //TODO: Fix resize
     GetTransform()->SetDirty();
 }
 
@@ -486,8 +487,7 @@ void Camera::BeginRenderTarget(const RenderTargetTexture* rtt, bool clearAttachm
                                            renderer->GetDevice(), rtt->GetDepthBuffer()->GetImage());
         rtt->GetDepthBuffer()->ValidateTransition();
     }
-
-    // transition from SHADER_READ_ONLY to COLOR_ATTACHMENT
+    
     VkImageMemoryBarrier colorBarrier{};
     colorBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     colorBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -613,9 +613,7 @@ void Camera::RenderPostProcess(VulkanRenderer* renderer)
             continue;
 
         // Determine which render target is the source and which is the dest.
-        SafePtr<RenderTargetTexture> src = (i == 0)
-                                               ? m_renderTarget
-                                               : m_postProcessRenderTargets[(i - 1) % 2];
+        SafePtr<RenderTargetTexture> src = (i == 0) ? m_renderTarget : m_postProcessRenderTargets[(i - 1) % 2];
         SafePtr<RenderTargetTexture> dest = m_postProcessRenderTargets[i % 2];
         
         mat->SetAttribute("albedoSampler", src);

@@ -662,6 +662,7 @@ void CubeMap::DispatchBRDFLutCompute(VulkanRenderer* renderer, uint32_t resoluti
     vkFreeCommandBuffers(device->GetDevice(),
                          renderer->GetCommandPool()->GetCommandPool(), 1, &cmd);
 
+    // Write to file, so no need to compute every launch
     void* mapped;
     vkMapMemory(device->GetDevice(), stagingBuffer.GetBufferMemory(), 0, dataSize, 0, &mapped);
     std::ofstream file(fileCachePath, std::ios::binary | std::ios::trunc);
