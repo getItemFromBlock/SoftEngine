@@ -67,6 +67,7 @@ public:
     void LoadDefaultShader(const std::filesystem::path& shaderPath);
     void LoadDefaultTexture(const std::filesystem::path& texturePath);
     void LoadBlankTexture(const std::filesystem::path& texturePath);
+    void LoadBlackTexture(const std::filesystem::path& texturePath);
     void LoadDefaultNormal(const std::filesystem::path& texturePath);
     void LoadDefaultMaterial(const std::filesystem::path& materialPath);
     void LoadDefaultCubeMap(const std::filesystem::path& cubeMapPath);
@@ -77,6 +78,7 @@ public:
     std::shared_ptr<Shader> GetDefaultShader() const;
     std::shared_ptr<Texture> GetDefaultTexture() const;
     std::shared_ptr<Texture> GetBlankTexture() const;
+    std::shared_ptr<Texture> GetBlackTexture() const;
     std::shared_ptr<Texture> GetDefaultNormal() const;
     std::shared_ptr<Material> GetDefaultMaterial() const;
     std::shared_ptr<CubeMap> GetDefaultCubeMap() const;
@@ -106,6 +108,7 @@ private:
 
     Core::UUID m_defaultTexture;
     Core::UUID m_blankTexture;
+    Core::UUID m_blackTexture;
     Core::UUID m_defaultNormal;
     Core::UUID m_defaultShader;
     Core::UUID m_defaultMaterial;

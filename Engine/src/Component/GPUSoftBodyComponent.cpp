@@ -80,9 +80,19 @@ void GPUSoftBodyComponent::OnCreate()
     m_billboardMaterial->SetShader(instancingShader);
     m_billboardMaterial->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
     
-    m_material = resourceManager->CreateMaterial("SoftbodySkinned");
-    m_material->SetShader(skinnedShader);
+    m_material = resourceManager->CreateMaterial("SoftbodySkinned", skinnedShader);
     m_material->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
+    m_material->SetAttribute("normalSampler", resourceManager->GetDefaultNormal());
+    m_material->SetAttribute("roughnessSampler", resourceManager->GetBlankTexture());
+    m_material->SetAttribute("metalnessSampler", resourceManager->GetBlankTexture());
+    m_material->SetAttribute("aoSampler", resourceManager->GetBlankTexture());
+    m_material->SetAttribute("heightSampler", resourceManager->GetBlackTexture());
+
+    m_material->SetAttribute("material.color", Vec4f::One());
+    m_material->SetAttribute("material.roughnessFactor", 1.f);
+    m_material->SetAttribute("material.metalnessFactor", 1.f);
+    m_material->SetAttribute("material.aoFactor", 1.f);
+    m_material->SetAttribute("material.heightScale", 0.0f);
 
     m_mesh = std::make_shared<Mesh>("internal");
     m_billboardMesh = resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cube.obj/Cube.mesh");

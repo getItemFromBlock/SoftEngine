@@ -105,6 +105,12 @@ void RenderQueue::SubmitSoftBody(Mesh* mesh, Material* material, VkBuffer partic
     cmd.particleBufferSize = particleBufferSize;
     cmd.particleCount = particleCount;
     cmd.particleGridSize = gridSize;
+    cmd.albedoTexture = material->GetTexture("albedoSampler");
+    cmd.normalTexture = material->GetTexture("normalSampler");
+    cmd.roughnessTexture = material->GetTexture("roughnessSampler");
+    cmd.metallicTexture = material->GetTexture("metalnessSampler");
+    cmd.AOTexture = material->GetTexture("aoSampler");
+    cmd.heightTexture = material->GetTexture("heightSampler");
     cmd.GenerateSortKey();
 
     Submit(cmd);
@@ -215,13 +221,8 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
 {
     const int NUM_TEXTURE = 6;
     const int NUM_UBO = 2;
-    if (!gBufferMaterial || !gBufferMaterial->GetShader()) return;
-
-    auto* vulkanMaterial = gBufferMaterial->GetHandle();
-    auto* pipeline = vulkanMaterial->GetPipeline();
 
     constexpr uint32_t TEXTURE_SET_INDEX = 0;
-    VkDescriptorSetLayout setLayout = pipeline->GetDescriptorSetLayouts()[TEXTURE_SET_INDEX]->GetLayout();
 
     uint32_t maxFrames = renderer->GetMaxFramesInFlight();
     uint32_t frameIndex = renderer->GetFrameIndex();
@@ -232,6 +233,7 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
         std::vector<VkDescriptorPoolSize> sizes = {
             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 512 * NUM_UBO},
             {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 512 * NUM_TEXTURE},
+            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 512 * 1},
         };
         for (uint32_t i = 0; i < maxFrames; ++i)
         {
@@ -264,22 +266,6 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
     m_gBufferPools[frameIndex]->Reset();
     m_materialDataBuffers[frameIndex].offset = 0;
 
-    if (!renderer->BindShader(gBufferMaterial->GetShader().getPtr())) return;
-    Shader* lastShader = gBufferMaterial->GetShader().getPtr();
-    Material* lastMaterial = gBufferMaterial;
-
-    auto* currentScene = Engine::Get()->GetSceneHolder()->GetCurrentScene();
-    gBufferMaterial->SetAttribute("cameraUBO.viewProj", currentScene->GetCameraData().VP);
-    gBufferMaterial->SetAttribute("cameraUBO.cameraPos", currentScene->GetCameraData().position);
-    gBufferMaterial->SendUBOValues(renderer);
-
-    auto* camUBO = vulkanMaterial->GetUniformBuffer(0, 0);
-    if (!camUBO)
-    {
-        PrintError("ExecuteGBuffer: missing camera UBO");
-        return;
-    }
-
     auto blank = Engine::Get()->GetResourceManager()->GetBlankTexture();
     if (!blank || !blank->HasBeenSent())
     {
@@ -292,8 +278,36 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
 
     Mesh* lastMesh = nullptr;
 
+    const auto &cameraData = Engine::Get()->GetSceneHolder()->GetCurrentScene()->GetCameraData();
+
     for (auto& cmd : m_commands)
     {
+        Material* currentMaterial;
+
+        if (cmd.type == RenderCommand::Type::Mesh)
+            currentMaterial = gBufferMaterial;
+        else
+            currentMaterial = cmd.material;
+        if (!cmd.material || !currentMaterial->GetShader() || !currentMaterial->GetHandle()) continue;
+
+        auto* vulkanMaterial = currentMaterial->GetHandle();
+        auto* pipeline = vulkanMaterial->GetPipeline();
+
+        VkDescriptorSetLayout setLayout = pipeline->GetDescriptorSetLayouts()[TEXTURE_SET_INDEX]->GetLayout();
+        if (!renderer->BindShader(currentMaterial->GetShader().getPtr())) return;
+        Shader* lastShader = currentMaterial->GetShader().getPtr();
+
+        currentMaterial->SetAttribute("cameraUBO.viewProj", cameraData.VP);
+        currentMaterial->SetAttribute("cameraUBO.cameraPos", cameraData.position);
+        currentMaterial->SendUBOValues(renderer);
+
+        auto* camUBO = vulkanMaterial->GetUniformBuffer(0, 0);
+        if (!camUBO)
+        {
+            PrintError("ExecuteGBuffer: missing camera UBO");
+            return;
+        }
+
         if (cmd.shader && cmd.shader != lastShader)
         {
             lastShader = cmd.shader;
@@ -403,8 +417,8 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
         case RenderCommand::Type::SoftBodyDebug:
         {
             // Per-draw: bind the specific particle buffer for this object
-            cmd.material->GetHandle()->SetStorageBuffer(
-                0, 8, cmd.particleBuffer, 0, cmd.particleBufferSize, renderer);
+            vulkanMaterial->SetStorageBuffer(
+                drawSet, 0, 8, cmd.particleBuffer, 0, cmd.particleBufferSize, renderer);
 
             struct SoftBodyPush
             {
@@ -415,7 +429,7 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
             push.size = cmd.particleGridSize;
 
             vkCmdPushConstants(renderer->GetCommandBuffer(),
-                cmd.material->GetHandle()->GetPipeline()->GetPipelineLayout(),
+                pipeline->GetPipelineLayout(),
                 VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(SoftBodyPush), &push);
 
             uint32_t instanceCount = (cmd.type == RenderCommand::Type::SoftBodyDebug)

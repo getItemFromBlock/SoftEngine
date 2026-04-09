@@ -312,6 +312,10 @@ VkBool32 VulkanContext::DebugCallback(
     {
         PrintLog("Validation layer: %s", pCallbackData->pMessage);
     }
+    else
+    {
+        PrintLog("Validation layer: %s", pCallbackData->pMessage);
+    }
 
     return VK_FALSE;
 }
