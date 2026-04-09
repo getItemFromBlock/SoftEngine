@@ -215,7 +215,8 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
 {
     const int NUM_TEXTURE = 6;
     const int NUM_UBO = 2;
-    if (!gBufferMaterial || !gBufferMaterial->GetShader()) return;
+    if (!gBufferMaterial || !gBufferMaterial->GetShader() || !gBufferMaterial->GetHandle()) 
+        return;
 
     auto* vulkanMaterial = gBufferMaterial->GetHandle();
     auto* pipeline = vulkanMaterial->GetPipeline();

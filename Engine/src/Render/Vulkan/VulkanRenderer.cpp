@@ -170,6 +170,16 @@ void VulkanRenderer::Update()
 
 bool VulkanRenderer::BeginFrame()
 {
+    // Callbacks
+    std::unordered_map<Core::UUID, std::function<void()>> callbacks;
+    {
+        std::scoped_lock lock(m_beforeRenderMutex);
+        callbacks.swap(m_beforeRender);
+    }
+
+    for (auto& [id, method] : callbacks)
+        method();
+    
     p_triangleCount = 0;
     p_vertexCount = 0;
     m_imageIndex = 0;
@@ -297,6 +307,16 @@ void VulkanRenderer::EndFrame()
     }
 
     m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+    
+    // Callbacks
+    std::unordered_map<Core::UUID, std::function<void()>> callbacks;
+    {
+        std::scoped_lock lock(m_afterRenderMutex);
+        callbacks.swap(m_afterRender);
+    }
+
+    for (auto& [id, method] : callbacks)
+        method();
 }
 
 void VulkanRenderer::SendPushConstants(void* data, uint32_t size, Shader* shader, PushConstant pushConstant) const
@@ -679,15 +699,63 @@ void VulkanRenderer::ClearColor() const
     }
 
     m_renderPass->Begin(commandBuffer, 
-                       m_swapChain->GetImageViews()[imageIndex], 
-                       m_depthBuffer->GetImageView(), 
-                       m_swapChain->GetExtent(), 
-                       clearValues);
+                        m_swapChain->GetImageViews()[imageIndex], 
+                        m_depthBuffer->GetImageView(), 
+                        m_swapChain->GetExtent(), 
+                        clearValues);
 }
 
-void VulkanRenderer::AddLine(const Vec3f& start, const Vec3f& end, const Vec4f& color, float thickness)
+void VulkanRenderer::DrawLine(const Vec3f& start, const Vec3f& end, const Vec4f& color, float thickness)
 {
     m_lineRenderer.AddLine(start, end, color, thickness);
+}
+
+void VulkanRenderer::DrawWireCube(const Vec3f& center, const Vec3f& size, const Vec4f& color, float thickness)
+{
+    // Define the eight vertices of the cube
+    Vec3f vertices[8];
+    vertices[0] = center + Vec3f(-size.x, -size.y, -size.z);
+    vertices[1] = center + Vec3f(size.x, -size.y, -size.z);
+    vertices[2] = center + Vec3f(size.x, size.y, -size.z);
+    vertices[3] = center + Vec3f(-size.x, size.y, -size.z);
+    vertices[4] = center + Vec3f(-size.x, -size.y, size.z);
+    vertices[5] = center + Vec3f(size.x, -size.y, size.z);
+    vertices[6] = center + Vec3f(size.x, size.y, size.z);
+    vertices[7] = center + Vec3f(-size.x, size.y, size.z);
+
+    // Draw the edges of the cube
+    DrawLine(vertices[0], vertices[1], color, thickness);
+    DrawLine(vertices[1], vertices[2], color, thickness);
+    DrawLine(vertices[2], vertices[3], color, thickness);
+    DrawLine(vertices[3], vertices[0], color, thickness);
+    DrawLine(vertices[4], vertices[5], color, thickness);
+    DrawLine(vertices[5], vertices[6], color, thickness);
+    DrawLine(vertices[6], vertices[7], color, thickness);
+    DrawLine(vertices[7], vertices[4], color, thickness);
+    DrawLine(vertices[0], vertices[4], color, thickness);
+    DrawLine(vertices[1], vertices[5], color, thickness);
+    DrawLine(vertices[2], vertices[6], color, thickness);
+    DrawLine(vertices[3], vertices[7], color, thickness);
+}
+
+Core::UUID VulkanRenderer::AddBeforeRenderCallback(const std::function<void()>& method, Core::UUID uuid)
+{
+    if (uuid == UUID_INVALID)
+        uuid = {};
+    m_beforeRenderMutex.lock();
+    m_beforeRender[uuid] = method;
+    m_beforeRenderMutex.unlock();
+    return uuid;
+}
+
+Core::UUID VulkanRenderer::AddAfterRenderCallback(const std::function<void()>& method, Core::UUID uuid)
+{
+    if (uuid == UUID_INVALID)
+        uuid = {};
+    m_afterRenderMutex.lock();
+    m_afterRender[uuid] = method;
+    m_afterRenderMutex.unlock();
+    return uuid;
 }
 
 void VulkanRenderer::RecreateSwapChain()

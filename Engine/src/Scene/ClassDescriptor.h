@@ -38,7 +38,9 @@ enum class PropertyType
     Material,
     Shader,
     PostProcessShader,
-    ParticleSystem
+    ParticleSystem,
+    PushID,
+    PopID
 };
 
 inline size_t GetPropertyTypeSize(PropertyType type)
@@ -103,6 +105,10 @@ struct Property
     const char *dataDescriptor = nullptr;
 
     std::function<void(void*)> setter;
+    std::function<void()> addElement;
+    std::function<void(int)> removeElement;
+    std::function<void(int, void*)> setElement;
+    int index = -1;
 
     bool isList = false;
     bool readOnly = false;
@@ -151,6 +157,8 @@ struct ClassDescriptor
 {
     std::vector<Property> properties;
 
+    Property& PushID(std::string id);
+    Property& PopID();
     Property& AddProperty(const char* name, PropertyType type, void* data);
     Property& AddProperty(const Property& property);
     Property& AddButton(const char* name);

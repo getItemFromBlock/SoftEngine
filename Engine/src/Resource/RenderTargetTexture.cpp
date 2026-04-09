@@ -24,7 +24,7 @@ void RenderTargetTexture::Unload()
     }
 }
 
-void RenderTargetTexture::CreateRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height, VkFilter filter)
+void RenderTargetTexture::CreateRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height, VkFilter filter, bool createDepthBuffer)
 {
     VulkanDevice* device = renderer->GetDevice();
     
@@ -48,10 +48,13 @@ void RenderTargetTexture::CreateRenderTarget(VulkanRenderer* renderer, uint32_t 
     m_buffer->CreateRenderTarget(imageInfo, device, renderer->GetCommandPool(), 
                                            renderer->GetDevice()->GetGraphicsQueue());
     
-    m_depthBuffer = std::make_unique<VulkanDepthBuffer>();
-    if (!m_depthBuffer->Initialize(device, VkExtent2D{width, height}))
+    if (createDepthBuffer)
     {
-        PrintError("Failed to create offscreen depth buffer");
+        m_depthBuffer = std::make_unique<VulkanDepthBuffer>();
+        if (!m_depthBuffer->Initialize(device, VkExtent2D{width, height}))
+        {
+            PrintError("Failed to create offscreen depth buffer");
+        }
     }
     
     SetLoaded();
@@ -60,6 +63,7 @@ void RenderTargetTexture::CreateRenderTarget(VulkanRenderer* renderer, uint32_t 
 
 void RenderTargetTexture::Resize(VulkanRenderer* renderer, uint32_t width, uint32_t height, VkFilter filter)
 {
+    bool hadDepth = m_depthBuffer != nullptr;
     Unload();
-    CreateRenderTarget(renderer, width, height, filter);
+    CreateRenderTarget(renderer, width, height, filter, hadDepth);
 }

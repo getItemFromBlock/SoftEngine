@@ -37,7 +37,7 @@ public:
     Mat4 GetProjectionMatrix() const;
     Mat4 GetOrthographicMatrix() const;
     Mat4 GetViewProjectionMatrix() const;
-    
+
     void Describe(ClassDescriptor& descriptor) override;
 
     float GetFOV() const;
@@ -48,7 +48,7 @@ public:
 
     float GetNear() const;
     void SetNear(float near);
-    
+
     void SetRenderTargetSize(uint32_t width, uint32_t height);
     Vec2i GetRenderTargetSize() const;
 
@@ -56,7 +56,7 @@ public:
 
     void SetClearColor(const Vec4f& color);
     Vec4f GetClearColor() const;
-    
+
     ViewMode::Type GetViewMode() const { return p_viewMode; }
     void SetViewMode(ViewMode::Type viewMode);
 
@@ -67,19 +67,25 @@ public:
 
     void SetSkybox(const SafePtr<CubeMap>& skybox);
     SafePtr<CubeMap> GetSkybox() const;
-    
-    void SetPostProcessShader(const SafePtr<PostProcessShader>& shader);
-    void CleanupPostprocessRenderTarget();
+
+    void AddPostProcessShader(const SafePtr<PostProcessShader>& shader);
+    void RemovePostProcessShader(const SafePtr<PostProcessShader>& shader);
+    void RemovePostProcessShader(int index);
+    void SetPostProcessShaderAt(int32_t index, const SafePtr<PostProcessShader>& shader);
+    void ClearPostProcessShaders();
+    const std::vector<SafePtr<PostProcessShader>>& GetPostProcessShaders() const;
     bool IsPostProcessActive() const;
-    
+    void CleanupPostprocessRenderTarget();
+
     void InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height);
     void CleanupRenderTarget();
     void HandleResize(VulkanRenderer* renderer);
 
-    SafePtr<Texture> MakeGBufferTexture(SafePtr<Texture> texture, const GBufferAttachment& attachment, VkSampler sampler, uint32_t width, uint32_t height);
+    SafePtr<Texture> MakeGBufferTexture(SafePtr<Texture> texture, const GBufferAttachment& attachment,
+                                        VkSampler sampler, uint32_t width, uint32_t height);
 
     SafePtr<RenderTargetTexture> GetRenderTarget() const;
-    
+
     void Begin();
     void EndGeometry();
     void End();
@@ -87,24 +93,28 @@ public:
     void BeginForwardPass() const;
     void EndForwardPass();
 
-    void UpdateResizeRenderTarget(VulkanRenderer* renderer);
-    void BeginRenderTarget(const RenderTargetTexture* rtt) const;
+    void BeginRenderTarget(const RenderTargetTexture* rtt, bool clearAttachment = true) const;
     void EndRenderTarget(RenderTargetTexture* rtt);
-    
+
     void RenderSkybox(VulkanRenderer* renderer) const;
     void RenderPostProcess(VulkanRenderer* renderer);
-    
+
     void BlitToSwapchain(VulkanRenderer* renderer);
 
     SafePtr<Material> GetGBufferMaterial() const { return m_gBufferMaterial; }
+
 public:
     Event<Vec2i> OnRenderTargetResized;
+
 private:
     void BeginGBufferPass(RenderTargetTexture* rtt);
     void EndGBufferPass();
     void BeginCompositionPass(RenderTargetTexture* rtt);
     void EndCompositionPass(RenderTargetTexture* rtt);
     void DrawComposition(VulkanRenderer* renderer) const;
+
+    void EnsurePostProcessResources();
+
 protected:
     float p_fov = 70.f;
     float p_far = 1000.f;
@@ -113,19 +123,19 @@ protected:
     Vec4f p_clearColor = Vec4f(70.f / 255.f, 70.f / 255.f, 70.f / 255.f, 1.00f);
 
     ViewMode::Type p_viewMode = ViewMode::Type::Perspective;
-    
+
     Frustum p_frustum;
-    
+
     // Skybox
     SafePtr<CubeMap> m_skybox;
     SafePtr<Material> m_skyboxMaterial;
-    
+
     // Post process
     SafePtr<Mesh> m_quad;
-    SafePtr<Material> m_postProcessMaterial;
-    SafePtr<PostProcessShader> m_postProcessShader;
-    SafePtr<RenderTargetTexture> m_postProcessRenderTarget;
-    
+    std::vector<SafePtr<PostProcessShader>> m_postProcessShaders;
+    std::vector<SafePtr<Material>> m_postProcessMaterials;
+    SafePtr<RenderTargetTexture> m_postProcessRenderTargets[2];
+
     Vec2i p_requestedSize;
     Vec2i p_renderTargetSize;
     SafePtr<RenderTargetTexture> m_renderTarget;
@@ -137,6 +147,7 @@ protected:
     SafePtr<Texture> m_normalTexture;
     SafePtr<Texture> m_albedoTexture;
     SafePtr<Texture> m_metallicRoughnessTexture;
+
 private:
     std::shared_ptr<TransformComponent> m_transform;
 };

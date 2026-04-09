@@ -17,7 +17,12 @@ public:
     
     bool GenerateIrradiance(VulkanRenderer* renderer, uint32_t resolution = 32);
     bool GeneratePrefiltered(VulkanRenderer* renderer, uint32_t resolution = 512, uint32_t mipLevels = 5);
+    
+    // BRDF methods
     bool GenerateBRDFLut(VulkanRenderer* renderer, uint32_t resolution = 256);
+    bool LoadBRDFLutFromCache(VulkanRenderer* renderer, uint32_t resolution, const std::filesystem::path& fileCachePath, const std::string& textureName);
+    void DispatchBRDFLutCompute(VulkanRenderer* renderer, uint32_t resolution, const std::filesystem::path& fileCachePath, const std::string& textureName);
+    void RegisterBRDFLutTexture(const std::string& textureName, uint32_t resolution);
 
     VulkanTexture* GetPrefilteredCubemap() const;
     bool IsPrefilteredReady() const;
