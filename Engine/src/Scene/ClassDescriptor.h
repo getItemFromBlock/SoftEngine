@@ -125,7 +125,7 @@ struct Property
         {
             float minFloat, maxFloat;
         } floatRange;
-    } range;
+    } range = { 0x3f800000, static_cast<int>(0xbf800000) };
 
     std::function<void()> onModified;
 

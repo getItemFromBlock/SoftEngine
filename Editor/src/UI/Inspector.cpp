@@ -55,7 +55,7 @@ void Inspector::OnRender()
             Core::UUID deletedID = UUID_INVALID;
             for (SafePtr<IComponent>& component : components)
             {
-                const ClassDescriptor& descriptor = GetDescriptor(component->GetUUID(), component);
+                const ClassDescriptor& descriptor = GetDescriptor(component);
                 ImGui::PushID(component->GetUUID());
 
                 bool enable = component->IsEnable();
@@ -103,18 +103,6 @@ void Inspector::OnRender()
 void Inspector::SetSelectedObject(const Core::UUID& uuid)
 {
     m_selectedObject = uuid;
-
-    if (SafePtr<GameObject> object = m_sceneHolder->GetCurrentScene()->GetGameObject(uuid))
-    {
-        std::vector<SafePtr<IComponent>> components = object->GetComponents();
-
-        for (SafePtr<IComponent>& component : components)
-        {
-            ClassDescriptor descriptor;
-            component->Describe(descriptor);
-            m_descriptors[component->GetUUID()] = descriptor;
-        }
-    }
 }
 
 template <>
