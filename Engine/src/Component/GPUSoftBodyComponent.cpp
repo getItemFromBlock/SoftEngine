@@ -67,7 +67,6 @@ void GPUSoftBodyComponent::CreateFromMesh(SafePtr<Mesh> inputMesh)
 
 void GPUSoftBodyComponent::OnCreate()
 {
-    m_seed = Random::Global().Range(0, 100000);
     auto resourceManager = Engine::Get()->GetResourceManager();
     auto renderer = Engine::Get()->GetRenderer();
 

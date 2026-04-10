@@ -62,13 +62,6 @@ struct ConnectionData
     float initialLength;
 };
 
-struct InstanceData
-{
-    Vec3f localPosition;
-    float localScale;
-    Quat  localRotation;
-};
-
 class GPUSoftBodyComponent : public IComponent
 {
 public:
@@ -120,6 +113,5 @@ private:
     bool m_needsRecreation = false;
     bool m_drawDebug = false;
 
-    Seed m_seed;
     BodySettings m_particleSettings;
 };
