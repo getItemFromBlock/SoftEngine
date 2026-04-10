@@ -35,7 +35,7 @@ layout(location = 6) out vec3 vTangentViewDir;
 
 void main() {
     vec4 worldPos = vec4(inPosition * 0.025 + particles[gl_InstanceIndex].position, 1.0);
-	worldPos = worldPos * pc.transform;
+	worldPos = pc.transform * worldPos;
 	
     gl_Position = cameraUBO.viewProj * worldPos;
     vWorldPos = worldPos.xyz;

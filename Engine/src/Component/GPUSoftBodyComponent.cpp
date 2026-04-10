@@ -88,9 +88,9 @@ void GPUSoftBodyComponent::OnCreate()
     m_material->SetAttribute("aoSampler", resourceManager->GetBlankTexture());
     m_material->SetAttribute("heightSampler", resourceManager->GetBlackTexture());
 
-    m_material->SetAttribute("material.color", Vec4f::One());
-    m_material->SetAttribute("material.roughnessFactor", 1.f);
-    m_material->SetAttribute("material.metalnessFactor", 1.f);
+    m_material->SetAttribute("material.color", Vec4f(0.05f, 0.3f, 0.05f, 1.0f));
+    m_material->SetAttribute("material.roughnessFactor", 0.05f);
+    m_material->SetAttribute("material.metalnessFactor", 0.8f);
     m_material->SetAttribute("material.aoFactor", 1.f);
     m_material->SetAttribute("material.heightScale", 0.0f);
 
@@ -229,15 +229,17 @@ void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
     auto* rqm = Engine::Get()->GetRenderer()->GetRenderQueueManager();
     auto* queue = rqm->GetOpaqueQueue();
 
-    const Mat4 transform = GetGameObject()->GetTransform()
-                               ->GetWorldMatrix().GetTranspose();
+    const Mat4 transform = GetGameObject()->GetTransform()->GetWorldMatrix();
 
-    // Skinned soft body mesh
-    queue->SubmitSoftBody(
-        m_mesh.get(), m_material.getPtr(),
-        m_particleBuffer->GetBuffer(), PBufSizeAligned,
-        m_totalParticleCount, m_particleSettings.general.particleAmount,
-        transform, /*isDebug=*/false);
+    if (!m_drawDebug)
+    {
+        // Skinned soft body mesh
+        queue->SubmitSoftBody(
+            m_mesh.get(), m_material.getPtr(),
+            m_particleBuffer->GetBuffer(), PBufSizeAligned,
+            m_totalParticleCount, m_particleSettings.general.particleAmount,
+            transform, /*isDebug=*/false);
+    }
 
     // Debug billboard instancing (one cube per particle)
     if (m_drawDebug && m_billboardMaterial && m_billboardMesh)

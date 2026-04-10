@@ -431,13 +431,15 @@ void Inspector::ShowProperty(const Property& property)
     switch (property.type)
     {
     case PropertyType::None:
-        ImGui::Text("None");
-        break;
+        {
+            ImGui::Text("None");
+            break;
+        }
     case PropertyType::Button:
-    {
-        RenderButtonProperty(property, "X" + id);
-        break;
-    }
+        {
+            RenderButtonProperty(property, "X" + id);
+            break;
+        }
     case PropertyType::Bool:
         {
             RenderBoolProperty(property, id);
@@ -449,20 +451,20 @@ void Inspector::ShowProperty(const Property& property)
             break;
         }
     case PropertyType::Vec2i:
-    {
-        RenderIVec2Property(property, id);
-        break;
-    }
+        {
+            RenderIVec2Property(property, id);
+            break;
+        }
     case PropertyType::Vec3i:
-    {
-        RenderIVec3Property(property, id);
-        break;
-    }
+        {
+            RenderIVec3Property(property, id);
+            break;
+        }
     case PropertyType::Vec4i:
-    {
-        RenderIVec4Property(property, id);
-        break;
-    }
+        {
+            RenderIVec4Property(property, id);
+            break;
+        }
     case PropertyType::Float:
         {
             RenderFloatProperty(property, id);
@@ -499,10 +501,10 @@ void Inspector::ShowProperty(const Property& property)
             break;
         }
     case PropertyType::Enum:
-    {
-        RenderEnumProperty(property, id);
-        break;
-    }
+        {
+            RenderEnumProperty(property, id);
+            break;
+        }
     case PropertyType::Texture:
         {
             RenderTextureProperty(property, id);
@@ -534,8 +536,10 @@ void Inspector::ShowProperty(const Property& property)
             break;
         }
     default:
-        PrintWarning("Property type not handle on Inspector");
-        break;
+        {
+            PrintWarning("Property type not handle on Inspector");
+            break;
+        }
     }
     ImGui::PopID();
 }
@@ -581,7 +585,8 @@ void Inspector::UpdateProperty(const Property& property, void* newValue)
 
 void Inspector::RenderButtonProperty(const Property& property, const std::string& id)
 {
-    if (ImGui::Button(id.c_str()))
+    ImVec2 button_sz(19, 19);
+    if (ImGui::Button(id.c_str(), button_sz))
     {
         UpdateProperty(property, nullptr);
     }

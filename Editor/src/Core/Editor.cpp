@@ -154,6 +154,7 @@ void Editor::Run()
             go0->GetTransform()->SetLocalPosition(Vec3f(4, 0, 0));
 
             auto go1 = currentScene->CreateGameObject();
+            go1->SetName("SoftBody");
             auto soft = go1->AddComponent<GPUSoftBodyComponent>();
             soft->CreateFromMesh(
                 m_engine->GetResourceManager()->Load<Mesh>(RESOURCE_PATH"/models/Barrel.obj/Cylinder.mesh"));
