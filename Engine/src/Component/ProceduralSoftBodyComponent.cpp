@@ -102,26 +102,34 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
     VulkanMaterial* mat1 = m_simulationCompute1->GetMaterial();
 
     // First compute pass needs both particle data and connections
-    mat0->SetStorageBuffer(0, 0, m_particleBuffer->GetBuffer(), 0,
+    mat0->SetStorageBuffer( 0, 0, m_particleBuffer->GetBuffer(), 0,
                             PBufSizeAligned, renderer);
-    mat0->SetStorageBuffer(0, 1, m_particleBuffer->GetBuffer(), PBufSizeAligned,
-                            CBufSizeAligned, renderer);
+    mat0->SetStorageBuffer( 0, 1, m_particleBuffer->GetBuffer(), 0,
+                            PBufSizeAligned, renderer);
+    mat0->SetStorageBuffer( 0, 2, m_particleBuffer->GetBuffer(), 0,
+                            PBufSizeAligned, renderer);
 
     mat0->BindForCompute(cmd, renderer->GetFrameIndex());
 
     struct Push0
     {
-        Vec3f gravity;
-        float deltaTime;
-        float damping;
-        float strength;
-        uint32_t  particleCount;
+        Vec3f   gravity;
+        float   deltaTime;
+        float   damping;
+        float   strength;
+        uint32_t    offset;
+        uint32_t    particleCount;
     } push0;
 
     push0.gravity = GetGameObject()->GetTransform()->GetWorldRotation().GetInverse() * Vec3f(0, 9.81f, 0);
     push0.deltaTime = std::min(deltaTime, 1/60.0f);
     push0.damping = m_particleSettings.general.damping;
     push0.strength = m_particleSettings.general.strength;
+
+    for (auto &chunk : chunks)
+    {
+
+    }
     push0.particleCount = m_totalParticleCount;
 
     vkCmdPushConstants(cmd, mat0->GetPipeline()->GetPipelineLayout(),
