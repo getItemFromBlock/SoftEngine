@@ -46,7 +46,7 @@ void main() {
 	}
 
     vec4 worldPos = vec4(pos, 1.0);
-	worldPos = worldPos * pc.transform;
+	worldPos = pc.transform * worldPos;
 	
 	gl_Position = cameraUBO.viewProj * worldPos;
     vWorldPos = worldPos.xyz;
