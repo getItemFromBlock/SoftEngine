@@ -53,8 +53,9 @@ struct PConnectionData0
 struct PConnectionData1
 {
     uint32_t chunkID;
-    uint32_t particleID;
     float initialLength;
+    Vec3f originalPos;
+    uint32_t particleID;
 };
 
 struct GPUNeighborData
@@ -76,6 +77,7 @@ struct CPUChunkData
 {
     Mesh *mesh;
     Vec3f localPosition;
+    Vec2i iPos;
     uint32_t id;
     uint32_t globalOffset;
     uint32_t neighbors[8];
@@ -88,6 +90,12 @@ struct BufferChunk
     uint32_t offset;
     uint32_t size;
     uint32_t occupied;
+};
+
+struct HeightPointData
+{
+    Vec3f pos;
+    uint32_t id;
 };
 
 class ProceduralSoftBodyComponent : public IComponent
@@ -104,17 +112,18 @@ public:
     PBodySettings& GetSettings() { return m_particleSettings; }
 
     SafePtr<Material> GetMaterial() const { return m_material; }
-    SafePtr<Mesh> GetMesh() const { return m_mesh; }
 private:
     void CreateParticleBuffers();
-    void CreateSkinnedMesh(std::vector<WeightedVertex> &vertices, std::vector<uint32_t> &indices);
+    void CreateSkinnedMesh(CPUChunkData &chunkData, std::vector<PSBParticleData> &particles);
     void InitializeParticleData(std::vector<PSBParticleData> &particles, std::vector<PConnectionData0> &connections0,
-                                std::vector<PConnectionData1> &connections1, const Vec3f &worldPos);
+                                std::vector<PConnectionData1> &connections1, const Vec2i &chunkID);
+    void CreateHeightMap(const Vec2i &chunkID);
 
     Vec2i GetChunkPos(Vec3f pos);
     float GetHeightAt(float posX, float posZ);
+    Vec3f GetNormalAt(const Vec3f &pos, float dt);
     uint32_t CreateChunkAt(Vec3f pos);
-    void DeleteChunk(uint32_t id);
+    void DeleteChunk(Vec2i iPos);
 
     BufferChunk AllocChunk(uint32_t size);
     void FreeChunk(uint32_t id);
@@ -128,6 +137,7 @@ private:
 
     std::list<BufferChunk> memChunks;
     std::unordered_map<Vec2i, CPUChunkData> chunks;
+    std::unordered_map<Vec2i, std::vector<HeightPointData>> heightData;
     uint32_t globalChunkCount;
     uint32_t globalChunkOffset;
 

@@ -64,7 +64,6 @@ void ProceduralSoftBodyComponent::OnCreate()
     m_material->SetAttribute("material.aoFactor", 1.f);
     m_material->SetAttribute("material.heightScale", 0.0f);
 
-    m_mesh = std::make_shared<Mesh>("internal");
     m_billboardMesh = resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cube.obj/Cube.mesh");
 
     computeShader0->EOnSentToGPU.Bind([this, computeShader0, renderer]()
@@ -91,7 +90,7 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
         delta.y = 0;
         if (delta.Length() > 10.0f)
         {
-            DeleteChunk(chunk.second.id);
+            DeleteChunk(chunk.second.iPos);
         }
     }
 
@@ -275,19 +274,76 @@ void ProceduralSoftBodyComponent::CreateParticleBuffers()
     m_particleBuffer = std::move(particleBuffer);
 }
 
-void ProceduralSoftBodyComponent::CreateSkinnedMesh(std::vector<WeightedVertex> &vertices, std::vector<uint32_t> &indices)
+void ProceduralSoftBodyComponent::CreateSkinnedMesh(CPUChunkData &data, std::vector<PSBParticleData> &particles)
 {
-    
+    data.mesh = new Mesh("internal");
+
+    const std::vector<HeightPointData> *maps[4];
+
+    uint32_t counter = 0;
+    for (int i = 0; i < 2; i++)
+    {
+        for (int j = 0; j < 2; j++)
+        {
+            Vec2i iPos = data.iPos + Vec2i(i, j);
+            if (!heightData.contains(iPos))
+                CreateHeightMap(iPos);
+            maps[counter++] = &heightData[iPos];
+        }
+    }
+
+    const Vec2i amount = m_particleSettings.general.particleAmount;
+    const Vec2i numPoints = m_particleSettings.general.surfacePoints;
+    const float posDelta = 1.0f / std::max(numPoints.x, numPoints.y);
+    std::vector<WeightedVertex> vertices;
+    std::vector<uint32_t> indices;
+
+    for (int32_t i = 0; i <= numPoints.x; i++)
+    {
+        float posX = (float)(i) / numPoints.x + 0.5f / amount.x;
+
+        for (int32_t j = 0; j <= numPoints.y; j++)
+        {
+            const float posZ = (float)(j) / numPoints.y + 0.5f / amount.y;
+            const float height = GetHeightAt(posX + data.iPos.x * CHUNK_SIZE, posZ + data.iPos.y * CHUNK_SIZE);
+            const Vec3f pos = Vec3f(posX, height, posZ);
+
+            WeightedVertex v = {};
+            v.position = pos;
+            v.texCoord = Vec2f((float)(i) / numPoints.x, (float)(j) / numPoints.y);
+            v.normal = GetNormalAt(pos, 1.0f / posDelta);
+            v.tangent = Vec3f::Forward().Cross(v.normal);
+            vertices.push_back(v);
+        }
+    }
+
+    for (int32_t j = 0; j < numPoints.x - 1; j++)
+    {
+        for (int32_t k = 0; k < numPoints.y - 1; k++)
+        {
+            indices.push_back(k * numPoints.x + j);
+            indices.push_back(k * numPoints.x + j + 1);
+            indices.push_back((k + 1) * numPoints.x + j);
+
+            indices.push_back((k + 1) * numPoints.x + j);
+            indices.push_back(k * numPoints.x + j + 1);
+            indices.push_back((k + 1) * numPoints.x + j + 1);
+        }
+    }
+
+    // TODO Map mesh to points
 }
 
 void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParticleData> &particles, std::vector<PConnectionData0> &connections0,
-                                                            std::vector<PConnectionData1> &connections1, const Vec3f &pos)
+                                                            std::vector<PConnectionData1> &connections1, const Vec2i &chunkID)
 {
     const Vec2i amount = m_particleSettings.general.particleAmount;
     const int32_t maxL = m_particleSettings.general.connectionStrength;
     const float heightDelta = 1.0f / std::max(amount.x, amount.y);
 
     std::unordered_map<Vec3i, uint32_t> tmpParticles;
+    std::vector<HeightPointData> heightMap;
+    const bool exist = heightData.contains(chunkID);
 
     for (int32_t i = 0; i < amount.x; i++)
     {
@@ -295,12 +351,19 @@ void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParti
         for (int32_t k = 0; k < amount.y; k++)
         {
             float posZ = (k + 0.5f) / amount.y;
-            float height = GetHeightAt(posX, posZ);
+            float height = GetHeightAt(posX + chunkID.x * CHUNK_SIZE, posZ + chunkID.y * CHUNK_SIZE);
 
             int j = 0;
             for (float posY = -0.5f; posY < height; posY += heightDelta)
             {
                 const Vec3f pos = Vec3f(posX, posY, posZ);
+                if (!exist && posY + heightDelta >= height)
+                {
+                    HeightPointData d;
+                    d.id = particles.size();
+                    d.pos = pos;
+                    heightMap.push_back(d);
+                }
 
                 PSBParticleData particle = {};
                 particle.position = pos;
@@ -311,6 +374,9 @@ void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParti
             }
         }
     }
+
+    if (!exist)
+        heightData[chunkID] = heightMap;
 
     for (auto particleID : tmpParticles)
     {
@@ -330,7 +396,7 @@ void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParti
                     if (l == 0 && m == 0 && n == 0)
                         continue;
 
-                    Vec3f p = Vec3f(l, m, n) + particleID.first;
+                    const Vec3f p = Vec3f(l, m, n) + particleID.first;
                     if (!tmpParticles.contains(p))
                     {
                         // TODO deal with neighbor chunk particles
@@ -360,33 +426,97 @@ uint32_t ProceduralSoftBodyComponent::CreateChunkAt(Vec3f pos)
     std::vector<PSBParticleData> particles;
     std::vector<PConnectionData0> connections0;
     std::vector<PConnectionData1> connections1;
-    InitializeParticleData(particles, connections0, connections1, pos);
+    InitializeParticleData(particles, connections0, connections1, k);
 
     const uint32_t totalSize = sizeof(PSBParticleData) * particles.size() + sizeof(uint32_t) * connections0.size();
     const BufferChunk newChunk = AllocChunk(totalSize);
 
-    // TODO generate mesh
-    // TODO copy data to GPU
-
     CPUChunkData data;
     data.id = newChunk.id;
+    data.iPos = k;
     data.globalOffset = newChunk.offset;
     data.localPosition = Vec3f(k.x * CHUNK_SIZE, 0.0f, k.y * CHUNK_SIZE);
+
+    CreateSkinnedMesh(data, particles);
+    
+    // TODO copy data to GPU
+
     chunks[k] = data;
 
     return data.id;
 }
 
+void ProceduralSoftBodyComponent::CreateHeightMap(const Vec2i &chunkID)
+{
+    const Vec2i amount = m_particleSettings.general.particleAmount;
+    const float heightDelta = 1.0f / std::max(amount.x, amount.y);
+
+    std::vector<HeightPointData> heightMap;
+    uint32_t counter = 0;
+    const bool exist = heightData.contains(chunkID);
+
+    for (int32_t i = 0; i < amount.x; i++)
+    {
+        float posX = (i + 0.5f) / amount.x;
+        for (int32_t k = 0; k < amount.y; k++)
+        {
+            const float posZ = (k + 0.5f) / amount.y;
+            const float height = GetHeightAt(posX + chunkID.x * CHUNK_SIZE, posZ + chunkID.y * CHUNK_SIZE);
+
+            for (float posY = -0.5f; posY < height; posY += heightDelta)
+            {
+                const Vec3f pos = Vec3f(posX, posY, posZ);
+                if (!exist && posY + heightDelta >= height)
+                {
+                    HeightPointData d;
+                    d.id = counter;
+                    d.pos = pos;
+                    heightMap.push_back(d);
+                }
+                counter++;
+            }
+        }
+    }
+
+    if (!exist)
+        heightData[chunkID] = heightMap;
+}
+
+void ProceduralSoftBodyComponent::DeleteChunk(Vec2i iPos)
+{
+    ASSERT(chunks.contains(iPos));
+    const auto &chunk = chunks.at(iPos);
+    delete chunk.mesh;
+    FreeChunk(chunk.id);
+    chunks.erase(iPos);
+}
+
 Vec2i ProceduralSoftBodyComponent::GetChunkPos(Vec3f pos)
 {
-    float x = pos.x / CHUNK_SIZE;
-    float y = pos.y / CHUNK_SIZE;
-    return Vec2i(std::round(x + 0.5f), std::round(y + 0.5f));
+    const float x = pos.x / CHUNK_SIZE;
+    const float y = pos.y / CHUNK_SIZE;
+    return Vec2i(std::floor(x), std::floor(y));
 }
 
 float ProceduralSoftBodyComponent::GetHeightAt(float posX, float posZ)
 {
     return sinf(posX * 0.4687435f + 0.76543f * posZ) * 0.25f + cosf(posX * 0.61354313 - 0.2684354 * posZ) * 0.2f + sinf(-posX * 1.23384643f + 1.4687351f * posZ) * 0.15f;
+}
+
+Vec3f ProceduralSoftBodyComponent::GetNormalAt(const Vec3f &pos, float dt)
+{
+    Vec2f xp = Vec2f(pos.x + dt, GetHeightAt(pos.x + dt, pos.z));
+    Vec2f xn = Vec2f(pos.x - dt, GetHeightAt(pos.x - dt, pos.z));
+    Vec2f zp = Vec2f(pos.z + dt, GetHeightAt(pos.x, pos.z + dt));
+    Vec2f zn = Vec2f(pos.z - dt, GetHeightAt(pos.x, pos.z - dt));
+    float tmpX = xp.Length();
+    float fx = tmpX / (xn.Length() + tmpX);
+    float dx = xp.x * fx + xn.x * (1 - fx);
+    float tmpZ = zp.Length();
+    float fz = tmpZ / (zn.Length() + tmpZ);
+    float dz = zp.x * fz + zn.x * (1 - fz);
+
+    return Vec3f(pos.x - dx, 1.0f, pos.z - dz).GetNormalize();
 }
 
 BufferChunk ProceduralSoftBodyComponent::AllocChunk(uint32_t size)
@@ -457,5 +587,5 @@ void ProceduralSoftBodyComponent::FreeChunk(uint32_t id)
         }
     }
 
-    PrintError("Bruh");
+    PrintError("Bruh, out of memory");
 }
