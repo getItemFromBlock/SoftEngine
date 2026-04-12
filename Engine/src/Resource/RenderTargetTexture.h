@@ -11,7 +11,7 @@ public:
     bool SendToGPU(VulkanRenderer* renderer) override;
     void Unload() override;
     
-    void CreateRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height, VkFilter filter = VK_FILTER_LINEAR);
+    void CreateRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height, VkFilter filter = VK_FILTER_LINEAR, bool createDepthBuffer = true);
     void Resize(VulkanRenderer* renderer, uint32_t width, uint32_t height, VkFilter filter = VK_FILTER_LINEAR);
     
     VulkanDepthBuffer* GetDepthBuffer() const { return m_depthBuffer.get(); }

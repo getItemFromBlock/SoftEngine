@@ -108,9 +108,16 @@ public:
 
     LineRenderer* GetLineRenderer() { return &m_lineRenderer; }
     SkyboxRenderer* GetSkyboxRenderer() { return &m_skyboxRenderer; }
-    void AddLine(const Vec3f& start, const Vec3f& end, const Vec4f& color, float thickness = 1.f);
+    
+    void DrawLine(const Vec3f& start, const Vec3f& end, const Vec4f& color, float thickness = 1.f);
+    void DrawWireCube(const Vec3f& center, const Vec3f& size, const Vec4f& color, float thickness = 1.f);
     
     void SetBlittedToSwapchain(bool value) { m_blittedToSwapchain = value; }
+
+    Core::UUID AddBeforeRenderCallback(const std::function<void()>& method, Core::UUID uuid = UUID_INVALID);
+
+    Core::UUID AddAfterRenderCallback(const std::function<void()>& method, Core::UUID uuid = UUID_INVALID);
+
 private:
     void RecreateSwapChain();
     void TransitionImageForPresent() const;
@@ -144,4 +151,9 @@ private:
     SkyboxRenderer m_skyboxRenderer;
     
     bool m_blittedToSwapchain = false;
+    
+    std::mutex m_beforeRenderMutex;
+    std::unordered_map<Core::UUID, std::function<void()>> m_beforeRender;
+    std::mutex m_afterRenderMutex;
+    std::unordered_map<Core::UUID, std::function<void()>> m_afterRender;
 };

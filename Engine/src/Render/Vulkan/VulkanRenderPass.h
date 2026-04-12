@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan.h>
 #include <vector>
+#include <xstring>
 
 class VulkanGBuffer;
 class VulkanDevice;
@@ -14,9 +15,9 @@ public:
     bool Initialize(VulkanDevice* device, VkFormat swapChainImageFormat);
     void Cleanup();
     
-    void Begin(VkCommandBuffer commandBuffer, VkImageView colorImageView, 
-               VkImageView depthImageView, VkExtent2D extent, 
-               const std::vector<VkClearValue>& clearValues);
+    void Begin(VkCommandBuffer commandBuffer, VkImageView colorImageView,
+               VkImageView depthImageView, VkExtent2D extent,
+               const std::vector<VkClearValue>& clearValues, bool clearAttachment = true);
     
     void End(VkCommandBuffer commandBuffer);
 

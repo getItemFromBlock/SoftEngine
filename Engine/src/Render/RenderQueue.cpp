@@ -221,6 +221,8 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
 {
     const int NUM_TEXTURE = 6;
     const int NUM_UBO = 2;
+    if (!gBufferMaterial || !gBufferMaterial->GetShader() || !gBufferMaterial->GetHandle()) 
+        return;
 
     constexpr uint32_t TEXTURE_SET_INDEX = 0;
 
