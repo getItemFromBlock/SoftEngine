@@ -114,7 +114,8 @@ public:
     SafePtr<Material> GetMaterial() const { return m_material; }
 private:
     void CreateParticleBuffers();
-    void CreateSkinnedMesh(CPUChunkData &chunkData, std::vector<PSBParticleData> &particles);
+    void CreateSkinnedMesh(CPUChunkData &chunkData);
+    void MapMeshToParticles(CPUChunkData &data, std::vector<WeightedVertex> &vertices);
     void InitializeParticleData(std::vector<PSBParticleData> &particles, std::vector<PConnectionData0> &connections0,
                                 std::vector<PConnectionData1> &connections1, const Vec2i &chunkID);
     void CreateHeightMap(const Vec2i &chunkID);

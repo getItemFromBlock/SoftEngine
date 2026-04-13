@@ -125,6 +125,7 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
     push0.damping = m_particleSettings.general.damping;
     push0.strength = m_particleSettings.general.strength;
 
+    // TODO
     for (auto &chunk : chunks)
     {
 
@@ -274,23 +275,9 @@ void ProceduralSoftBodyComponent::CreateParticleBuffers()
     m_particleBuffer = std::move(particleBuffer);
 }
 
-void ProceduralSoftBodyComponent::CreateSkinnedMesh(CPUChunkData &data, std::vector<PSBParticleData> &particles)
+void ProceduralSoftBodyComponent::CreateSkinnedMesh(CPUChunkData &data)
 {
     data.mesh = new Mesh("internal");
-
-    const std::vector<HeightPointData> *maps[4];
-
-    uint32_t counter = 0;
-    for (int i = 0; i < 2; i++)
-    {
-        for (int j = 0; j < 2; j++)
-        {
-            Vec2i iPos = data.iPos + Vec2i(i, j);
-            if (!heightData.contains(iPos))
-                CreateHeightMap(iPos);
-            maps[counter++] = &heightData[iPos];
-        }
-    }
 
     const Vec2i amount = m_particleSettings.general.particleAmount;
     const Vec2i numPoints = m_particleSettings.general.surfacePoints;
@@ -331,7 +318,116 @@ void ProceduralSoftBodyComponent::CreateSkinnedMesh(CPUChunkData &data, std::vec
         }
     }
 
-    // TODO Map mesh to points
+    MapMeshToParticles(data, vertices);
+
+    data.mesh->CreateFrom(reinterpret_cast<float *>(vertices.data()), static_cast<uint32_t>(vertices.size()), indices.data(),
+        static_cast<uint32_t>(indices.size()), true);
+}
+
+void ProceduralSoftBodyComponent::MapMeshToParticles(CPUChunkData &data, std::vector<WeightedVertex> &vertices)
+{
+    const std::vector<HeightPointData> *maps[4];
+
+    uint32_t counter = 0;
+    for (int i = 0; i < 2; i++)
+    {
+        for (int j = 0; j < 2; j++)
+        {
+            Vec2i iPos = data.iPos + Vec2i(i, j);
+            if (!heightData.contains(iPos))
+                CreateHeightMap(iPos);
+            maps[counter++] = &heightData[iPos];
+        }
+    }
+
+    for (uint32_t i = 0; i < vertices.size(); i++)
+    {
+        struct ParticleDist
+        {
+            Vec3f pos;
+            uint32_t id;
+            float dist;
+        };
+
+        Vec3f pos = vertices[i].position;
+
+        std::array<ParticleDist, 3> closests = std::array<ParticleDist, 3>();
+        uint32_t count = 0;
+
+        const bool cr = pos.x < 0.5f;
+        const bool cu = pos.z < 0.5f;
+
+        for (int x = 0; x < 2; x++)
+        {
+            if (cr && x > 0)
+                break;
+            for (int y = 0; y < 2; y++)
+            {
+                if (cu && y > 0)
+                    break;
+
+                const std::vector<HeightPointData> &particles = *(maps[x*2+y]);
+                for (uint32_t l = 0; l < particles.size(); l++)
+                {
+                    Vec3f pos2 = particles[l].pos;
+                    float d = pos2.Distance(pos);
+                    if (count < closests.size())
+                    {
+                        ParticleDist p;
+                        p.id = particles[l].id;
+                        p.dist = d;
+                        p.pos = pos2;
+                        closests[count] = p;
+                        count++;
+                        continue;
+                    }
+                    for (uint32_t m = 0; m < count; m++)
+                    {
+                        if (d < closests[m].dist)
+                        {
+                            for (uint32_t n = 1; n < count - m; n++)
+                            {
+                                closests[count - n] = closests[count - n - 1];
+                            }
+                            closests[m].id = particles[l].id;
+                            closests[m].dist = d;
+                            closests[m].pos = pos2;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        Vec3f weights = Vec3f();
+        Vec3f normal = (closests[1].pos - closests[0].pos).Cross(closests[2].pos - closests[0].pos);
+        float area = normal.Length();
+        area = std::copysign(area, normal.x * normal.y * normal.z);
+        if (std::abs(area) > 0.001f)
+        {
+            normal = normal.GetNormalize();
+            Vec3f pos2 = pos - normal * normal.Dot(pos - closests[0].pos);
+
+            for (uint32_t l = 0; l < 3; l++)
+            {
+                Vec3f normal1 = (closests[(l + 1) % 3].pos - pos2).Cross(closests[(l + 2) % 3].pos - pos2);
+                float area1 = normal1.Length();
+                area1 = std::copysign(area1, normal1.x * normal1.y * normal1.z);
+                float w = std::max(area1 / area, 0.0f);
+                weights[l] = w;
+            }
+        }
+        else
+        {
+            weights = Vec4f(1.0f, 0, 0, 0);
+        }
+        float l = weights[0] + weights[1] + weights[2];
+        if (l <= 0.0001f)
+            vertices[i].weights = Vec4f(1.0f, 0.0f, 0.0f, 0.0f);
+        else
+            vertices[i].weights = Vec4f(weights / l, 0.0f);
+        vertices[i].indices = Vec4i(closests[0].id, closests[1].id, closests[2].id, -1);
+    }
 }
 
 void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParticleData> &particles, std::vector<PConnectionData0> &connections0,
@@ -428,7 +524,7 @@ uint32_t ProceduralSoftBodyComponent::CreateChunkAt(Vec3f pos)
     std::vector<PConnectionData1> connections1;
     InitializeParticleData(particles, connections0, connections1, k);
 
-    const uint32_t totalSize = sizeof(PSBParticleData) * particles.size() + sizeof(uint32_t) * connections0.size();
+    const uint32_t totalSize = sizeof(PSBParticleData) * particles.size() + sizeof(PConnectionData0) * connections0.size() + sizeof(PConnectionData1) * connections1.size();
     const BufferChunk newChunk = AllocChunk(totalSize);
 
     CPUChunkData data;
@@ -437,9 +533,24 @@ uint32_t ProceduralSoftBodyComponent::CreateChunkAt(Vec3f pos)
     data.globalOffset = newChunk.offset;
     data.localPosition = Vec3f(k.x * CHUNK_SIZE, 0.0f, k.y * CHUNK_SIZE);
 
-    CreateSkinnedMesh(data, particles);
+    CreateSkinnedMesh(data);
     
-    // TODO copy data to GPU
+    void *mappedData;
+    auto device = Engine::Get()->GetRenderer()->GetDevice()->GetDevice();
+    vkMapMemory(device, m_particleBuffer->GetBufferMemory(), newChunk.offset, totalSize, 0, &mappedData);
+
+    unsigned char *ptr = reinterpret_cast<unsigned char *>(mappedData);
+
+    memcpy(ptr, particles.data(), particles.size() * sizeof(PSBParticleData));
+    ptr += particles.size() * sizeof(PSBParticleData);
+
+    memcpy(ptr, connections0.data(), connections0.size() * sizeof(PConnectionData0));
+    ptr += connections0.size() * sizeof(PConnectionData0);
+
+    if (!connections1.empty())
+        memcpy(ptr, connections1.data(), connections1.size() * sizeof(PConnectionData1));
+
+    vkUnmapMemory(device, m_particleBuffer->GetBufferMemory());
 
     chunks[k] = data;
 
