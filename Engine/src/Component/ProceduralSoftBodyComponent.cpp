@@ -11,6 +11,7 @@
 #include "Utils/Random.h"
 
 #define MAX_BUFFER_SIZE 0x4000000
+#define MAX_CHUNK_BUFFER_SIZE 0x10
 #define CHUNK_SIZE 2.0f
 
 // Aligns an integer to the next nearest memory aligned value. Alignement MUST be a power of two!
@@ -110,30 +111,47 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
 
     mat0->BindForCompute(cmd, renderer->GetFrameIndex());
 
-    struct Push0
-    {
-        Vec3f   gravity;
-        float   deltaTime;
-        float   damping;
-        float   strength;
-        uint32_t    offset;
-        uint32_t    particleCount;
-    } push0;
+    const Vec3f gravity = GetGameObject()->GetTransform()->GetWorldRotation().GetInverse() * Vec3f(0, 9.81f, 0);
+    const Vec3f spherePos = m_particleSettings.sphereData.position;
+    const float sphereRad = m_particleSettings.sphereData.radius;
+    const float dt = std::min(deltaTime, 1 / 60.0f);
+    const float damping = m_particleSettings.general.damping;
+    const float strength = m_particleSettings.general.strength;
 
-    push0.gravity = GetGameObject()->GetTransform()->GetWorldRotation().GetInverse() * Vec3f(0, 9.81f, 0);
-    push0.deltaTime = std::min(deltaTime, 1/60.0f);
-    push0.damping = m_particleSettings.general.damping;
-    push0.strength = m_particleSettings.general.strength;
-
+    GPUCommonData   commonData;
+    commonData.spherePos = spherePos;
+    // TODO set radius to -1 when can't collide
+    commonData.sphereRadius = sphereRad;
+    commonData.damping = damping;
+    commonData.deltaTime = deltaTime;
+    commonData.strength = strength;
+    commonData.gravity = gravity;
+    GPUChunkData    tempData[MAX_CHUNK_BUFFER_SIZE];
+    uint32_t    count = 0;
+    uint32_t    particleCount = 0;
     // TODO
     for (auto &chunk : chunks)
     {
+        const CPUChunkData &source = chunk.second;
 
+        tempData[count].chunkPos = source.localPosition;
+        tempData[count].offset = source.globalOffset;
+        tempData[count].particleCount = source.particleCount;
+        particleCount += source.particleCount;
+        count++;
+        if (count == MAX_CHUNK_BUFFER_SIZE)
+        {
+            // TODO
+            // write to mapped buffers AND FLUSH
+
+            count = 0;
+            particleCount = 0;
+        }
     }
-    push0.particleCount = m_totalParticleCount;
-
-    vkCmdPushConstants(cmd, mat0->GetPipeline()->GetPipelineLayout(),
-                       VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(Push0), &push0);
+    if (count)
+    {
+        // TODO
+    }
 
     uint32_t groups = (m_totalParticleCount + 63) / 64;
     mat0->DispatchCompute(renderer, groups, 1, 1);
@@ -149,7 +167,7 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
 
     vkCmdPipelineBarrier(cmd,
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                          0, 0, nullptr, 1, &barrier0, 0, nullptr);
 
 
@@ -262,17 +280,17 @@ void ProceduralSoftBodyComponent::CreateParticleBuffers()
 
     auto particleBuffer = std::make_unique<VulkanBuffer>();
     particleBuffer->Initialize(device, PBufSizeAligned,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    VkCommandBufferAllocateInfo alloc{};
-    alloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    alloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    alloc.commandPool = renderer->GetCommandPool()->GetCommandPool();
-    alloc.commandBufferCount = 1;
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     m_particleBuffer = std::move(particleBuffer);
+
+    auto chunkBuffer = std::make_unique<VulkanBuffer>();
+    chunkBuffer->Initialize(device, sizeof(GPUCommonData) + sizeof(GPUChunkData) * MAX_CHUNK_BUFFER_SIZE,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    m_chunkDataBuffer = std::move(chunkBuffer);
 }
 
 void ProceduralSoftBodyComponent::CreateSkinnedMesh(CPUChunkData &data)

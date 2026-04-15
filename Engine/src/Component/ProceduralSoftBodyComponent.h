@@ -66,11 +66,22 @@ struct GPUNeighborData
 
 struct GPUChunkData
 {
-    Vec3f globalPos;
-    int globalOffset;
+    Vec3f   chunkPos;
+    int     offset;
     GPUNeighborData neighbors[8];
+    uint32_t    particleCount;
+    float       _padding[3];
+};
+
+struct GPUCommonData
+{
     Vec3f spherePos;
     float sphereRadius;
+    Vec3f   gravity;
+    float   deltaTime;
+    float   damping;
+    float   strength;
+    float   _padding[2];
 };
 
 struct CPUChunkData
@@ -134,6 +145,7 @@ private:
     std::unique_ptr<ComputeDispatch> m_simulationCompute1;
 
     std::unique_ptr<VulkanBuffer> m_particleBuffer;
+    std::unique_ptr<VulkanBuffer> m_chunkDataBuffer;
     VkDeviceSize PBufSizeAligned;
 
     std::list<BufferChunk> memChunks;
