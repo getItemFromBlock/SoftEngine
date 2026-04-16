@@ -149,10 +149,14 @@ private:
     std::unique_ptr<VulkanBuffer> m_stagingParticleBuffer;
     VkDeviceSize    m_pBufSizeAligned;
     void            *m_mappedpBuf;
+    std::unique_ptr<VulkanBuffer> m_connectionBuffer;
+    std::unique_ptr<VulkanBuffer> m_stagingConnectionBuffer;
+    VkDeviceSize    m_cnBufSizeAligned;
+    void            *m_mappedcnBuf;
     std::unique_ptr<VulkanBuffer> m_chunkDataBuffer;
     std::unique_ptr<VulkanBuffer> m_stagingChunkDataBuffer;
-    VkDeviceSize    m_cBufSizeAligned;
-    void            *m_mappedcBuf;
+    VkDeviceSize    m_chBufSizeAligned;
+    void            *m_mappedchBuf;
     VkDeviceSize    m_atomicBufferAlignement;
     uint32_t        m_chunkBufferOffset;
 

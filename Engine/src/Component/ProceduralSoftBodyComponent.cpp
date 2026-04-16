@@ -134,6 +134,7 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
 
         tempData[count].chunkPos = source.localPosition;
         tempData[count].offset = source.globalOffset;
+        tempData[count].connectionOffset = source.globalOffset + source.particleCount;
         tempData[count].particleCount = source.particleCount;
         particleCount += source.particleCount;
         count++;
