@@ -254,12 +254,19 @@ bool GLTFLoader::Load(const std::filesystem::path& fullPath, Model& model)
     // Meshes
     if (file.contains("meshes"))
     {
+        size_t index = 0;
         for (const auto& meshJson : file["meshes"])
         {
             Mesh mesh;
 
             if (meshJson.contains("name"))
+            {
                 mesh.name = meshJson["name"].get<std::string>();
+            }
+            else
+            {
+                mesh.name = fullPath.filename().stem().generic_string() + "_Mesh_" + std::to_string(index++);
+            }
 
             if (!meshJson.contains("primitives"))
             {

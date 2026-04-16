@@ -20,6 +20,7 @@
 #include "Component/TransformComponent.h"
 #include "Component/LightComponent.h"
 #include "Component/ParticleSystemComponent.h"
+#include "Component/GPUSoftBodyComponent.h"
 
 
 #include "Utils/Color.h"
@@ -70,7 +71,8 @@ bool Engine::Initialize(EngineDesc desc)
         SafePtr<Material> mat = m_resourceManager->CreateMaterial(RESOURCE_PATH"/materials/unlit.mat");
         mat->SetShader(unlit);
     }
-
+    m_resourceManager->InitializeResources();
+    
     m_renderer->GetLineRenderer()->Initialize(m_renderer.get());
     m_renderer->GetSkyboxRenderer()->Initialize();
     
@@ -80,6 +82,7 @@ bool Engine::Initialize(EngineDesc desc)
     m_componentRegister->RegisterComponent<TestComponent>();
     m_componentRegister->RegisterComponent<LightComponent>();
     m_componentRegister->RegisterComponent<ParticleSystemComponent>();
+    m_componentRegister->RegisterComponent<GPUSoftBodyComponent>();
     
     m_sceneHolder = std::make_unique<SceneHolder>();
     m_sceneHolder->Initialize();
@@ -104,6 +107,9 @@ void Engine::Update()
     m_deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
     lastTime = currentTime;
 
+    if (!m_sceneHolder->GetCurrentScene())
+        return;
+    m_sceneHolder->GetCurrentScene()->UpdateEditorCamera(m_deltaTime);
     switch (m_runtimeMode)
     {
     case RuntimeMode::Edit:

@@ -7,6 +7,8 @@
 
 #include "Core/Window.h"
 
+#include <nfd.hpp>
+
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -73,6 +75,82 @@ Platform::ErrorDialogResult Platform::CreateErrorDialog(const char* title, const
             return ErrorDialogResult::Cancel;
     }
 #endif
+}
+
+std::string Platform::SaveDialog(const std::vector<Filter>& filters,
+    const std::filesystem::path& defaultOpenPath)
+{
+    std::string resultString;
+
+    NFD::Guard nfdGuard;
+
+    NFD::UniquePath outPath;
+
+    const size_t count = filters.size();
+    std::vector<nfdfilteritem_t> filterItems(count);
+
+    for (size_t i = 0; i < count; i++)
+    {
+        filterItems[i].name = filters[i].name.c_str();
+        filterItems[i].spec = filters[i].spec.c_str();
+    }
+
+    // show the dialog
+    const nfdresult_t result = NFD::SaveDialog(outPath, filterItems.data(), static_cast<uint32_t>(count),
+                                               defaultOpenPath.generic_string().c_str());
+    if (result == NFD_OKAY)
+    {
+        resultString = std::string(outPath.get());
+    }
+    else if (result == NFD_CANCEL)
+    {
+    }
+    else
+    {
+    }
+
+    // NFD::Guard will automatically quit NFD.
+    return resultString;
+}
+
+std::string Platform::OpenDialog(const std::vector<Filter>& filters,
+    const std::filesystem::path& defaultOpenPath)
+{
+    std::string resultString;
+
+    // initialize NFD
+    NFD::Guard nfdGuard;
+
+    // auto-freeing memory
+    NFD::UniquePath outPath;
+
+    const size_t count = filters.size();
+    // prepare filters for the dialog
+    std::vector<nfdfilteritem_t> filterItems(count);
+
+    for (size_t i = 0; i < count; i++)
+    {
+        filterItems[i].name = filters[i].name.c_str();
+        filterItems[i].spec = filters[i].spec.c_str();
+    }
+
+    // show the dialog
+
+    const nfdresult_t result = NFD::OpenDialog(outPath, filterItems.data(), static_cast<uint32_t>(count),
+                                               defaultOpenPath.generic_string().c_str());
+    if (result == NFD_OKAY)
+    {
+        resultString = std::string(outPath.get());
+    }
+    else if (result == NFD_CANCEL)
+    {
+    }
+    else
+    {
+    }
+
+    // NFD::Guard will automatically quit NFD.
+    return resultString;
 }
 
 void Platform::Break()

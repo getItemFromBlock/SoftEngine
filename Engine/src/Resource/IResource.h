@@ -59,6 +59,7 @@ inline static std::unordered_map<std::string, ResourceType> extensionToResourceT
     {"psd", ResourceType::Texture},
     {"gif", ResourceType::Texture},
     {"obj", ResourceType::Model},
+    {"gltf", ResourceType::Model},
     {"mesh", ResourceType::Mesh},
     {"vert", ResourceType::VertexShader},
     {"frag", ResourceType::FragmentShader},
@@ -124,7 +125,7 @@ public:
     Core::UUID GetUUID() const { return p_uuid; }
     std::filesystem::path GetPath() const { return p_path; }
 
-    virtual bool Exists() const { return File::Exist(p_path); }
+    virtual bool Exists() const { return File::Exists(p_path); }
     virtual std::string GetName(bool extension = false) const;
  
     bool IsLoading() const { return p_state == ResourceState::Loading; }

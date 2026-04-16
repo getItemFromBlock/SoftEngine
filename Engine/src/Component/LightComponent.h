@@ -1,6 +1,8 @@
 #pragma once
 #include "IComponent.h"
 
+class SceneSerializer;
+
 class LightComponent : public IComponent
 {
 public:
@@ -13,13 +15,23 @@ public:
     
     Vec3f GetColor() const { return m_color; }
     float GetIntensity() const { return m_intensity; }
+    float GetAttenuation() const { return m_attenuation; }
+    Vec3f GetOtherPosition() const { return m_otherPosition; }
+    Vec2f GetAngleFactors() const { return m_angleFactors; }
+    int32_t GetLightType() const { return static_cast<int32_t>(m_lightType.type); }
     
     void SetColor(const Vec4f& color) { m_color = color; }
     void SetIntensity(float intensity) { m_intensity = intensity; }
+    void SetAttenuation(float attenuation) { m_attenuation = attenuation; }
+    void SetOtherPosition(const Vec3f& position) { m_otherPosition = position; }
+    void SetAngleFactors(const Vec2f& angleFactors) { m_angleFactors = angleFactors; }
+    void SetLightType(int32_t type) { m_lightType.type = static_cast<LightType::Type>(type); }
 
     void SerializeData(Vec4f dataOut[4]) const;
     
 private:
+    friend class SceneSerializer;
+
     Vec3f m_color = Vec3f::One();
     float m_intensity = 1.0f;
     float m_attenuation = 10.0f;

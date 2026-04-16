@@ -21,6 +21,7 @@
 
 class VulkanRenderer;
 class GameObject;
+class SceneSerializer;
 
 class IComponent : public IDescribe
 {
@@ -48,6 +49,8 @@ public:
     Core::UUID GetUUID() const { return p_uuid; }
     GameObject* GetGameObject() const { return p_gameObject; }
 protected:
+    friend class SceneSerializer;
+
     bool p_enable = true;
     Core::UUID p_uuid;
     GameObject* p_gameObject = nullptr;

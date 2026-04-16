@@ -35,7 +35,7 @@ bool Model::Load(ResourceManager* resourceManager)
         for (auto& mat : model.materials)
         {
             std::filesystem::path matPath = p_path / mat.name;
-            if (File::Exist(matPath))
+            if (File::Exists(matPath))
             {
                 resourceManager->Load<Material>(matPath);
             }
@@ -157,15 +157,21 @@ bool Model::Load(ResourceManager* resourceManager)
         {
             std::string matName = mat.name.generic_string();
             ASSERT(!matName.empty())
-            std::filesystem::path matPath = p_path / matName;
+            
+            //TODO: Fix with OBJ
+            std::filesystem::path matPath = p_path / (matName + ".mat");
 
-            if (File::Exist(matPath))
+            SafePtr<Material> matResource = {};
+            if (resourceManager->GetResource<Material>(matPath))
             {
-                materials[matName] = resourceManager->Load<Material>(matPath);
-                continue;
+                matResource = resourceManager->GetResource<Material>(matPath);
+                matResource->SetShader(resourceManager->GetDefaultShader());
+            }
+            else
+            {
+                matResource = resourceManager->CreateMaterial(matPath);
             }
 
-            SafePtr<Material> matResource = resourceManager->CreateMaterial(matPath);
 
             TextureParam linearParam;
             linearParam.format = TextureFormat::UNORM;

@@ -8,6 +8,7 @@
 #include "Scene.h"
 
 class Scene;
+class SceneSerializer;
 
 class GameObject
 {
@@ -49,6 +50,7 @@ public:
     Scene* GetScene() const { return &m_scene; }
 private:
     friend Scene;
+    friend class SceneSerializer;
     
     Core::UUID m_uuid;
     std::string m_name;

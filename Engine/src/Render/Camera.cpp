@@ -21,6 +21,7 @@ Camera::Camera()
 
 Camera::~Camera()
 {
+    EOnDestroy.Invoke();
 }
 
 Mat4 Camera::GetViewMatrix() const

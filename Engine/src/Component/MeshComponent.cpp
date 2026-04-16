@@ -64,7 +64,7 @@ void MeshComponent::OnRender(VulkanRenderer* renderer)
         return;
     
     auto queue = renderer->GetRenderQueueManager()->GetOpaqueQueue();
-    if (!m_materials.empty() && m_materials[0]->GetShader().getPtr() != Engine::Get()->GetResourceManager()->GetDefaultShader().get())
+    if (!m_materials.empty() && m_materials[0] && m_materials[0]->GetShader().getPtr() != Engine::Get()->GetResourceManager()->GetDefaultShader().get())
     {
         queue = renderer->GetRenderQueueManager()->GetTransparentQueue(); // Use transparent queue to render in forward pass
     }

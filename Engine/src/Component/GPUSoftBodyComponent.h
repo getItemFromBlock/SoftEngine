@@ -12,6 +12,7 @@
 
 class Material;
 class Mesh;
+class SceneSerializer;
 
 struct BodySettings
 {
@@ -62,7 +63,7 @@ struct ConnectionData
     float initialLength;
 };
 
-struct InstanceData
+struct SoftBodyInstanceData
 {
     Vec3f localPosition;
     float localScale;
@@ -85,9 +86,24 @@ public:
     
     void CreateFromMesh(SafePtr<Mesh> inputMesh);
 
+    bool IsLoadedFromMesh() const { return m_loadedFromMesh; }
+    SafePtr<Mesh> GetInitializerMesh() const { return m_initializerMesh; }
+    
+    bool GetDrawDebug() const { return m_drawDebug; }
+    void SetDrawDebug(bool drawDebug) { m_drawDebug = drawDebug; }
+    
     SafePtr<Material> GetMaterial() const { return m_material; }
     SafePtr<Mesh> GetMesh() const { return m_mesh; }
 private:
+    friend class SceneSerializer;
+
+    struct DeferredReleaseState;
+
+    void ReleaseGPUResources(std::unique_ptr<VulkanBuffer> particleBuffer,
+        std::shared_ptr<Mesh> mesh = {},
+        std::unique_ptr<ComputeDispatch> simulationCompute0 = {},
+        std::unique_ptr<ComputeDispatch> simulationCompute1 = {});
+    
     void CreateParticleBuffers();
     void CreateSkinnedMesh(std::vector<WeightedVertex> &vertices, std::vector<uint32_t> &indices);
     void MapMeshToParticles(std::vector<WeightedVertex> &vertices);

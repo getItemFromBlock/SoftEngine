@@ -22,7 +22,7 @@ bool File::ReadAllText(const std::filesystem::path& path, std::string& out)
     return file.ReadAllText(out);
 }
 
-bool File::Exist(const std::filesystem::path& path)
+bool File::Exists(const std::filesystem::path& path)
 {
     return std::filesystem::exists(path);
 }

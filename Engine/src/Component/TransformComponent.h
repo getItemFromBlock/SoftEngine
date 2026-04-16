@@ -36,6 +36,7 @@ public:
     void SetLocalRotation(const Quat& rotation);
     void SetLocalRotation(const Vec3f& rotation);
     Quat GetLocalRotation() const { return m_localRotation; }
+    Vec3f GetLocalEulerAngles() const { return m_localEulerAngles; }
     
     void SetWorldRotation(const Quat& rotation);
     Quat GetWorldRotation() const;
@@ -61,6 +62,7 @@ private:
     void ComputeModelMatrix();
     void UpdateModelMatrix(const Mat4& matrix);
 private:
+    friend class SceneSerializer;
     Mat4 m_modelMatrix;
     
     Vec3f m_localPosition = Vec3f::Zero();

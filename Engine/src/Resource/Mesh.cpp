@@ -84,7 +84,7 @@ void Mesh::Unload()
 
 bool Mesh::Exists() const
 {
-    return File::Exist(p_path.parent_path());
+    return File::Exists(p_path.parent_path());
 }
 
 void Mesh::ComputeBoundingBox(const std::vector<Vec3f>& positionVertices)

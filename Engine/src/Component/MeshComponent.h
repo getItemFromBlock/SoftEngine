@@ -4,6 +4,7 @@
 #include "Utils/Type.h"
 
 class Material;
+class SceneSerializer;
 
 class MeshComponent : public IComponent
 {
@@ -21,10 +22,15 @@ public:
     void RemoveMaterial(const SafePtr<Material>& material);
     void SetMaterial(size_t index, const SafePtr<Material>& material);
 
+    SafePtr<Mesh> GetMesh() const { return m_mesh; }
     std::vector<SafePtr<Material>> GetMaterials() const;
     SafePtr<Material> GetMaterial(size_t index);
+    bool GetDrawBounds() const { return m_drawBounds; }
+    void SetDrawBounds(bool drawBounds) { m_drawBounds = drawBounds; }
 
 private:
+    friend class SceneSerializer;
+
     std::vector<SafePtr<Material>> m_materials;
     SafePtr<Mesh> m_mesh;
     bool m_visible = true;

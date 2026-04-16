@@ -165,8 +165,7 @@ void GPUSoftBodyComponent::OnGameUpdate(float deltaTime)
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                          VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
                          0, 0, nullptr, 1, &barrier0, 0, nullptr);
-
-
+    
     // Second compute pass does not need connection data, as it just updates the position based on the velocity computed in the first pass
     mat1->SetStorageBuffer(0, 0, m_particleBuffer->GetBuffer(), 0,
                             PBufSizeAligned, renderer);
@@ -242,9 +241,47 @@ void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
 
 void GPUSoftBodyComponent::OnDestroy()
 {
-    Engine::Get()->GetRenderer()->WaitForGPU();
+    ReleaseGPUResources(
+        std::move(m_particleBuffer),
+        std::move(m_mesh),
+        std::move(m_simulationCompute0),
+        std::move(m_simulationCompute1));
+}
 
-    if (m_particleBuffer) m_particleBuffer->Cleanup();
+struct GPUSoftBodyComponent::DeferredReleaseState
+{
+    std::unique_ptr<VulkanBuffer> particleBuffer;
+    std::shared_ptr<Mesh> mesh;
+    std::unique_ptr<ComputeDispatch> simulationCompute0;
+    std::unique_ptr<ComputeDispatch> simulationCompute1;
+};
+
+void GPUSoftBodyComponent::ReleaseGPUResources(std::unique_ptr<VulkanBuffer> particleBuffer,
+    std::shared_ptr<Mesh> mesh,
+    std::unique_ptr<ComputeDispatch> simulationCompute0,
+    std::unique_ptr<ComputeDispatch> simulationCompute1)
+{
+    if (!particleBuffer && !mesh && !simulationCompute0 && !simulationCompute1)
+        return;
+
+    auto* engine = Engine::Get();
+    auto* renderer = engine->GetRenderer();
+
+    auto releasedState = std::make_shared<DeferredReleaseState>();
+    releasedState->particleBuffer = std::move(particleBuffer);
+    releasedState->mesh = std::move(mesh);
+    releasedState->simulationCompute0 = std::move(simulationCompute0);
+    releasedState->simulationCompute1 = std::move(simulationCompute1);
+
+    //TODO: Fix
+    renderer->AddAfterRenderCallback([releasedState]()
+    {
+        auto* engine = Engine::Get();
+        auto* renderer = engine ? engine->GetRenderer() : nullptr;
+
+        if (renderer && renderer->IsInitialized())
+            renderer->WaitForGPU();
+    });
 }
 
 void GPUSoftBodyComponent::CreateParticleBuffers()
@@ -252,10 +289,8 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
     auto renderer = Engine::Get()->GetRenderer();
     auto device = renderer->GetDevice();
 
-    renderer->WaitForGPU();
-
-    if (m_particleBuffer)
-        m_particleBuffer->Cleanup();
+    std::shared_ptr<Mesh> oldMesh = std::move(m_mesh);
+    ReleaseGPUResources(std::move(m_particleBuffer), std::move(oldMesh));
     
     if (m_particles.empty())
         InitializeParticleData(m_particles, m_connections);
@@ -360,8 +395,10 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
 
     MapMeshToParticles(vertices);
 
-    m_mesh->CreateFrom(reinterpret_cast<float*>(vertices.data()), static_cast<uint32_t>(vertices.size()), indices.data(), 
+    auto newMesh = std::make_shared<Mesh>("internal");
+    newMesh->CreateFrom(reinterpret_cast<float*>(vertices.data()), static_cast<uint32_t>(vertices.size()), indices.data(), 
         static_cast<uint32_t>(indices.size()), true);
+    m_mesh = std::move(newMesh);
     
     m_particles.clear();
     m_connections.clear();
