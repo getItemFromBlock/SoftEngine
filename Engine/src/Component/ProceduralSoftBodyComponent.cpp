@@ -106,16 +106,6 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
     VulkanMaterial* mat0 = m_simulationCompute0->GetMaterial();
     VulkanMaterial* mat1 = m_simulationCompute1->GetMaterial();
 
-    // First compute pass needs both particle data and connections
-    mat0->SetStorageBuffer( 0, 0, m_particleBuffer->GetBuffer(), 0,
-                            m_pBufSizeAligned, renderer);
-    mat0->SetStorageBuffer( 0, 1, m_particleBuffer->GetBuffer(), 0,
-                            m_pBufSizeAligned, renderer);
-    mat0->SetStorageBuffer( 0, 2, m_particleBuffer->GetBuffer(), 0,
-                            m_pBufSizeAligned, renderer);
-
-    mat0->BindForCompute(cmd, renderer->GetFrameIndex());
-
     const Vec3f gravity = GetGameObject()->GetTransform()->GetWorldRotation().GetInverse() * Vec3f(0, 9.81f, 0);
     const Vec3f spherePos = m_particleSettings.sphereData.position;
     const float sphereRad = m_particleSettings.sphereData.radius;
@@ -131,10 +121,12 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
     commonData.deltaTime = deltaTime;
     commonData.strength = strength;
     commonData.gravity = gravity;
+
     GPUChunkData    tempData[MAX_CHUNK_BUFFER_SIZE];
     uint32_t    count = 0;
     uint32_t    particleCount = 0;
     std::vector<uint32_t>   particleCounts;
+    uint8_t *ptr = reinterpret_cast<uint8_t*>(m_mappedcBuf);
     // TODO
     for (auto &chunk : m_chunks)
     {
@@ -147,8 +139,9 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
         count++;
         if (count == MAX_CHUNK_BUFFER_SIZE)
         {
-            std::memcpy();
-            // write to mapped buffers AND FLUSH
+            std::memcpy(ptr + m_chunkBufferOffset * m_cBufSizeAligned, &commonData, sizeof(GPUCommonData));
+            std::memcpy(ptr + m_chunkBufferOffset * m_cBufSizeAligned + sizeof(GPUCommonData), tempData, sizeof(CPUChunkData) * MAX_CHUNK_BUFFER_SIZE);
+            m_chunkBufferOffset++;
 
             particleCounts.push_back(particleCount);
             count = 0;
@@ -157,11 +150,48 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
     }
     if (count)
     {
-        // TODO
+        std::memcpy(ptr + m_chunkBufferOffset * m_cBufSizeAligned, &commonData, sizeof(GPUCommonData));
+        std::memcpy(ptr + m_chunkBufferOffset * m_cBufSizeAligned + sizeof(GPUCommonData), tempData, sizeof(CPUChunkData) * count);
+        m_chunkBufferOffset++;
+        particleCounts.push_back(particleCount);
     }
 
-    uint32_t groups = (m_totalParticleCount + 63) / 64;
-    mat0->DispatchCompute(renderer, groups, 1, 1);
+    VkMappedMemoryRange stagingRange = {};
+    stagingRange.memory = m_stagingChunkDataBuffer->GetBufferMemory();
+    stagingRange.offset = 0;
+    stagingRange.size = m_chunkBufferOffset * m_cBufSizeAligned;
+    vkFlushMappedMemoryRanges(renderer->GetDevice()->GetDevice(), 1, &stagingRange);
+
+    m_chunkDataBuffer->CopyFrom(cmd, m_stagingChunkDataBuffer.get(), m_chunkBufferOffset * m_cBufSizeAligned);
+
+    VkBufferMemoryBarrier barrier = {};
+    barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    barrier.buffer = m_chunkDataBuffer->GetBuffer();
+    barrier.size = VK_WHOLE_SIZE;
+
+    vkCmdPipelineBarrier(cmd,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        0, 0, nullptr, 1, &barrier, 0, nullptr);
+
+    mat0->BindForCompute(cmd, renderer->GetFrameIndex());
+
+    mat0->SetStorageBuffer( 0, 1, m_particleBuffer->GetBuffer(), 0,
+        m_pBufSizeAligned, renderer);
+    mat0->SetStorageBuffer( 0, 2, m_particleBuffer->GetBuffer(), 0,
+        m_pBufSizeAligned, renderer);
+
+    for (uint32_t i = 0; i < particleCounts.size(); i++)
+    {
+        mat0->SetStorageBuffer( 0, 0, m_chunkDataBuffer->GetBuffer(), i * m_cBufSizeAligned,
+            m_cBufSizeAligned, renderer);
+
+        uint32_t groups = (particleCounts[i] + 63) / 64;
+        mat0->DispatchCompute(renderer, groups, 1, 1);
+    }
+
 
     VkBufferMemoryBarrier barrier0{};
     barrier0.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
@@ -297,12 +327,18 @@ void ProceduralSoftBodyComponent::CreateParticleBuffers()
 
     m_cBufSizeAligned = align(sizeof(GPUCommonData) + sizeof(GPUChunkData) * MAX_CHUNK_BUFFER_SIZE, m_atomicBufferAlignement);
 
-    auto chunkBuffer = std::make_unique<VulkanBuffer>();
-    chunkBuffer->Initialize(device, m_cBufSizeAligned * MAX_CHUNK_BUFFER_COUNT,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    m_chunkDataBuffer = std::make_unique<VulkanBuffer>();
+    m_chunkDataBuffer->Initialize(device, m_cBufSizeAligned * MAX_CHUNK_BUFFER_COUNT,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    m_chunkDataBuffer = std::move(chunkBuffer);
+    m_stagingChunkDataBuffer = std::make_unique<VulkanBuffer>();
+    m_stagingChunkDataBuffer->Initialize(device, m_cBufSizeAligned * MAX_CHUNK_BUFFER_COUNT,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    vkMapMemory(device->GetDevice(), m_stagingChunkDataBuffer->GetBufferMemory(), 0, VK_WHOLE_SIZE, 0, &m_mappedcBuf);
+    
     m_chunkBufferOffset = 0;
 }
 
