@@ -40,6 +40,9 @@ public:
 
     void PreFrame(VulkanRenderer* renderer);
     void OnRender(VulkanRenderer* renderer);
+    void OnStart();
+    void OnUpdateEditor(float deltaTime);
+    void OnUpdateRuntime(float deltaTime);
     void OnUpdate(float deltaTime);
 
     #pragma region GameObject

@@ -37,6 +37,7 @@ public:
 
     virtual void OnCreate() {}
     virtual void OnStart() {}
+    virtual void OnGameUpdate(float deltaTime) {}
     virtual void OnUpdate(float deltaTime) {}
     virtual void OnRender(VulkanRenderer* renderer) {}
     virtual void OnDestroy() {}

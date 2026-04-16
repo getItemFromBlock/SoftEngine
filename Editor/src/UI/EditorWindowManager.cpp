@@ -8,6 +8,8 @@
 
 void EditorWindowManager::Initialize(Engine* engine, ImGuiHandler* handler)
 {
+    m_engine = engine;
+
     auto hierarchy = std::make_unique<Hierarchy>(engine, handler);
     auto inspector = std::make_unique<Inspector>(engine, handler);
 
@@ -58,9 +60,74 @@ void EditorWindowManager::RenderMainDock()
     ImGui::End();
 }
 
+void EditorWindowManager::RenderMainBar() const
+{
+    if (ImGui::BeginMainMenuBar())
+    {
+        if (ImGui::BeginMenu("File"))
+        {
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Edit"))
+        {
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("View"))
+        {
+            for (auto& window : m_windows)
+            {
+                if (ImGui::MenuItem(window->GetTitle().c_str(), nullptr, window->IsOpened()))
+                {
+                    window->SetOpened(!window->IsOpened());
+                }
+            }
+            ImGui::EndMenu();
+        }
+
+        if (m_engine)
+        {
+            using RuntimeMode = Engine::RuntimeMode;
+            RuntimeMode mode = m_engine->GetRuntimeMode();
+
+            constexpr float buttonWidth = 70.f;
+            constexpr float spacing = 6.f;
+            const float controlsWidth = buttonWidth * 3.f + spacing * 2.f;
+            const float startX = (ImGui::GetWindowWidth() - controlsWidth) * 0.5f;
+            ImGui::SetCursorPosX(startX);
+
+            const char* playLabel = mode == RuntimeMode::Pause ? "Resume" : "Play";
+            ImGui::BeginDisabled(mode == RuntimeMode::Play);
+            if (ImGui::Button(playLabel, ImVec2(buttonWidth, 0)))
+            {
+                m_engine->SetRuntimeMode(RuntimeMode::Play);
+            }
+            ImGui::EndDisabled();
+
+            ImGui::SameLine(0.0f, spacing);
+            ImGui::BeginDisabled(mode != RuntimeMode::Play);
+            if (ImGui::Button("Pause", ImVec2(buttonWidth, 0)))
+            {
+                m_engine->SetRuntimeMode(RuntimeMode::Pause);
+            }
+            ImGui::EndDisabled();
+
+            ImGui::SameLine(0.0f, spacing);
+            ImGui::BeginDisabled(mode == RuntimeMode::Edit);
+            if (ImGui::Button("Stop", ImVec2(buttonWidth, 0)))
+            {
+                m_engine->SetRuntimeMode(RuntimeMode::Edit);
+            }
+            ImGui::EndDisabled();
+        }
+
+        ImGui::EndMainMenuBar();
+    }
+}
+
 void EditorWindowManager::Render() const
 {
     RenderMainDock();
+    RenderMainBar();
     for (auto& window : m_windows)
         window->OnRender();
 }

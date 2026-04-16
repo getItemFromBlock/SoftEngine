@@ -12,7 +12,7 @@ public:
     void Describe(ClassDescriptor& d) override;
     
     void OnCreate() override;
-    void OnUpdate(float deltaTime) override;
+    void OnGameUpdate(float deltaTime) override;
 
     void SetOffset(float offset) { m_offset = offset; }
     void SetSpeed(float speed) { m_speed = speed; }

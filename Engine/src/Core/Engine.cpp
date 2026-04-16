@@ -103,8 +103,18 @@ void Engine::Update()
     auto currentTime = std::chrono::high_resolution_clock::now();
     m_deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
     lastTime = currentTime;
-    
-    m_sceneHolder->Update(m_deltaTime);
+
+    switch (m_runtimeMode)
+    {
+    case RuntimeMode::Edit:
+        m_sceneHolder->UpdateEditor(m_deltaTime);
+        break;
+    case RuntimeMode::Play:
+        m_sceneHolder->UpdateRuntime(m_deltaTime);
+        break;
+    case RuntimeMode::Pause:
+        break;
+    }
 }
 
 void Engine::Render()
@@ -135,6 +145,22 @@ void Engine::Cleanup()
     ThreadPool::Terminate();
 
     m_window->Terminate();
+}
+
+void Engine::SetRuntimeMode(RuntimeMode mode)
+{
+    if (m_runtimeMode == mode)
+        return;
+
+    if (m_sceneHolder)
+    {
+        if (mode == RuntimeMode::Play && m_runtimeMode == RuntimeMode::Edit)
+            m_sceneHolder->BeginPlay();
+        else if (mode == RuntimeMode::Edit && m_runtimeMode != RuntimeMode::Edit)
+            m_sceneHolder->EndPlay();
+    }
+
+    m_runtimeMode = mode;
 }
 
 Engine* Engine::Get()

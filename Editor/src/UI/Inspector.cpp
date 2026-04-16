@@ -16,7 +16,7 @@
 #include "Resource/Mesh.h"
 #include "Resource/PostProcessShader.h"
 
-Inspector::Inspector(Engine* engine, ImGuiHandler* handler) : EditorWindow(handler)
+Inspector::Inspector(Engine* engine, ImGuiHandler* handler) : EditorWindow("Inspector", handler)
 {
     m_sceneHolder = engine->GetSceneHolder();
 }

@@ -12,10 +12,14 @@ public:
 
     Scene* GetCurrentScene() const { return m_currentScene.get(); }
     
+    void BeginPlay();
+    void EndPlay();
     void PreFrame(VulkanRenderer* renderer);
-    void Update(float deltaTime);
+    void UpdateEditor(float deltaTime);
+    void UpdateRuntime(float deltaTime);
     void Render(VulkanRenderer* renderer);
     
 private:
     std::unique_ptr<Scene> m_currentScene;
+    bool m_hasStartedRuntime = false;
 };

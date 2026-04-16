@@ -60,7 +60,7 @@ void MeshComponent::OnUpdate(float deltaTime)
 
 void MeshComponent::OnRender(VulkanRenderer* renderer) 
 {
-    if (!m_visible || !m_mesh)
+    if (!m_mesh || !m_visible)
         return;
     
     auto queue = renderer->GetRenderQueueManager()->GetOpaqueQueue();

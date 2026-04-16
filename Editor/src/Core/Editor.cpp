@@ -63,7 +63,6 @@ void Editor::Initialize()
     resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/gaussianBlur.pshader");
     resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/pixelate.pshader");
     
-    
     auto sponza = resourceManager->Load<Model>(RESOURCE_PATH"models/Cube.obj");
     sponza->EOnLoaded.Bind([this, currentScene, sponza]()
     {

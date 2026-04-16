@@ -14,7 +14,10 @@ public:
     void Render() const;
 private:
     static void RenderMainDock();
+    
+    void RenderMainBar() const;
 private:
     std::vector<std::unique_ptr<EditorWindow>> m_windows;
+    Engine* m_engine = nullptr;
     
 };

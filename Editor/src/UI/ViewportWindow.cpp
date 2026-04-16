@@ -5,12 +5,12 @@
 #include "Core/ImGuiHandler.h"
 #include "Resource/RenderTargetTexture.h"
 
-ViewportWindow::ViewportWindow(ImGuiHandler* imguiHandler, Camera* camera) : EditorWindow(imguiHandler),
+ViewportWindow::ViewportWindow(ImGuiHandler* imguiHandler, Camera* camera) : EditorWindow("ViewportWindow", imguiHandler),
                                                                              m_camera(camera)
 {
     m_camera->OnRenderTargetResized += [this](const Vec2i& size)
     {
-        m_imguiHandler->UpdateTextureID(m_camera->GetRenderTarget().getPtr());
+        p_imguiHandler->UpdateTextureID(m_camera->GetRenderTarget().getPtr());
     };
 }
 
@@ -75,7 +75,7 @@ void ViewportWindow::OnRender()
 
         ImGui::SetCursorPos(ImVec2(cursorPos.x + xPos, cursorPos.y + yPos));
 
-        ImTextureRef textureID = m_imguiHandler->GetTextureID(m_camera->GetRenderTarget().getPtr());
+        ImTextureRef textureID = p_imguiHandler->GetTextureID(m_camera->GetRenderTarget().getPtr());
 
         ImGui::Image(textureID, ImVec2(int(width), int(height)));
         ImGui::SetCursorPos(ImVec2(cursorPos.x + xPos, cursorPos.y + yPos));

@@ -16,6 +16,13 @@ struct ENGINE_API EngineDesc
 class ENGINE_API Engine
 {
 public:
+    enum class RuntimeMode
+    {
+        Edit,
+        Play,
+        Pause
+    };
+
     static Engine* Create();
     
     bool Initialize(EngineDesc desc);
@@ -25,6 +32,9 @@ public:
     void EndFrame();
     void WaitBeforeClean();
     void Cleanup();
+
+    void SetRuntimeMode(RuntimeMode mode);
+    RuntimeMode GetRuntimeMode() const { return m_runtimeMode; }
     
     static Engine* Get();
 
@@ -43,4 +53,5 @@ private:
     inline static std::unique_ptr<Engine> s_instance = nullptr;
     
     float m_deltaTime = 0.0f;
+    RuntimeMode m_runtimeMode = RuntimeMode::Edit;
 };

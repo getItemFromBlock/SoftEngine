@@ -93,16 +93,47 @@ void Scene::OnRender(VulkanRenderer* renderer)
 
 void Scene::OnUpdate(float deltaTime)
 {
-    UpdateCamera(deltaTime);
+    OnUpdateEditor(deltaTime);
+    OnUpdateRuntime(deltaTime);
+}
 
+void Scene::OnStart()
+{
     std::scoped_lock lock(m_componentsMutex);
+    for (const std::vector<std::shared_ptr<IComponent>>& componentList : m_components | std::views::values)
+    {
+        for (const std::shared_ptr<IComponent>& component : componentList)
+        {
+            if (component->IsEnable())
+                component->OnStart();
+        }
+    }
+}
 
+void Scene::OnUpdateEditor(float deltaTime)
+{
+    UpdateCamera(deltaTime);
+    std::scoped_lock lock(m_componentsMutex);
     for (const std::vector<std::shared_ptr<IComponent>>& componentList : m_components | std::views::values)
     {
         for (const std::shared_ptr<IComponent>& component : componentList)
         {
             if (component->IsEnable())
                 component->OnUpdate(deltaTime);
+        }
+    }
+}
+
+void Scene::OnUpdateRuntime(float deltaTime)
+{
+    UpdateCamera(deltaTime);
+    std::scoped_lock lock(m_componentsMutex);
+    for (const std::vector<std::shared_ptr<IComponent>>& componentList : m_components | std::views::values)
+    {
+        for (const std::shared_ptr<IComponent>& component : componentList)
+        {
+            if (component->IsEnable())
+                component->OnGameUpdate(deltaTime);
         }
     }
 }

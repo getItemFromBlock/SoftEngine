@@ -98,7 +98,7 @@ void GPUSoftBodyComponent::OnCreate()
         });
 }
 
-void GPUSoftBodyComponent::OnUpdate(float deltaTime)
+void GPUSoftBodyComponent::OnGameUpdate(float deltaTime)
 {
     if (!m_simulationCompute0 || !m_simulationCompute1)
         return;
