@@ -670,11 +670,10 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
 
     BoundingBox BBox = m_initializerMesh.getPtr()->m_boundingBox;
 
-    constexpr size_t vertexSize = sizeof(Vertex) / sizeof(float);
-
-    int pointCount = static_cast<int>(m_initializerMesh->m_vertices.size() / vertexSize);
+    int pointCount = static_cast<int>(m_initializerMesh->m_indices.size());
 
     Vertex* vertices = reinterpret_cast<Vertex*>(m_initializerMesh->m_vertices.data());
+    uint32_t* indices = m_initializerMesh->m_indices.data();
 
     float invDensity = 1 / density;
 
@@ -691,9 +690,9 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
                 bool shouldDiscard = false;
                 for (int i = 0; i < pointCount / 3; i++)
                 {
-                    Vec3f a = vertices[i * 3    ].position;
-                    Vec3f b = vertices[i * 3 + 1].position;
-                    Vec3f c = vertices[i * 3 + 2].position;
+                    Vec3f a = vertices[indices[i * 3    ]].position;
+                    Vec3f b = vertices[indices[i * 3 + 1]].position;
+                    Vec3f c = vertices[indices[i * 3 + 2]].position;
 
                     Vec3f n = (b - a).Cross(c - a);
 
