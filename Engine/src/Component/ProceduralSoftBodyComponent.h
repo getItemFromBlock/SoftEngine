@@ -70,7 +70,8 @@ struct GPUChunkData
     int     offset;
     GPUNeighborData neighbors[8];
     uint32_t    particleCount;
-    float       _padding[3];
+    uint32_t    connectionOffset;
+    float       _padding[2];
 };
 
 struct GPUCommonData
@@ -145,14 +146,21 @@ private:
     std::unique_ptr<ComputeDispatch> m_simulationCompute1;
 
     std::unique_ptr<VulkanBuffer> m_particleBuffer;
+    std::unique_ptr<VulkanBuffer> m_stagingParticleBuffer;
+    VkDeviceSize    m_pBufSizeAligned;
+    void            *m_mappedpBuf;
     std::unique_ptr<VulkanBuffer> m_chunkDataBuffer;
-    VkDeviceSize PBufSizeAligned;
+    std::unique_ptr<VulkanBuffer> m_stagingChunkDataBuffer;
+    VkDeviceSize    m_cBufSizeAligned;
+    void            *m_mappedcBuf;
+    VkDeviceSize    m_atomicBufferAlignement;
+    uint32_t        m_chunkBufferOffset;
 
-    std::list<BufferChunk> memChunks;
-    std::unordered_map<Vec2i, CPUChunkData> chunks;
-    std::unordered_map<Vec2i, std::vector<HeightPointData>> heightData;
-    uint32_t globalChunkCount;
-    uint32_t globalChunkOffset;
+    std::list<BufferChunk> m_memChunks;
+    std::unordered_map<Vec2i, CPUChunkData> m_chunks;
+    std::unordered_map<Vec2i, std::vector<HeightPointData>> m_heightData;
+    uint32_t m_globalChunkCount;
+    uint32_t m_globalChunkOffset;
 
     SafePtr<Mesh> m_billboardMesh;
     SafePtr<Material> m_material;
