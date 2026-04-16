@@ -71,7 +71,7 @@ bool Model::Load(ResourceManager* resourceManager)
                 }
                 else
                 {
-                    metallic = resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png");
+                    metallic = resourceManager->GetBlackTexture();
                     matResource->SetAttribute("material.metalnessFactor", 0.f);
                 }
                 metallic->SetTextureParameters(param);
@@ -83,7 +83,7 @@ bool Model::Load(ResourceManager* resourceManager)
                 }
                 else
                 {
-                    roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png");
+                    roughness = resourceManager->GetBlackTexture();
                     matResource->SetAttribute("material.roughnessFactor", 0.f);
                 }
 
@@ -92,7 +92,7 @@ bool Model::Load(ResourceManager* resourceManager)
                 matResource->SetAttribute("metalnessSampler", metallic);
                 matResource->SetAttribute("roughnessSampler", roughness);
                 matResource->SetAttribute("aoSampler",
-                                          resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png"));
+                                          resourceManager->GetBlackTexture());
                 matResource->SetAttribute("material.color", static_cast<Vec4f>(Color(mat.diffuse, mat.transparency)));
 
                 materials[mat.name.generic_string()] = matResource;
@@ -134,7 +134,10 @@ bool Model::Load(ResourceManager* resourceManager)
 
             m_meshes.push_back(meshResource);
 
-            meshResource->m_vertices = mesh.finalVertices;
+            static_assert(sizeof(OBJLoader::Vertex) == sizeof(Vertex));
+            meshResource->m_vertices.resize(mesh.finalVertices.size() * (sizeof(OBJLoader::Vertex) / sizeof(float)));
+            std::memcpy(meshResource->m_vertices.data(), mesh.finalVertices.data(), sizeof(OBJLoader::Vertex) * mesh.finalVertices.size());
+            meshResource->m_indices = mesh.finalIndices;
             meshResource->SetLoaded();
             ASSERT(!meshResource->m_vertices.empty())
             resourceManager->AddResourceToSend(meshResource.getPtr());
@@ -199,7 +202,7 @@ bool Model::Load(ResourceManager* resourceManager)
             }
             else
             {
-                metallic = resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png");
+                metallic = resourceManager->GetBlackTexture();
                 matResource->SetAttribute("material.metalnessFactor", 0.f);
             }
             metallic->SetTextureParameters(linearParam);
@@ -213,7 +216,7 @@ bool Model::Load(ResourceManager* resourceManager)
             }
             else
             {
-                roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png");
+                roughness = resourceManager->GetBlackTexture();
                 matResource->SetAttribute("material.roughnessFactor", 0.f);
             }
             roughness->SetTextureParameters(linearParam);
@@ -285,7 +288,10 @@ bool Model::Load(ResourceManager* resourceManager)
                 }
             }
 
-            meshResource->m_vertices = mesh.finalVertices;
+            static_assert(sizeof(OBJLoader::Vertex) == sizeof(Vertex));
+            meshResource->m_vertices.resize(mesh.finalVertices.size() * (sizeof(OBJLoader::Vertex) / sizeof(float)));
+            std::memcpy(meshResource->m_vertices.data(), mesh.finalVertices.data(), sizeof(OBJLoader::Vertex) * mesh.finalVertices.size());
+            meshResource->m_indices = mesh.finalIndices;
             meshResource->SetLoaded();
             ASSERT(!meshResource->m_vertices.empty())
             resourceManager->AddResourceToSend(meshResource.getPtr());
