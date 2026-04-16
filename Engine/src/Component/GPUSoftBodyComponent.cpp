@@ -660,12 +660,6 @@ void GPUSoftBodyComponent::ApplySettings()
     m_needsRecreation = true;
 }
 
-struct convexMesh
-{
-    int verticesCount;
-    Vertex* vertices;
-};
-
 void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float maxDistToConnect)
 {
     m_particles.clear();
@@ -713,7 +707,7 @@ void GPUSoftBodyComponent::GenerateConnection(BoundingBox BBox, float maxDistToC
 
         m_particles[i].connectionsCount = static_cast<uint32_t>(m_connections.size() - m_particles[i].connectionsOffset);
     }
-    
+
     m_totalParticleCount = static_cast<uint32_t>(m_particles.size());
 }
 
@@ -723,7 +717,7 @@ struct Ray
     Vec3f direction;
 };
 
-bool RayIntersectTriangle(Ray ray, Vec3f a, Vec3f b, Vec3f c, float& dist)
+bool RayIntersectTriangle(const Ray& ray, const Vec3f& a, const Vec3f& b, const Vec3f& c, float& dist)
 {
     const float EPSILON = 0.0000001f;
     Vec3f edge1 = b - a;
