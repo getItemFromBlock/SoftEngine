@@ -161,7 +161,7 @@ void Editor::Run()
             go1->SetName("SoftBody");
             auto soft = go1->AddComponent<GPUSoftBodyComponent>();
             soft->CreateFromMesh(
-                m_engine->GetResourceManager()->Load<Mesh>(RESOURCE_PATH"/models/fox.obj/Low_Poly_Fox.mesh"));
+                m_engine->GetResourceManager()->Load<Mesh>(RESOURCE_PATH"/models/fox.obj/Fox.mesh"));
         }
 
         m_window->PollEvents();
