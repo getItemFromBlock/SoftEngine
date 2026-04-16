@@ -282,12 +282,18 @@ void ProceduralSoftBodyComponent::CreateParticleBuffers()
 
     m_pBufSizeAligned = align(MAX_BUFFER_SIZE, m_atomicBufferAlignement);
 
-    auto particleBuffer = std::make_unique<VulkanBuffer>();
-    particleBuffer->Initialize(device, m_pBufSizeAligned,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    m_particleBuffer = std::make_unique<VulkanBuffer>();
+    m_particleBuffer->Initialize(device, m_pBufSizeAligned,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    m_particleBuffer = std::move(particleBuffer);
+    m_stagingParticleBuffer = std::make_unique<VulkanBuffer>();
+    m_stagingParticleBuffer->Initialize(device, m_pBufSizeAligned,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    vkMapMemory(device->GetDevice(), m_stagingParticleBuffer->GetBufferMemory(), 0, VK_WHOLE_SIZE, 0, &m_mappedpBuf);
+
 
     m_cBufSizeAligned = align(sizeof(GPUCommonData) + sizeof(GPUChunkData) * MAX_CHUNK_BUFFER_SIZE, m_atomicBufferAlignement);
 
