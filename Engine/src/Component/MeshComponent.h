@@ -14,6 +14,7 @@ public:
     void Describe(ClassDescriptor& d) override;
 
     void OnUpdate(float deltaTime) override;
+    void OnGameUpdate(float deltaTime) override;
     void OnRender(VulkanRenderer* renderer) override;
 
     void SetMesh(const SafePtr<Mesh>& mesh);

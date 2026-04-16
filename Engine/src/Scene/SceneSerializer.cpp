@@ -393,9 +393,12 @@ namespace
                     componentData.contains("initializerMesh") ? componentData["initializerMesh"] : json());
 
                 if (componentData.value("loadedFromMesh", false) && initializerMesh)
-                    softBodyComponent->CreateFromMesh(initializerMesh);
-                else
-                    softBodyComponent->ApplySettings();
+                {
+                    initializerMesh->EOnSentToGPU += [softBodyComponent, initializerMesh]{
+                        softBodyComponent->CreateFromMesh(initializerMesh);
+                    };
+                }
+                softBodyComponent->ApplySettings();
             }
         }
 

@@ -69,6 +69,7 @@ bool Engine::Initialize(EngineDesc desc)
 
         SafePtr<Shader> unlit = m_resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/Unlit/Unlit.shader");
         SafePtr<Material> mat = m_resourceManager->CreateMaterial(RESOURCE_PATH"/materials/unlit.mat");
+        mat->SetAttribute("material.color", Vec4f::One());
         mat->SetShader(unlit);
     }
     m_resourceManager->InitializeResources();
@@ -89,7 +90,7 @@ bool Engine::Initialize(EngineDesc desc)
     return true;
 }
 
-bool Engine::BeginFrame() const
+bool Engine::BeginFrame()
 {
     m_resourceManager->UpdateResourceToSend();
     m_sceneHolder->PreFrame(m_renderer.get());
@@ -97,6 +98,7 @@ bool Engine::BeginFrame() const
     if (!m_renderer->BeginFrame())
         return false;
 
+    m_frameInProgress = true;
     return true;
 }
 
@@ -131,6 +133,7 @@ void Engine::Render()
 void Engine::EndFrame()
 {
     m_renderer->EndFrame();
+    m_frameInProgress = false;
 }
 
 void Engine::WaitBeforeClean()
@@ -153,7 +156,7 @@ void Engine::Cleanup()
     m_window->Terminate();
 }
 
-void Engine::SetRuntimeMode(RuntimeMode mode)
+void Engine::ApplyRuntimeMode(RuntimeMode mode)
 {
     if (m_runtimeMode == mode)
         return;
@@ -167,6 +170,41 @@ void Engine::SetRuntimeMode(RuntimeMode mode)
     }
 
     m_runtimeMode = mode;
+}
+
+void Engine::SetRuntimeMode(RuntimeMode mode)
+{
+    if (m_runtimeMode == mode && !m_pendingRuntimeMode.has_value())
+        return;
+
+    if (m_pendingRuntimeMode.has_value() && *m_pendingRuntimeMode == mode)
+        return;
+
+    if (m_frameInProgress)
+    {
+        m_pendingRuntimeMode = mode;
+
+        if (m_pendingRuntimeModeCallback == UUID_INVALID)
+        {
+            m_pendingRuntimeModeCallback = m_renderer->AddAfterRenderCallback([this]()
+            {
+                m_pendingRuntimeModeCallback = UUID_INVALID;
+
+                if (!m_pendingRuntimeMode.has_value())
+                    return;
+
+                const RuntimeMode pendingMode = *m_pendingRuntimeMode;
+                m_pendingRuntimeMode.reset();
+
+                m_renderer->WaitForGPU();
+
+                ApplyRuntimeMode(pendingMode);
+            });
+        }
+        return;
+    }
+
+    ApplyRuntimeMode(mode);
 }
 
 Engine* Engine::Get()

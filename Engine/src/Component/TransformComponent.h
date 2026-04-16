@@ -19,6 +19,7 @@ public:
     void Describe(ClassDescriptor& d) override;
 
     void OnUpdate(float deltaTime) override;
+    void OnGameUpdate(float deltaTime) override;
 
     Mat4 GetWorldMatrix() const;
     Mat4 GetLocalMatrix() const;

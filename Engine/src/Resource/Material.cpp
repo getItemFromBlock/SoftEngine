@@ -15,8 +15,11 @@ bool Material::Load(ResourceManager* resourceManager)
     auto parentModel = p_path.parent_path();
     
     if (parentModel.extension() == ".obj" || parentModel.extension() == ".gltf")
+    {
         resourceManager->Load<Model>(parentModel);
-    return true;
+        return true;
+    }
+    return false;
 }
 
 bool Material::SendToGPU(VulkanRenderer* renderer)

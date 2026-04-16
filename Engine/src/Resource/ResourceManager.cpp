@@ -406,7 +406,7 @@ void ResourceManager::ReadCache()
     while (stream >> uuid >> std::quoted(pathString))
     {
         std::shared_ptr<IResource> resource = CreateResourceFromPath(pathString);
-        if (!resource || !resource->Exists())
+        if (!resource || !resource->Exists() || Contains(pathString))
             continue;
         resource->p_uuid = uuid;
         AddResource(uuid, resource, GetHash(pathString));

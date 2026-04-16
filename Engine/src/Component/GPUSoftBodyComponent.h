@@ -77,6 +77,7 @@ public:
 
     void Describe(ClassDescriptor& d) override;
     void OnCreate() override;
+    void OnUpdate(float deltaTime) override;
     void OnGameUpdate(float deltaTime) override;
     void OnRender(VulkanRenderer* renderer) override;
     void OnDestroy() override;
@@ -96,8 +97,6 @@ public:
     SafePtr<Mesh> GetMesh() const { return m_mesh; }
 private:
     friend class SceneSerializer;
-
-    struct DeferredReleaseState;
 
     void ReleaseGPUResources(std::unique_ptr<VulkanBuffer> particleBuffer,
         std::shared_ptr<Mesh> mesh = {},

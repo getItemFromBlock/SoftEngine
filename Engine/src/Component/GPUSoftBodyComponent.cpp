@@ -19,50 +19,59 @@ uint64_t align(uint64_t value, uint64_t alignement)
 
 void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
 {
-    auto &res = d.AddVec3i("Block Size", m_particleSettings.general.particleAmount).SetRangeInt(3, 1024);
+    auto& res = d.AddVec3i("Block Size", m_particleSettings.general.particleAmount).SetRangeInt(3, 1024);
     res.onModified = [this](void)
-        {
-            m_needsRecreation = true;
-        };
+    {
+        m_needsRecreation = true;
+    };
 
-    auto &res2 = d.AddProperty("Connections Amount", PropertyType::Int, &m_particleSettings.general.connectionStrength)
-        .SetRangeInt(2, 256);
+    auto& res2 = d.AddProperty("Connections Amount", PropertyType::Int, &m_particleSettings.general.connectionStrength)
+                  .SetRangeInt(2, 256);
     res2.onModified = [this](void)
-        {
-            m_needsRecreation = true;
-        };
+    {
+        m_needsRecreation = true;
+    };
 
-    auto &res3 = d.AddInt("Solid Layers", m_particleSettings.general.solidLayers).SetRangeInt(1, 1024);
+    auto& res3 = d.AddInt("Solid Layers", m_particleSettings.general.solidLayers).SetRangeInt(1, 1024);
     res3.onModified = [this](void)
-        {
-            m_needsRecreation = true;
-        };
+    {
+        m_needsRecreation = true;
+    };
 
     d.AddFloat("Damping", m_particleSettings.general.damping).SetRangeFloat(0, 65536);
 
     d.AddFloat("Connection Strength", m_particleSettings.general.strength).SetRangeFloat(0, 65536);
 
-    auto &res6 = d.AddEnum("Shape", reinterpret_cast<int32_t *>(&m_particleSettings.shape.type), m_particleSettings.shape.to_cstr());
+    auto& res6 = d.AddEnum("Shape", reinterpret_cast<int32_t*>(&m_particleSettings.shape.type),
+                           m_particleSettings.shape.to_cstr());
     res6.onModified = [this](void)
-        {
-            m_needsRecreation = true;
-        };
+    {
+        m_needsRecreation = true;
+    };
 
     d.AddBool("Debug", m_drawDebug);
 
     d.AddButton("Reset")
-        .onModified = [this](void)
+     .onModified = [this](void)
+    {
+        m_needsRecreation = true;
+    };
+
+    d.AddMesh("Mesh", m_initializerMesh).setter = [this](void* value)
+    {
+        SafePtr<Mesh> mesh = *static_cast<SafePtr<Mesh>*>(value);
+        mesh->EOnSentToGPU += [mesh, this]
         {
-            m_needsRecreation = true;
+            CreateFromMesh(mesh);
         };
+    };
 }
 
 void GPUSoftBodyComponent::CreateFromMesh(SafePtr<Mesh> inputMesh)
 {
     m_initializerMesh = inputMesh;
     m_loadedFromMesh = true;
-    InitializeParticleDataFromMesh(5, 0.5);
-    CreateParticleBuffers();
+    m_needsRecreation = true;
 }
 
 void GPUSoftBodyComponent::OnCreate()
@@ -79,7 +88,7 @@ void GPUSoftBodyComponent::OnCreate()
     m_billboardMaterial = resourceManager->CreateMaterial("SoftbodyInstancing");
     m_billboardMaterial->SetShader(instancingShader);
     m_billboardMaterial->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
-    
+
     m_material = resourceManager->CreateMaterial("SoftbodySkinned");
     m_material->SetShader(skinnedShader);
     m_material->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
@@ -88,21 +97,38 @@ void GPUSoftBodyComponent::OnCreate()
     m_billboardMesh = resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cube.obj/Cube.mesh");
 
     computeShader0->EOnSentToGPU.Bind([this, computeShader0, renderer]()
-        {
-            m_simulationCompute0 = computeShader0->CreateDispatch(renderer);
-        });
+    {
+        m_simulationCompute0 = computeShader0->CreateDispatch(renderer);
+    });
 
     computeShader1->EOnSentToGPU.Bind([this, computeShader1, renderer]()
+    {
+        m_simulationCompute1 = computeShader1->CreateDispatch(renderer);
+    });
+}
+
+void GPUSoftBodyComponent::OnUpdate(float deltaTime)
+{
+    if (!m_simulationCompute0 || !m_simulationCompute1)
+        return;
+
+    if (m_needsRecreation)
+    {
+        if (m_loadedFromMesh)
         {
-            m_simulationCompute1 = computeShader1->CreateDispatch(renderer);
-        });
+            InitializeParticleDataFromMesh(5, 0.5);
+        }
+        CreateParticleBuffers();
+        m_needsRecreation = false;
+        return;
+    }
 }
 
 void GPUSoftBodyComponent::OnGameUpdate(float deltaTime)
 {
     if (!m_simulationCompute0 || !m_simulationCompute1)
         return;
-    
+
     if (m_needsRecreation)
     {
         if (m_loadedFromMesh)
@@ -125,9 +151,9 @@ void GPUSoftBodyComponent::OnGameUpdate(float deltaTime)
 
     // First compute pass needs both particle data and connections
     mat0->SetStorageBuffer(0, 0, m_particleBuffer->GetBuffer(), 0,
-                            PBufSizeAligned, renderer);
+                           PBufSizeAligned, renderer);
     mat0->SetStorageBuffer(0, 1, m_particleBuffer->GetBuffer(), PBufSizeAligned,
-                            CBufSizeAligned, renderer);
+                           CBufSizeAligned, renderer);
 
     mat0->BindForCompute(cmd, renderer->GetFrameIndex());
 
@@ -137,11 +163,11 @@ void GPUSoftBodyComponent::OnGameUpdate(float deltaTime)
         float deltaTime;
         float damping;
         float strength;
-        uint32_t  particleCount;
+        uint32_t particleCount;
     } push0;
 
     push0.gravity = GetGameObject()->GetTransform()->GetWorldRotation().GetInverse() * Vec3f(0, 9.81f, 0);
-    push0.deltaTime = std::min(deltaTime, 1/60.0f);
+    push0.deltaTime = std::min(deltaTime, 1 / 60.0f);
     push0.damping = m_particleSettings.general.damping;
     push0.strength = m_particleSettings.general.strength;
     push0.particleCount = m_totalParticleCount;
@@ -165,10 +191,10 @@ void GPUSoftBodyComponent::OnGameUpdate(float deltaTime)
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                          VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
                          0, 0, nullptr, 1, &barrier0, 0, nullptr);
-    
+
     // Second compute pass does not need connection data, as it just updates the position based on the velocity computed in the first pass
     mat1->SetStorageBuffer(0, 0, m_particleBuffer->GetBuffer(), 0,
-                            PBufSizeAligned, renderer);
+                           PBufSizeAligned, renderer);
 
     mat1->BindForCompute(cmd, renderer->GetFrameIndex());
 
@@ -182,7 +208,7 @@ void GPUSoftBodyComponent::OnGameUpdate(float deltaTime)
     push1.particleCount = m_totalParticleCount;
 
     vkCmdPushConstants(cmd, mat1->GetPipeline()->GetPipelineLayout(),
-        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(Push1), &push1);
+                       VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(Push1), &push1);
 
     mat1->DispatchCompute(renderer, groups, 1, 1);
 
@@ -196,9 +222,9 @@ void GPUSoftBodyComponent::OnGameUpdate(float deltaTime)
     barrier1.size = VK_WHOLE_SIZE;
 
     vkCmdPipelineBarrier(cmd,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-        0, 0, nullptr, 1, &barrier1, 0, nullptr);
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+                         0, 0, nullptr, 1, &barrier1, 0, nullptr);
 
     CameraData cam = p_gameObject->GetScene()->GetCameraData();
     m_material->SetAttribute("cameraUBO.viewProj", cam.VP);
@@ -210,16 +236,16 @@ void GPUSoftBodyComponent::OnGameUpdate(float deltaTime)
 
 void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
 {
-    if (!m_mesh || !m_mesh->IsLoaded() || !m_mesh->HasBeenSent()) 
+    if (!m_mesh || !m_mesh->IsLoaded() || !m_mesh->HasBeenSent())
         return;
-    if (!m_particleBuffer || !m_material) 
+    if (!m_particleBuffer || !m_material)
         return;
 
     auto* rqm = Engine::Get()->GetRenderer()->GetRenderQueueManager();
     auto* queue = rqm->GetTransparentQueue();
 
     const Mat4 transform = GetGameObject()->GetTransform()
-                               ->GetWorldMatrix().GetTranspose();
+                                          ->GetWorldMatrix().GetTranspose();
 
     // Skinned soft body mesh
     queue->SubmitSoftBody(
@@ -248,18 +274,10 @@ void GPUSoftBodyComponent::OnDestroy()
         std::move(m_simulationCompute1));
 }
 
-struct GPUSoftBodyComponent::DeferredReleaseState
-{
-    std::unique_ptr<VulkanBuffer> particleBuffer;
-    std::shared_ptr<Mesh> mesh;
-    std::unique_ptr<ComputeDispatch> simulationCompute0;
-    std::unique_ptr<ComputeDispatch> simulationCompute1;
-};
-
 void GPUSoftBodyComponent::ReleaseGPUResources(std::unique_ptr<VulkanBuffer> particleBuffer,
-    std::shared_ptr<Mesh> mesh,
-    std::unique_ptr<ComputeDispatch> simulationCompute0,
-    std::unique_ptr<ComputeDispatch> simulationCompute1)
+                                               std::shared_ptr<Mesh> mesh,
+                                               std::unique_ptr<ComputeDispatch> simulationCompute0,
+                                               std::unique_ptr<ComputeDispatch> simulationCompute1)
 {
     if (!particleBuffer && !mesh && !simulationCompute0 && !simulationCompute1)
         return;
@@ -267,21 +285,16 @@ void GPUSoftBodyComponent::ReleaseGPUResources(std::unique_ptr<VulkanBuffer> par
     auto* engine = Engine::Get();
     auto* renderer = engine->GetRenderer();
 
-    auto releasedState = std::make_shared<DeferredReleaseState>();
-    releasedState->particleBuffer = std::move(particleBuffer);
-    releasedState->mesh = std::move(mesh);
-    releasedState->simulationCompute0 = std::move(simulationCompute0);
-    releasedState->simulationCompute1 = std::move(simulationCompute1);
+    if (renderer && renderer->IsInitialized())
+        renderer->WaitForGPU();
 
-    //TODO: Fix
-    renderer->AddAfterRenderCallback([releasedState]()
-    {
-        auto* engine = Engine::Get();
-        auto* renderer = engine ? engine->GetRenderer() : nullptr;
+    if (particleBuffer)
+        particleBuffer->Cleanup();
 
-        if (renderer && renderer->IsInitialized())
-            renderer->WaitForGPU();
-    });
+    particleBuffer.reset();
+    mesh.reset();
+    simulationCompute0.reset();
+    simulationCompute1.reset();
 }
 
 void GPUSoftBodyComponent::CreateParticleBuffers()
@@ -291,7 +304,7 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
 
     std::shared_ptr<Mesh> oldMesh = std::move(m_mesh);
     ReleaseGPUResources(std::move(m_particleBuffer), std::move(oldMesh));
-    
+
     if (m_particles.empty())
         InitializeParticleData(m_particles, m_connections);
 
@@ -304,14 +317,14 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
 
     auto particleBuffer = std::make_unique<VulkanBuffer>();
     particleBuffer->Initialize(device, PBufSizeAligned + CBufSizeAligned,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+                               VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     auto stagingBuffer = std::make_unique<VulkanBuffer>();
     stagingBuffer->Initialize(device, PBufSizeAligned + CBufSizeAligned,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+                              VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     stagingBuffer->CopyData(m_particles.data(), PBufSize);
     if (CBufSize)
@@ -341,9 +354,9 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
     barrier.size = VK_WHOLE_SIZE;
 
     vkCmdPipelineBarrier(cmd,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        0, 0, nullptr, 1, &barrier, 0, nullptr);
+                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         0, 0, nullptr, 1, &barrier, 0, nullptr);
 
     vkEndCommandBuffer(cmd);
 
@@ -356,7 +369,7 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
     vkQueueWaitIdle(device->GetGraphicsQueue().handle);
 
     vkFreeCommandBuffers(device->GetDevice(),
-        renderer->GetCommandPool()->GetCommandPool(), 1, &cmd);
+                         renderer->GetCommandPool()->GetCommandPool(), 1, &cmd);
 
     m_particleBuffer = std::move(particleBuffer);
     stagingBuffer->Cleanup();
@@ -370,13 +383,14 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
         static_assert(offsetof(Vertex, normal) == offsetof(WeightedVertex, normal));
         static_assert(offsetof(Vertex, tangent) == offsetof(WeightedVertex, tangent));
 
-        const uint32_t stride = (m_initializerMesh->m_isWeighted ? sizeof(WeightedVertex) : sizeof(Vertex)) / sizeof(float);
+        const uint32_t stride = (m_initializerMesh->m_isWeighted ? sizeof(WeightedVertex) : sizeof(Vertex)) / sizeof(
+            float);
         const uint32_t vertCount = static_cast<uint32_t>(m_initializerMesh->m_vertices.size() / stride);
         const uint32_t dataStride = sizeof(Vertex) / sizeof(float);
 
         vertices.resize(vertCount);
-        const float *ptrSource = m_initializerMesh->m_vertices.data();
-        float *ptrDest = reinterpret_cast<float*>(vertices.data());
+        const float* ptrSource = m_initializerMesh->m_vertices.data();
+        float* ptrDest = reinterpret_cast<float*>(vertices.data());
 
         for (uint32_t i = 0; i < vertCount; i++)
         {
@@ -396,10 +410,11 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
     MapMeshToParticles(vertices);
 
     auto newMesh = std::make_shared<Mesh>("internal");
-    newMesh->CreateFrom(reinterpret_cast<float*>(vertices.data()), static_cast<uint32_t>(vertices.size()), indices.data(), 
-        static_cast<uint32_t>(indices.size()), true);
+    newMesh->CreateFrom(reinterpret_cast<float*>(vertices.data()), static_cast<uint32_t>(vertices.size()),
+                        indices.data(),
+                        static_cast<uint32_t>(indices.size()), true);
     m_mesh = std::move(newMesh);
-    
+
     m_particles.clear();
     m_connections.clear();
 }
@@ -414,7 +429,7 @@ const uint32_t _cubeSwizzlesValues[] =
     1, 0, 2
 };
 
-void GPUSoftBodyComponent::CreateSkinnedMesh(std::vector<WeightedVertex> &vertices, std::vector<uint32_t> &indices)
+void GPUSoftBodyComponent::CreateSkinnedMesh(std::vector<WeightedVertex>& vertices, std::vector<uint32_t>& indices)
 {
     if (m_particleSettings.shape.type == BodySettings::Shape::Type::Cube)
     {
@@ -424,13 +439,13 @@ void GPUSoftBodyComponent::CreateSkinnedMesh(std::vector<WeightedVertex> &vertic
             {
                 for (int32_t k = 0; k < m_particleSettings.general.surfacePoints.y; k++)
                 {
-                                        
-                    Vec3f pos = Vec3f(   static_cast<float>(j) / static_cast<float>(m_particleSettings.general.surfacePoints.x - 1),
-                                         static_cast<float>(k) / static_cast<float>(m_particleSettings.general.surfacePoints.y - 1),
-                                         i < 3 ? -1.f : 1.f);
+                    Vec3f pos = Vec3f(
+                        static_cast<float>(j) / static_cast<float>(m_particleSettings.general.surfacePoints.x - 1),
+                        static_cast<float>(k) / static_cast<float>(m_particleSettings.general.surfacePoints.y - 1),
+                        i < 3 ? -1.f : 1.f);
                     pos.x = pos.x * 2 - 1;
                     pos.y = pos.y * 2 - 1;
-                    const uint32_t *ptr = _cubeSwizzlesValues + (i*3);
+                    const uint32_t* ptr = _cubeSwizzlesValues + (i * 3);
                     pos = Vec3f(pos[ptr[0]], pos[ptr[1]], pos[ptr[2]]);
                     WeightedVertex v;
                     v.position = pos;
@@ -446,10 +461,11 @@ void GPUSoftBodyComponent::CreateSkinnedMesh(std::vector<WeightedVertex> &vertic
 
         for (int32_t i = 0; i < 6; i++)
         {
-            const int32_t offset = m_particleSettings.general.surfacePoints.x * m_particleSettings.general.surfacePoints.y * i;
-            for (int32_t j = 0; j < m_particleSettings.general.surfacePoints.x-1; j++)
+            const int32_t offset = m_particleSettings.general.surfacePoints.x * m_particleSettings.general.surfacePoints
+                .y * i;
+            for (int32_t j = 0; j < m_particleSettings.general.surfacePoints.x - 1; j++)
             {
-                for (int32_t k = 0; k < m_particleSettings.general.surfacePoints.y-1; k++)
+                for (int32_t k = 0; k < m_particleSettings.general.surfacePoints.y - 1; k++)
                 {
                     indices.push_back(offset + k * m_particleSettings.general.surfacePoints.x + j);
                     indices.push_back(offset + k * m_particleSettings.general.surfacePoints.x + j + 1);
@@ -464,7 +480,7 @@ void GPUSoftBodyComponent::CreateSkinnedMesh(std::vector<WeightedVertex> &vertic
     }
 }
 
-void GPUSoftBodyComponent::MapMeshToParticles(std::vector<WeightedVertex> &vertices)
+void GPUSoftBodyComponent::MapMeshToParticles(std::vector<WeightedVertex>& vertices)
 {
     for (uint32_t i = 0; i < vertices.size(); i++)
     {
@@ -497,9 +513,9 @@ void GPUSoftBodyComponent::MapMeshToParticles(std::vector<WeightedVertex> &verti
             {
                 if (d < closests[m].dist)
                 {
-                    for (uint32_t n = 1; n < count-m; n++)
+                    for (uint32_t n = 1; n < count - m; n++)
                     {
-                        closests[count-n] = closests[count-n-1];
+                        closests[count - n] = closests[count - n - 1];
                     }
                     closests[m].id = l;
                     closests[m].dist = d;
@@ -520,7 +536,7 @@ void GPUSoftBodyComponent::MapMeshToParticles(std::vector<WeightedVertex> &verti
 
             for (uint32_t l = 0; l < 3; l++)
             {
-                Vec3f normal1 = (closests[(l+1)%3].pos - pos2).Cross(closests[(l+2)%3].pos - pos2);
+                Vec3f normal1 = (closests[(l + 1) % 3].pos - pos2).Cross(closests[(l + 2) % 3].pos - pos2);
                 float area1 = normal1.Length();
                 area1 = std::copysign(area1, normal1.x * normal1.y * normal1.z);
                 float w = std::max(area1 / area, 0.0f);
@@ -540,7 +556,8 @@ void GPUSoftBodyComponent::MapMeshToParticles(std::vector<WeightedVertex> &verti
     }
 }
 
-void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &particles, std::vector<ConnectionData> &connections)
+void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData>& particles,
+                                                  std::vector<ConnectionData>& connections)
 {
     const Vec3i amount = m_particleSettings.general.particleAmount;
     const int32_t maxL = m_particleSettings.general.connectionStrength;
@@ -554,7 +571,8 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &p
         {
             for (int32_t k = 0; k < amount.z; k++)
             {
-                const Vec3f offset = Vec3f(i / float(amount.x-1), j / float(amount.y-1), k / float(amount.z-1)) - Vec3f(0.5f, 0.5f, 0.5f);
+                const Vec3f offset = Vec3f(i / float(amount.x - 1), j / float(amount.y - 1), k / float(amount.z - 1)) -
+                    Vec3f(0.5f, 0.5f, 0.5f);
                 const Vec3f pos = offset * (m_particleSettings.shape.scale * 2);
                 const uint32_t index = i + j * (amount.x * amount.z) + k * (amount.x);
 
@@ -602,13 +620,13 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &p
             }
         }
     }
-    
+
     if (m_particleSettings.shape.type != BodySettings::Shape::Type::Cube)
     {
         std::vector<uint32_t> toRemove;
         const Vec3f center = Vec3f(0.5f, 0.5f, 0.5f);
         const float maxDist = powf((m_particleSettings.shape.scale), 2) + 0.01f;
-        SBParticleData *pPointer = &particles[0];
+        SBParticleData* pPointer = &particles[0];
 
         for (uint32_t i = 0; i < m_totalParticleCount; i++)
         {
@@ -629,7 +647,7 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &p
         }
         toRemove.push_back((uint32_t)particles.size());
 
-        SBParticleData *ptr = pPointer + toRemove[0];
+        SBParticleData* ptr = pPointer + toRemove[0];
         for (uint32_t i = 0; i < toRemove.size() - 1; i++)
         {
             std::copy(pPointer + toRemove[i] + 1, pPointer + toRemove[i + 1], ptr);
@@ -643,11 +661,11 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &p
 
         for (uint32_t i = 0; i < particles.size(); i++)
         {
-            ConnectionData *cOffset = &connections[particles[i].connectionsOffset];
+            ConnectionData* cOffset = &connections[particles[i].connectionsOffset];
             for (uint32_t j = 0; j < particles[i].connectionsCount; j++)
             {
                 uint32_t offset = 0;
-                for (uint32_t k = 0; k < toRemove.size()-1; k++)
+                for (uint32_t k = 0; k < toRemove.size() - 1; k++)
                 {
                     if (cOffset[j].particleID == toRemove[k]) // Particle was deleted
                     {
@@ -680,18 +698,21 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
     m_particles.clear();
     m_connections.clear();
 
-    int itConnectionOffset = 0;
-    UNUSED(itConnectionOffset);
-
     BoundingBox BBox = m_initializerMesh.getPtr()->m_boundingBox;
 
-    constexpr size_t vertexSize = sizeof(Vertex) / sizeof(float);
+    const bool isWeighted = m_initializerMesh->m_isWeighted;
+    const size_t vertexStride = (isWeighted ? sizeof(WeightedVertex) : sizeof(Vertex)) / sizeof(float);
+    const float* rawVerts = m_initializerMesh->m_vertices.data();
 
-    int pointCount = static_cast<int>(m_initializerMesh->m_vertices.size() / vertexSize);
+    auto getPos = [&](uint32_t idx) -> Vec3f
+    {
+        return *reinterpret_cast<const Vec3f*>(rawVerts + idx * vertexStride);
+    };
 
-    Vertex* vertices = reinterpret_cast<Vertex*>(m_initializerMesh->m_vertices.data());
+    const auto& indices = m_initializerMesh->m_indices;
+    const int triCount = static_cast<int>(indices.size()) / 3;
 
-    float invDensity = 1 / density;
+    const float invDensity = 1.0f / density;
 
     // Place point inside mesh
     for (float currY = BBox.min.y; currY <= BBox.max.y; currY += invDensity)
@@ -700,15 +721,14 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
         {
             for (float currX = BBox.min.x; currX <= BBox.max.x; currX += invDensity)
             {
-
-                Vec3f pos = { currX, currY, currZ };
+                Vec3f pos = {currX, currY, currZ};
 
                 bool shouldDiscard = false;
-                for (int i = 0; i < pointCount / 3; i++)
+                for (int i = 0; i < triCount; i++)
                 {
-                    Vec3f a = vertices[i * 3    ].position;
-                    Vec3f b = vertices[i * 3 + 1].position;
-                    Vec3f c = vertices[i * 3 + 2].position;
+                    Vec3f a = getPos(indices[i * 3]);
+                    Vec3f b = getPos(indices[i * 3 + 1]);
+                    Vec3f c = getPos(indices[i * 3 + 2]);
 
                     Vec3f n = (b - a).Cross(c - a);
 
@@ -720,15 +740,14 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
                         break;
                     }
                 }
-                
+
                 if (shouldDiscard)
                     continue;
 
-                SBParticleData data = { };
-
+                SBParticleData data = {};
                 data.position = pos;
                 data.originalPos = pos;
-                data.velocity = { 0 , 0 , 0 };
+                data.velocity = {0, 0, 0};
                 data.connectionsCount = 0;
                 m_particles.push_back(data);
             }
@@ -736,17 +755,16 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
     }
 
     // Generate connection
-    for (int i = 0; i < m_particles.size(); i++)
+    for (int i = 0; i < static_cast<int>(m_particles.size()); i++)
     {
         m_particles[i].connectionsOffset = static_cast<uint32_t>(m_connections.size());
-        if (m_particles[i].position.y <= BBox.min.y + 0.2f) continue;
+        if (m_particles[i].position.y <= BBox.min.y + 0.2f)
+            continue;
 
-        for (int j = 0; j < m_particles.size(); j++)
+        for (int j = 0; j < static_cast<int>(m_particles.size()); j++)
         {
             if (i == j) continue;
-
             float dist = m_particles[j].position.Distance(m_particles[i].position);
-
             if (dist <= maxDistToConnect)
             {
                 ConnectionData connectionData;
@@ -757,8 +775,8 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
                 m_connections.push_back(connectionData);
             }
         }
-
-        m_particles[i].connectionsCount = static_cast<uint32_t>(m_connections.size() - m_particles[i].connectionsOffset);
+        m_particles[i].connectionsCount =
+            static_cast<uint32_t>(m_connections.size() - m_particles[i].connectionsOffset);
     }
 
     m_totalParticleCount = static_cast<uint32_t>(m_particles.size());

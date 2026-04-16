@@ -66,7 +66,7 @@ void EditorWindowManager::RenderMainDock()
 void EditorWindowManager::RenderMainBar()
 {
     bool openModelPopup = false;
-	const std::vector filters = { Platform::Filter("Scene", "json") };
+	const std::vector filters = { Platform::Filter("Scene", "scene") };
     if (ImGui::BeginMainMenuBar())
     {
         if (ImGui::BeginMenu("File"))
