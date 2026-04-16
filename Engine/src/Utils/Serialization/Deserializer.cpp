@@ -104,11 +104,21 @@ bool Deserializer::Read(uint8_t *dataIn, uint64_t dataSize)
 	return true;
 }
 
+bool Utils::Serialization::Deserializer::Read(std::string &str, uint64_t strSize)
+{
+	str.resize(strSize);
+	if (!strSize) return true;
+	else if (strSize + cPos > bufferSize) return false;
+	return Read(reinterpret_cast<uint8_t*>(str.data()), strSize);
+}
+
 bool Deserializer::Read(std::string &in)
 {
 	uint64_t size;
 	if (!Read(size)) return false;
 	ASSERT(size + cPos <= bufferSize);
+	if (size + cPos > bufferSize)
+		return false;
 	in.resize(size);
 	return Read(reinterpret_cast<uint8_t *>(in.data()), size);
 }

@@ -15,8 +15,9 @@ namespace Utils::Serialization
 
 		~Serializer() = default;
 
-		const uint8_t *GetBuffer() const { return buffer.data(); }
+		const uint8_t *GetBufferData() const { return buffer.data(); }
 		const uint64_t GetBufferSize() const { return buffer.size(); }
+		const std::vector<uint8_t> &GetBuffer() const { return buffer; }
 
 		void Write(uint8_t in);
 		void Write(int8_t in);
