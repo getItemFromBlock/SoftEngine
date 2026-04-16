@@ -788,6 +788,7 @@ void GPUSoftBodyComponent::PlacePointMesh(BoundingBox BBox, Vertex* vertices, ui
                 {
                     SBParticleData data = { };
                     data.position = pos;
+                    data.originalPos = pos;
                     data.velocity = { 0 , 0 , 0 };
                     data.connectionsCount = 0;
                     m_particles.push_back(data);
