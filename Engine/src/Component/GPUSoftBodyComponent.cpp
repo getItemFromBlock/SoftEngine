@@ -672,54 +672,17 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
 
     int pointCount = static_cast<int>(m_initializerMesh->m_indices.size());
 
-    Vertex* vertices = reinterpret_cast<Vertex*>(m_initializerMesh->m_vertices.data());
-    uint32_t* indices = m_initializerMesh->m_indices.data();
+    Vertex* vertices    = reinterpret_cast<Vertex*>(m_initializerMesh->m_vertices.data());
+    uint32_t* indices   = reinterpret_cast<uint32_t*>(m_initializerMesh->m_indices.data());
 
-    float invDensity = 1 / density;
+    PlacePointMesh(BBox, vertices, indices, pointCount, density);
+    GenerateConnection(BBox, maxDistToConnect);
 
-    // Place point inside mesh
-    for (float currY = BBox.min.y; currY <= BBox.max.y; currY += invDensity)
-    {
-        for (float currZ = BBox.min.z; currZ <= BBox.max.z; currZ += invDensity)
-        {
-            for (float currX = BBox.min.x; currX <= BBox.max.x; currX += invDensity)
-            {
+    m_totalParticleCount = uint32_t(m_particles.size());
+}
 
-                Vec3f pos = { currX, currY, currZ };
-
-                bool shouldDiscard = false;
-                for (int i = 0; i < pointCount / 3; i++)
-                {
-                    Vec3f a = vertices[indices[i * 3    ]].position;
-                    Vec3f b = vertices[indices[i * 3 + 1]].position;
-                    Vec3f c = vertices[indices[i * 3 + 2]].position;
-
-                    Vec3f n = (b - a).Cross(c - a);
-
-                    Vec3f offset = pos - a;
-
-                    if (n.Dot(offset) > 0)
-                    {
-                        shouldDiscard = true;
-                        break;
-                    }
-                }
-                
-                if (shouldDiscard)
-                    continue;
-
-                SBParticleData data = { };
-
-                data.position = pos;
-                data.originalPos = pos;
-                data.velocity = { 0 , 0 , 0 };
-                data.connectionsCount = 0;
-                m_particles.push_back(data);
-            }
-        }
-    }
-
-    // Generate connection
+void GPUSoftBodyComponent::GenerateConnection(BoundingBox BBox, float maxDistToConnect)
+{
     for (int i = 0; i < m_particles.size(); i++)
     {
         m_particles[i].connectionsOffset = static_cast<uint32_t>(m_connections.size());
@@ -746,4 +709,85 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
     }
 
     m_totalParticleCount = static_cast<uint32_t>(m_particles.size());
+}
+
+struct Ray
+{
+    Vec3f origin;
+    Vec3f direction;
+};
+
+bool RayIntersectTriangle(const Ray& ray, const Vec3f& a, const Vec3f& b, const Vec3f& c, float& dist)
+{
+    const float EPSILON = 0.0000001f;
+    Vec3f edge1 = b - a;
+    Vec3f edge2 = c - a;
+
+    Vec3f h = ray.direction.Cross(edge2);
+    float det = ray.direction.Dot(edge1, h);
+
+    if (det > -EPSILON && det < EPSILON) 
+        return false;
+
+    float inv_det = 1.0f / det;
+    Vec3f s = ray.origin - a;
+    float u = inv_det * s.Dot(h);
+
+    if (u < 0.0f || u > 1.0f) 
+        return false;
+
+    Vec3f q = s.Cross(edge1);
+    float v = inv_det * ray.direction.Dot(q);
+
+    if (v < 0.0f || u + v > 1.0f) 
+        return false;
+
+    dist = inv_det * edge2.Dot(q);
+
+    return dist > EPSILON;
+}
+
+void GPUSoftBodyComponent::PlacePointMesh(BoundingBox BBox, Vertex* vertices, uint32_t* indices, int pointCount, float density)
+{
+    float invDensity = 1 / density;
+
+    Vec3f rayDir = {0.1234, 0.5678, 0.9101};
+    rayDir.Normalize();
+
+    for (float currY = BBox.min.y; currY <= BBox.max.y; currY += invDensity)
+    {
+        for (float currZ = BBox.min.z; currZ <= BBox.max.z; currZ += invDensity)
+        {
+            for (float currX = BBox.min.x; currX <= BBox.max.x; currX += invDensity)
+            {
+                Vec3f pos = { currX, currY, currZ };
+                Ray ray = { pos, rayDir };
+
+                int intersect = 0;
+                for (int i = 0; i < pointCount / 3; i++)
+                {
+                    Vec3f a = vertices[indices[i * 3    ]].position;
+                    Vec3f b = vertices[indices[i * 3 + 1]].position;
+                    Vec3f c = vertices[indices[i * 3 + 2]].position;
+                    
+                    float dist = 0;
+                    if (RayIntersectTriangle(ray, a, b, c, dist))
+                    {
+                        if (dist > 0)
+                            intersect++;
+                    }
+                }
+
+                if (intersect % 2 != 0)
+                {
+                    SBParticleData data = { };
+                    data.position = pos;
+                    data.originalPos = pos;
+                    data.velocity = { 0 , 0 , 0 };
+                    data.connectionsCount = 0;
+                    m_particles.push_back(data);
+                }
+            }
+        }
+    }
 }

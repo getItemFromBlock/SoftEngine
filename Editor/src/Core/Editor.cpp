@@ -121,7 +121,7 @@ void Editor::Initialize()
         loadedA = true;
     });
 
-    model = resourceManager->Load<Model>(RESOURCE_PATH"models/Barrel.obj");
+    model = resourceManager->Load<Model>(RESOURCE_PATH"models/fox.obj");
     model->EOnLoaded.Bind([model, this, currentScene]()
     {
         loadedB = true;
@@ -161,7 +161,7 @@ void Editor::Run()
             go1->SetName("SoftBody");
             auto soft = go1->AddComponent<GPUSoftBodyComponent>();
             soft->CreateFromMesh(
-                m_engine->GetResourceManager()->Load<Mesh>(RESOURCE_PATH"/models/Barrel.obj/Cylinder.mesh"));
+                m_engine->GetResourceManager()->Load<Mesh>(RESOURCE_PATH"/models/fox.obj/Fox.mesh"));
         }
 
         m_window->PollEvents();
