@@ -97,7 +97,7 @@ private:
 
     // Generation from meshes methods
 
-    void PlacePointInConvex(BoundingBox BBox, Vertex* vertices, int pointCount, float density);
+    void PlacePointMesh(BoundingBox BBox, Vertex* vertices, uint32_t* indices, int pointCount, float density);
 
     void GenerateConnection(BoundingBox BBox, float maxDistToConnect);
 
