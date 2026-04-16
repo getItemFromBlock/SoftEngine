@@ -676,15 +676,12 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
 
     BoundingBox BBox = m_initializerMesh.getPtr()->m_boundingBox;
 
-    constexpr size_t vertexSize = sizeof(Vertex) / sizeof(float);
-
-    int pointCount = static_cast<int>(m_initializerMesh->m_indices.size() / vertexSize);
+    int pointCount = static_cast<int>(m_initializerMesh->m_indices.size());
 
     Vertex* vertices    = reinterpret_cast<Vertex*>(m_initializerMesh->m_vertices.data());
     uint32_t* indices   = reinterpret_cast<uint32_t*>(m_initializerMesh->m_indices.data());
 
     PlacePointMesh(BBox, vertices, indices, pointCount, density);
-
     GenerateConnection(BBox, maxDistToConnect);
 
     m_totalParticleCount = uint32_t(m_particles.size());
