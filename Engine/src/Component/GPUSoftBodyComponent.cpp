@@ -76,9 +76,19 @@ void GPUSoftBodyComponent::OnCreate()
     auto instancingShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/sb_instancing.shader");
     auto skinnedShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/sb_skinning.shader");
 
-    m_billboardMaterial = resourceManager->CreateMaterial("SoftbodyInstancing");
-    m_billboardMaterial->SetShader(instancingShader);
+    m_billboardMaterial = resourceManager->CreateMaterial("SoftbodyInstancing", instancingShader);
     m_billboardMaterial->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
+    m_billboardMaterial->SetAttribute("normalSampler", resourceManager->GetDefaultNormal());
+    m_billboardMaterial->SetAttribute("roughnessSampler", resourceManager->GetBlankTexture());
+    m_billboardMaterial->SetAttribute("metalnessSampler", resourceManager->GetBlankTexture());
+    m_billboardMaterial->SetAttribute("aoSampler", resourceManager->GetBlankTexture());
+    m_billboardMaterial->SetAttribute("heightSampler", resourceManager->GetBlackTexture());
+
+    m_billboardMaterial->SetAttribute("material.color", Vec4f(0.05f, 0.3f, 0.05f, 1.0f));
+    m_billboardMaterial->SetAttribute("material.roughnessFactor", 0.05f);
+    m_billboardMaterial->SetAttribute("material.metalnessFactor", 0.8f);
+    m_billboardMaterial->SetAttribute("material.aoFactor", 1.f);
+    m_billboardMaterial->SetAttribute("material.heightScale", 0.0f);
     
     m_material = resourceManager->CreateMaterial("SoftbodySkinned", skinnedShader);
     m_material->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
