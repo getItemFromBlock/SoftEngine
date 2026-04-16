@@ -31,9 +31,9 @@ void Inspector::OnRender()
         {
             auto renderer = Engine::Get()->GetRenderer();
             auto pos = object->GetTransform()->GetWorldPosition();
-            renderer->AddLine(pos, pos + object->GetTransform()->GetRight(), {Vec3f::Right(), 1});
-            renderer->AddLine(pos, pos + object->GetTransform()->GetUp(), {Vec3f::Up(), 1});
-            renderer->AddLine(pos, pos + object->GetTransform()->GetForward(), {Vec3f::Forward() * -1, 1});
+            renderer->DrawLine(pos, pos + object->GetTransform()->GetRight(), {Vec3f::Right(), 1});
+            renderer->DrawLine(pos, pos + object->GetTransform()->GetUp(), {Vec3f::Up(), 1});
+            renderer->DrawLine(pos, pos + object->GetTransform()->GetForward(), {Vec3f::Forward() * -1, 1});
         }
     }
     if (ImGui::Begin("Inspector"))
@@ -55,7 +55,7 @@ void Inspector::OnRender()
             Core::UUID deletedID = UUID_INVALID;
             for (SafePtr<IComponent>& component : components)
             {
-                const ClassDescriptor& descriptor = GetDescriptor(component->GetUUID(), component);
+                const ClassDescriptor& descriptor = GetDescriptor(component);
                 ImGui::PushID(component->GetUUID());
 
                 bool enable = component->IsEnable();
@@ -103,18 +103,6 @@ void Inspector::OnRender()
 void Inspector::SetSelectedObject(const Core::UUID& uuid)
 {
     m_selectedObject = uuid;
-
-    if (SafePtr<GameObject> object = m_sceneHolder->GetCurrentScene()->GetGameObject(uuid))
-    {
-        std::vector<SafePtr<IComponent>> components = object->GetComponents();
-
-        for (SafePtr<IComponent>& component : components)
-        {
-            ClassDescriptor descriptor;
-            component->Describe(descriptor);
-            m_descriptors[component->GetUUID()] = descriptor;
-        }
-    }
 }
 
 template <>
@@ -368,7 +356,10 @@ void Inspector::ShowDescriptor(const ClassDescriptor& descriptor)
                 ImGui::SameLine();
                 if (ImGui::Button("+"))
                 {
-                    AddListElement(property);
+                    if (property.addElement)
+                        property.addElement();
+                    else
+                        AddListElement(property);
                 }
                 ImGui::TableSetColumnIndex(1);
                 size_t listSize = GetListSize(property);
@@ -406,15 +397,26 @@ void Inspector::ShowDescriptor(const ClassDescriptor& descriptor)
             }
             else
             {
-                ImGui::TableNextRow();
+                if (property.type == PropertyType::PushID)
+                {
+                    ImGui::PushID(property.name.c_str());
+                }
+                else if (property.type == PropertyType::PopID)
+                {
+                    ImGui::PopID();
+                }
+                else
+                {
+                    ImGui::TableNextRow();
 
-                // Label column
-                ImGui::TableSetColumnIndex(0);
-                ImGui::TextUnformatted(property.name.c_str());
+                    // Label column
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::TextUnformatted(property.name.c_str());
 
-                // Value column
-                ImGui::TableSetColumnIndex(1);
-                ShowProperty(property);
+                    // Value column
+                    ImGui::TableSetColumnIndex(1);
+                    ShowProperty(property);
+                }
             }
         }
 
@@ -425,19 +427,20 @@ void Inspector::ShowDescriptor(const ClassDescriptor& descriptor)
 void Inspector::ShowProperty(const Property& property)
 {
     std::string id = ("##" + property.name);
-    ImGui::PushID(id.c_str());
 
     ImGui::SetNextItemWidth(-FLT_MIN);
     switch (property.type)
     {
     case PropertyType::None:
-        ImGui::Text("None");
-        break;
+        {
+            ImGui::Text("None");
+            break;
+        }
     case PropertyType::Button:
-    {
-        RenderButtonProperty(property, "X" + id);
-        break;
-    }
+        {
+            RenderButtonProperty(property, "X" + id);
+            break;
+        }
     case PropertyType::Bool:
         {
             RenderBoolProperty(property, id);
@@ -449,20 +452,20 @@ void Inspector::ShowProperty(const Property& property)
             break;
         }
     case PropertyType::Vec2i:
-    {
-        RenderIVec2Property(property, id);
-        break;
-    }
+        {
+            RenderIVec2Property(property, id);
+            break;
+        }
     case PropertyType::Vec3i:
-    {
-        RenderIVec3Property(property, id);
-        break;
-    }
+        {
+            RenderIVec3Property(property, id);
+            break;
+        }
     case PropertyType::Vec4i:
-    {
-        RenderIVec4Property(property, id);
-        break;
-    }
+        {
+            RenderIVec4Property(property, id);
+            break;
+        }
     case PropertyType::Float:
         {
             RenderFloatProperty(property, id);
@@ -499,10 +502,10 @@ void Inspector::ShowProperty(const Property& property)
             break;
         }
     case PropertyType::Enum:
-    {
-        RenderEnumProperty(property, id);
-        break;
-    }
+        {
+            RenderEnumProperty(property, id);
+            break;
+        }
     case PropertyType::Texture:
         {
             RenderTextureProperty(property, id);
@@ -534,10 +537,11 @@ void Inspector::ShowProperty(const Property& property)
             break;
         }
     default:
-        PrintWarning("Property type not handle on Inspector");
-        break;
+        {
+            PrintWarning("Property type not handle on Inspector");
+            break;
+        }
     }
-    ImGui::PopID();
 }
 
 void Inspector::UpdateProperty(const Property& property, void* newValue)
@@ -545,6 +549,10 @@ void Inspector::UpdateProperty(const Property& property, void* newValue)
     if (property.setter)
     {
         property.setter(newValue);
+    }
+    else if (property.index != -1 && property.setElement)
+    {
+        property.setElement(property.index, newValue);
     }
     else if (property.data && !property.readOnly)
     {
@@ -581,7 +589,8 @@ void Inspector::UpdateProperty(const Property& property, void* newValue)
 
 void Inspector::RenderButtonProperty(const Property& property, const std::string& id)
 {
-    if (ImGui::Button(id.c_str()))
+    ImVec2 button_sz(17, 17);
+    if (ImGui::Button(id.c_str(), button_sz))
     {
         UpdateProperty(property, nullptr);
     }
@@ -852,6 +861,7 @@ void Inspector::RenderTextureProperty(const Property& property, const std::strin
     {
         textureID = Editor::Get()->GetImGuiHandler()->GetTextureID(texture.getPtr());
     }
+    ImGui::PushID(textureID.GetTexID());
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2.f, 2.f));
     if (!property.readOnly && ImGui::ImageButton(id.c_str(), textureID, ImVec2(64, 64)))
     {
@@ -869,6 +879,7 @@ void Inspector::RenderTextureProperty(const Property& property, const std::strin
         UpdateProperty(property, &newValue);
     }
     ImGui::PopStyleVar();
+    ImGui::PopID();
 }
 
 void Inspector::RenderCubeMapProperty(const Property& property, const std::string& id)
@@ -972,6 +983,7 @@ void Inspector::RenderListProperty(const Property& property, const std::string& 
         Property elementProp = property;
         elementProp.isList = false;
         elementProp.data = GetListElement(property, i);
+        elementProp.index = i;
 
         ShowProperty(elementProp);
 
@@ -981,7 +993,11 @@ void Inspector::RenderListProperty(const Property& property, const std::string& 
 
     if (removeIndex != -1)
     {
-        RemoveListElement(property, removeIndex);
+        if (property.removeElement)
+            property.removeElement(removeIndex);
+        else
+            RemoveListElement(property, removeIndex);
+        
     }
 }
 
@@ -1050,6 +1066,11 @@ void* Inspector::GetListElement(const Property& property, size_t index)
             auto* list = static_cast<std::vector<SafePtr<Material>>*>(property.data);
             return &(*list)[index];
         }
+    case PropertyType::PostProcessShader:
+        {
+            auto* list = static_cast<std::vector<SafePtr<PostProcessShader>>*>(property.data);
+            return &(*list)[index];
+        }
     default:
         return nullptr;
     }
@@ -1084,6 +1105,8 @@ size_t Inspector::GetListSize(const Property& property)
         return static_cast<std::vector<SafePtr<Mesh>>*>(property.data)->size();
     case PropertyType::Material:
         return static_cast<std::vector<SafePtr<Material>>*>(property.data)->size();
+    case PropertyType::PostProcessShader:
+        return static_cast<std::vector<SafePtr<PostProcessShader>>*>(property.data)->size();
     default:
         return 0;
     }
@@ -1220,6 +1243,9 @@ void Inspector::AddListElement(const Property& property)
         break;
     case PropertyType::Material:
         static_cast<std::vector<SafePtr<Material>>*>(property.data)->emplace_back();
+        break;
+    case PropertyType::PostProcessShader:
+        static_cast<std::vector<SafePtr<PostProcessShader>>*>(property.data)->emplace_back();
         break;
     default:
         PrintError("Type not handled for AddListElement");

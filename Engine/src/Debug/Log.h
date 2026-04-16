@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <ctime>
 #include <cstdint>
+#include <mutex>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -72,6 +73,7 @@ namespace Debug
         template <typename... Args>
         static void Print(const char* file, int line, LogType type, const char* format, Args... args)
         {
+            std::scoped_lock lock(m_logLock);
             time_t now = std::time(nullptr);
             tm calendar_time;
 
@@ -125,6 +127,7 @@ namespace Debug
 
     private:
         static bool m_isFileOpen;
+        static std::mutex m_logLock;
         static std::ofstream m_file;
     };
 }

@@ -28,4 +28,5 @@ private:
     std::vector<SafePtr<Material>> m_materials;
     SafePtr<Mesh> m_mesh;
     bool m_visible = true;
+    bool m_drawBounds = false;
 };

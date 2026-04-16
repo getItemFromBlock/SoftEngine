@@ -59,6 +59,10 @@ void Editor::Initialize()
     resourceManager->Load<Model>(RESOURCE_PATH"/models/Plane.obj");
     resourceManager->Load<CubeMap>(RESOURCE_PATH"/envMap/wooden_studio_09_4k.hdr");
     resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/inverted.pshader");
+    resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/gammaCorrection.pshader");
+    resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/gaussianBlur.pshader");
+    resourceManager->Load<PostProcessShader>(RESOURCE_PATH"/shaders/PostProcess/pixelate.pshader");
+    
     
     auto sponza = resourceManager->Load<Model>(RESOURCE_PATH"models/Cube.obj");
     sponza->EOnLoaded.Bind([this, currentScene, sponza]()
@@ -154,6 +158,7 @@ void Editor::Run()
             go0->GetTransform()->SetLocalPosition(Vec3f(4, 0, 0));
 
             auto go1 = currentScene->CreateGameObject();
+            go1->SetName("SoftBody");
             auto soft = go1->AddComponent<GPUSoftBodyComponent>();
             soft->CreateFromMesh(
                 m_engine->GetResourceManager()->Load<Mesh>(RESOURCE_PATH"/models/Barrel.obj/Cylinder.mesh"));

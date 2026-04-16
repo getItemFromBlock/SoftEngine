@@ -495,8 +495,17 @@ void VulkanMaterial::SetStorageBuffer(
     VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range,
     VulkanRenderer* renderer)
 {
-    uint32_t frameIndex = renderer->GetFrameIndex();
+    const uint32_t frameIndex = renderer->GetFrameIndex();
+    SetStorageBuffer(m_descriptorSets[set]->GetDescriptorSet(frameIndex),
+        set, binding, buffer, offset, range, renderer);
+}
 
+void VulkanMaterial::SetStorageBuffer(
+    VkDescriptorSet target,
+    uint32_t set, uint32_t binding,
+    VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range,
+    VulkanRenderer* renderer)
+{
     VkDescriptorBufferInfo info{};
     info.buffer = buffer;
     info.offset = offset;
@@ -504,7 +513,7 @@ void VulkanMaterial::SetStorageBuffer(
 
     VkWriteDescriptorSet write{};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    write.dstSet = m_descriptorSets[set]->GetDescriptorSet(frameIndex);
+    write.dstSet = target;
     write.dstBinding = binding;
     write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     write.descriptorCount = 1;

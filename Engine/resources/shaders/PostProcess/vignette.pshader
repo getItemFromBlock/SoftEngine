@@ -1,0 +1,5 @@
+ ------------- Shader ------------- 
+[vert] : postprocess.vert
+[frag] : vignette.frag
+[depthTest] : false
+ ============= Shader ============= 

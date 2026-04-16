@@ -6,6 +6,7 @@
 #include <fstream>
 
 bool Debug::Log::LogToFile = false;
+std::mutex Debug::Log::m_logLock;
 bool Debug::Log::m_isFileOpen = false;
 std::ofstream Debug::Log::m_file;
 

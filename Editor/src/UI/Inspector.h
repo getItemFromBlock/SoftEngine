@@ -53,11 +53,11 @@ private:
     static std::optional<SafePtr<T>> DisplayResourcePopup();
 
     template<typename T>
-    const ClassDescriptor& GetDescriptor(const Core::UUID& uuid, SafePtr<T> descriptorContainer)
+    static ClassDescriptor GetDescriptor(SafePtr<T> descriptorContainer)
     {
         ClassDescriptor descriptor;
         descriptorContainer->Describe(descriptor);
-        return m_descriptors[uuid] = descriptor;
+        return descriptor;
     }
     
     void DisplayAddComponentPopup() const;

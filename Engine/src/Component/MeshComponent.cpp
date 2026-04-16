@@ -18,7 +18,24 @@ void MeshComponent::Describe(ClassDescriptor& d)
     property.type = PropertyType::Material;
     property.name = "Materials";
     property.isList = true;
+    property.addElement = [this]()
+    {
+        auto resourceManager = Engine::Get()->GetResourceManager();
+        AddMaterial(resourceManager->GetDefaultMaterial());  
+    };
+    property.removeElement = [this](int index)
+    {
+        auto material = m_materials[index];
+        RemoveMaterial(material);
+    };
+    property.setElement = [this](size_t index, void* materialData)
+    {
+        SafePtr<Material> material = *static_cast<SafePtr<Material>*>(materialData);
+        SetMaterial(index, material);
+    };
+    
     d.AddProperty(property);
+    d.AddBool("Draw Bounds", m_drawBounds);
 }
 
 void MeshComponent::OnUpdate(float deltaTime)
@@ -43,7 +60,7 @@ void MeshComponent::OnUpdate(float deltaTime)
 
 void MeshComponent::OnRender(VulkanRenderer* renderer) 
 {
-    if (!m_visible)
+    if (!m_visible || !m_mesh)
         return;
     
     auto queue = renderer->GetRenderQueueManager()->GetOpaqueQueue();
@@ -52,6 +69,12 @@ void MeshComponent::OnRender(VulkanRenderer* renderer)
         queue = renderer->GetRenderQueueManager()->GetTransparentQueue(); // Use transparent queue to render in forward pass
     }
     queue->SubmitMeshRenderer(GetGameObject(), m_mesh.getPtr(), m_materials);
+    
+    if (m_drawBounds)
+    {
+        BoundingBox bounds = m_mesh->GetBoundingBox();
+        renderer->DrawWireCube(bounds.GetCenter(), bounds.GetExtents(), Vec4f(1.f, 0.f, 0.f, 1.f));
+    }
 }
 
 void MeshComponent::SetMesh(const SafePtr<Mesh>& mesh)
