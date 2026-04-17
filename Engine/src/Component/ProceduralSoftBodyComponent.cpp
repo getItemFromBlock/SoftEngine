@@ -17,6 +17,8 @@
 #define MAX_CHUNK_BUFFER_COUNT 0x40
 #define CHUNK_SIZE 2.0f
 
+using namespace ProceduralSoftBody;
+
 // Aligns an integer to the next nearest memory aligned value. Alignement MUST be a power of two!
 uint64_t align(uint64_t value, uint64_t alignement)
 {
@@ -322,11 +324,9 @@ void ProceduralSoftBodyComponent::OnRender(VulkanRenderer* renderer)
     for (const auto& chunk : m_chunks)
     {
         const CPUChunkData &source = chunk.second;
-        GPUChunkData data;
+        GPURenderData data;
         data.chunkPos = source.localPosition;
         data.offset = source.globalOffsetP;
-        data.spherePos = spherePos;
-        data.sphereRadius = sphereRad;
         uint32_t index = 0;
         for (int i = -1; i < 2; i++)
         {
@@ -335,34 +335,33 @@ void ProceduralSoftBodyComponent::OnRender(VulkanRenderer* renderer)
                 const auto &neighbor = m_chunks.find(source.iPos + Vec2i(i, j));
                 if (neighbor != m_chunks.end())
                 {
-                    tempData[count].neighbors[index].pos = neighbor->second.localPosition;
-                    tempData[count].neighbors[index].offset = neighbor->second.globalOffsetP;
+                    data.neighbors[index].pos = neighbor->second.localPosition;
+                    data.neighbors[index].offset = neighbor->second.globalOffsetP;
 
                 }
                 else
                 {
-                    tempData[count].neighbors[index].pos = Vec3f();
-                    tempData[count].neighbors[index].offset = -1;
+                    data.neighbors[index].pos = Vec3f();
+                    data.neighbors[index].offset = -1;
                 }
                 index++;
             }
         }
 
-        queue->SubmitSoftBody(
-            source.mesh, m_material.getPtr(),
-            m_particleBuffer->GetBuffer(), m_pBufSizeAligned,
-            1, m_particleSettings.general.particleAmount,
-            transform, false);
-    }
-    
-    // Debug billboard instancing (one cube per particle)
-    if (m_drawDebug && m_billboardMaterial && m_billboardMesh)
-    {
-        queue->SubmitSoftBody(
-            m_billboardMesh.getPtr(), m_billboardMaterial.getPtr(),
-            m_particleBuffer->GetBuffer(), PBufSizeAligned,
-            m_totalParticleCount, m_particleSettings.general.particleAmount,
-            transform, true);
+        if (m_drawDebug && m_billboardMaterial && m_billboardMesh)
+        {
+            queue->SubmitSoftBodyChunk(
+                m_billboardMesh.getPtr(), m_billboardMaterial.getPtr(),
+                m_particleBuffer.GetBuffer(), m_particleBuffer.GetSize(),
+                data, 1, transform, true);
+        }
+        else
+        {
+            queue->SubmitSoftBodyChunk(
+                source.mesh, m_material.getPtr(),
+                m_particleBuffer.GetBuffer(), m_particleBuffer.GetSize(),
+                data, source.particleCount, transform, false);
+        }
     }
 }
 
