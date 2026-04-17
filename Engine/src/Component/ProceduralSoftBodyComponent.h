@@ -3,6 +3,7 @@
 
 #include "Render/Vulkan/VulkanBuffer.h"
 #include "Render/Vulkan/VulkanRenderer.h"
+#include "Render/Vulkan/VulkanMappedBuffer.h"
 
 #include "Resource/ComputeShader.h"
 
@@ -69,12 +70,20 @@ struct GPUChunkData
     Vec3f   chunkPos;
     int     offset;
     GPUNeighborData neighbors[8];
-    uint32_t    particleCount;
-    uint32_t    connectionOffset;
-    float       _padding[2];
 };
 
 struct GPUCommonData
+{
+    Vec3f spherePos;
+    float sphereRadius;
+    Vec3f   gravity;
+    float   deltaTime;
+    float   damping;
+    float   strength;
+    float   _padding[2];
+};
+
+struct GPURenderData
 {
     Vec3f spherePos;
     float sphereRadius;
@@ -90,8 +99,12 @@ struct CPUChunkData
     Mesh *mesh;
     Vec3f localPosition;
     Vec2i iPos;
-    uint32_t id;
-    uint32_t globalOffset;
+    uint32_t pId;
+    uint32_t cId;
+    uint32_t lId;
+    uint32_t globalOffsetP;
+    uint32_t globalOffsetC;
+    uint32_t globalOffsetL;
     uint32_t neighbors[8];
     uint32_t particleCount;
 };
@@ -108,6 +121,16 @@ struct HeightPointData
 {
     Vec3f pos;
     uint32_t id;
+};
+
+struct CopyRequest
+{
+    VkDeviceSize offsetP;
+    VkDeviceSize sizeP;
+    VkDeviceSize offsetC;
+    VkDeviceSize sizeC;
+    VkDeviceSize offsetL;
+    VkDeviceSize sizeL;
 };
 
 class ProceduralSoftBodyComponent : public IComponent
@@ -135,36 +158,33 @@ private:
     Vec2i GetChunkPos(Vec3f pos);
     float GetHeightAt(float posX, float posZ);
     Vec3f GetNormalAt(const Vec3f &pos, float dt);
-    uint32_t CreateChunkAt(Vec3f pos);
+    void CreateChunkAt(Vec2i pos);
     void DeleteChunk(Vec2i iPos);
 
-    BufferChunk AllocChunk(uint32_t size);
-    void FreeChunk(uint32_t id);
+    BufferChunk AllocChunk(uint32_t size, uint32_t page);
+    void FreeChunk(uint32_t id, uint32_t page);
 
 private:
     std::unique_ptr<ComputeDispatch> m_simulationCompute0;
     std::unique_ptr<ComputeDispatch> m_simulationCompute1;
 
-    std::unique_ptr<VulkanBuffer> m_particleBuffer;
-    std::unique_ptr<VulkanBuffer> m_stagingParticleBuffer;
-    VkDeviceSize    m_pBufSizeAligned;
-    void            *m_mappedpBuf;
-    std::unique_ptr<VulkanBuffer> m_connectionBuffer;
-    std::unique_ptr<VulkanBuffer> m_stagingConnectionBuffer;
-    VkDeviceSize    m_cnBufSizeAligned;
-    void            *m_mappedcnBuf;
-    std::unique_ptr<VulkanBuffer> m_chunkDataBuffer;
-    std::unique_ptr<VulkanBuffer> m_stagingChunkDataBuffer;
-    VkDeviceSize    m_chBufSizeAligned;
-    void            *m_mappedchBuf;
+    VulkanMappedBuffer m_particleBuffer;
+    VulkanMappedBuffer m_connectionBuffer;
+    VulkanMappedBuffer m_connectionBufferL;
+    VulkanMappedBuffer m_chunkDataBuffer;
+
     VkDeviceSize    m_atomicBufferAlignement;
     uint32_t        m_chunkBufferOffset;
+    uint32_t        m_chunkSize;
 
-    std::list<BufferChunk> m_memChunks;
+    // Memory allocator stuff
+    std::list<BufferChunk> m_memChunks[3];
+    uint32_t m_globalChunkCount[3];
+    uint32_t m_globalChunkOffset[3];
+    std::vector<CopyRequest> copyRequests;
+
     std::unordered_map<Vec2i, CPUChunkData> m_chunks;
     std::unordered_map<Vec2i, std::vector<HeightPointData>> m_heightData;
-    uint32_t m_globalChunkCount;
-    uint32_t m_globalChunkOffset;
 
     SafePtr<Mesh> m_billboardMesh;
     SafePtr<Material> m_material;
