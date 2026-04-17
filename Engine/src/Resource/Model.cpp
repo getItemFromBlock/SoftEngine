@@ -34,69 +34,72 @@ bool Model::Load(ResourceManager* resourceManager)
         std::unordered_map<std::string, SafePtr<Material>> materials;
         for (auto& mat : model.materials)
         {
-            std::filesystem::path matPath = p_path / mat.name;
-            if (File::Exists(matPath))
+            std::filesystem::path matPath = p_path / (mat.name.generic_string() + ".mat");
+
+            SafePtr<Material> matResource = {};
+            if (resourceManager->GetResource<Material>(matPath))
             {
-                resourceManager->Load<Material>(matPath);
+                matResource = resourceManager->GetResource<Material>(matPath);
+                matResource->SetShader(resourceManager->GetDefaultShader());
             }
             else
             {
-                SafePtr<Material> matResource = resourceManager->CreateMaterial(matPath);
-
-                if (mat.albedo.has_value())
-                {
-                    SafePtr<Texture> texture = resourceManager->Load<
-                        Texture>(p_path.parent_path() / mat.albedo.value());
-                    matResource->SetAttribute("albedoSampler", texture);
-                }
-                SafePtr<Texture> normal;
-                SafePtr<Texture> metallic;
-                SafePtr<Texture> roughness;
-                TextureParam param;
-                param.format = TextureFormat::UNORM;
-                if (mat.normal.has_value())
-                {
-                    normal = resourceManager->Load<Texture>(p_path.parent_path() / mat.normal.value());
-                    normal->SetTextureParameters(param);
-                }
-                else
-                {
-                    normal = resourceManager->GetDefaultNormal();
-                }
-
-                if (mat.metallic.has_value())
-                {
-                    metallic = resourceManager->Load<Texture>(p_path.parent_path() / mat.metallic.value());
-                    matResource->SetAttribute("material.metalnessFactor", 1.f);
-                }
-                else
-                {
-                    metallic = resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png");
-                    matResource->SetAttribute("material.metalnessFactor", 0.f);
-                }
-                metallic->SetTextureParameters(param);
-
-                if (mat.roughness.has_value())
-                {
-                    roughness = resourceManager->Load<Texture>(p_path.parent_path() / mat.roughness.value());
-                    matResource->SetAttribute("material.roughnessFactor", 1.f);
-                }
-                else
-                {
-                    roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png");
-                    matResource->SetAttribute("material.roughnessFactor", 0.f);
-                }
-
-                roughness->SetTextureParameters(param);
-                matResource->SetAttribute("normalSampler", normal);
-                matResource->SetAttribute("metalnessSampler", metallic);
-                matResource->SetAttribute("roughnessSampler", roughness);
-                matResource->SetAttribute("aoSampler",
-                                          resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png"));
-                matResource->SetAttribute("material.color", static_cast<Vec4f>(Color(mat.diffuse, mat.transparency)));
-
-                materials[mat.name.generic_string()] = matResource;
+                matResource = resourceManager->CreateMaterial(matPath);
             }
+
+            if (mat.albedo.has_value())
+            {
+                SafePtr<Texture> texture = resourceManager->Load<
+                    Texture>(p_path.parent_path() / mat.albedo.value());
+                matResource->SetAttribute("albedoSampler", texture);
+            }
+            SafePtr<Texture> normal;
+            SafePtr<Texture> metallic;
+            SafePtr<Texture> roughness;
+            TextureParam param;
+            param.format = TextureFormat::UNORM;
+            if (mat.normal.has_value())
+            {
+                normal = resourceManager->Load<Texture>(p_path.parent_path() / mat.normal.value());
+                normal->SetTextureParameters(param);
+            }
+            else
+            {
+                normal = resourceManager->GetDefaultNormal();
+            }
+
+            if (mat.metallic.has_value())
+            {
+                metallic = resourceManager->Load<Texture>(p_path.parent_path() / mat.metallic.value());
+                matResource->SetAttribute("material.metalnessFactor", 1.f);
+            }
+            else
+            {
+                metallic = resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png");
+                matResource->SetAttribute("material.metalnessFactor", 0.f);
+            }
+            metallic->SetTextureParameters(param);
+
+            if (mat.roughness.has_value())
+            {
+                roughness = resourceManager->Load<Texture>(p_path.parent_path() / mat.roughness.value());
+                matResource->SetAttribute("material.roughnessFactor", 1.f);
+            }
+            else
+            {
+                roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png");
+                matResource->SetAttribute("material.roughnessFactor", 0.f);
+            }
+
+            roughness->SetTextureParameters(param);
+            matResource->SetAttribute("normalSampler", normal);
+            matResource->SetAttribute("metalnessSampler", metallic);
+            matResource->SetAttribute("roughnessSampler", roughness);
+            matResource->SetAttribute("aoSampler",
+                                      resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png"));
+            matResource->SetAttribute("material.color", static_cast<Vec4f>(Color(mat.diffuse, mat.transparency)));
+
+            materials[mat.name.generic_string()] = matResource;
         }
 
         std::vector<std::vector<Vec3f>> positions;

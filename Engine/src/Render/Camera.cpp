@@ -382,7 +382,6 @@ void Camera::CleanupPostprocessRenderTarget()
 
 void Camera::HandleResize(VulkanRenderer* renderer)
 {
-    /*
     if (p_requestedSize == p_renderTargetSize || p_requestedSize.x <= 0 || p_requestedSize.y <= 0)
         return;
     if (!m_gBufferMaterial || !m_gBufferMaterial->HasBeenSent())
@@ -422,14 +421,14 @@ void Camera::HandleResize(VulkanRenderer* renderer)
 
     p_renderTargetSize = p_requestedSize;
     p_requestedSize = Vec2i::Zero();
-    */
-    //TODO: Fix resize
+    EOnRenderTargetResized.Invoke(p_renderTargetSize);
     GetTransform()->SetDirty();
 }
 
 SafePtr<Texture> Camera::MakeGBufferTexture(SafePtr<Texture> texture, const GBufferAttachment& attachment,
                                             VkSampler sampler, uint32_t width, uint32_t height)
 {
+    texture->Unload();
     texture->CreateFromBuffer(attachment, sampler, width, height);
     return texture;
 }
@@ -722,35 +721,8 @@ void Camera::BeginGBufferPass(RenderTargetTexture* rtt)
         static_cast<uint32_t>(p_renderTargetSize.x),
         static_cast<uint32_t>(p_renderTargetSize.y)
     };
-
-    std::array<VkImage, 4> gBufferImages = {
-        m_gBuffer->GetPosition().image,
-        m_gBuffer->GetNormal().image,
-        m_gBuffer->GetAlbedo().image,
-        m_gBuffer->GetMetallicRoughness().image
-    };
-
-    std::vector<VkImageMemoryBarrier> barriers;
-    for (VkImage img : gBufferImages)
-    {
-        VkImageMemoryBarrier b{};
-        b.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        b.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        b.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        b.image = img;
-        b.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        b.srcAccessMask = 0;
-        b.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        barriers.push_back(b);
-    }
-
-    vkCmdPipelineBarrier(commandBuffer,
-                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                         0, 0, nullptr, 0, nullptr,
-                         static_cast<uint32_t>(barriers.size()), barriers.data());
+    
+    VulkanUtils::TransitionGBufferToColorAttachment(commandBuffer, *m_gBuffer);
 
     if (rtt->GetDepthBuffer()->NeedsTransition())
     {
@@ -788,35 +760,8 @@ void Camera::EndGBufferPass()
     VkCommandBuffer commandBuffer = renderer->GetCommandPool()->GetCommandBuffer(renderer->GetFrameIndex());
 
     renderer->GetRenderPass()->EndGBuffer(commandBuffer, m_gBuffer.get());
-
-    std::array<VkImage, 4> gBufferImages = {
-        m_gBuffer->GetPosition().image,
-        m_gBuffer->GetNormal().image,
-        m_gBuffer->GetAlbedo().image,
-        m_gBuffer->GetMetallicRoughness().image
-    };
-
-    std::vector<VkImageMemoryBarrier> barriers;
-    for (VkImage img : gBufferImages)
-    {
-        VkImageMemoryBarrier b{};
-        b.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        b.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        b.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        b.image = img;
-        b.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        b.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        b.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        barriers.push_back(b);
-    }
-
-    vkCmdPipelineBarrier(commandBuffer,
-                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                         0, 0, nullptr, 0, nullptr,
-                         static_cast<uint32_t>(barriers.size()), barriers.data());
+    
+    VulkanUtils::TransitionGBufferToShaderRead(commandBuffer, *m_gBuffer);
 }
 
 void Camera::BeginCompositionPass(RenderTargetTexture* rtt)
