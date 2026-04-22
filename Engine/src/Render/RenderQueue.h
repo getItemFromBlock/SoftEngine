@@ -7,6 +7,7 @@
 #include "Resource/Mesh.h"
 #include "Resource/Shader.h"
 #include "Utils/Type.h"
+#include "Component/ProceduralSoftBodyComponent.h"
 
 class VulkanRenderer;
 class GameObject;

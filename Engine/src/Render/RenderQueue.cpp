@@ -116,6 +116,32 @@ void RenderQueue::SubmitSoftBody(Mesh* mesh, Material* material, VkBuffer partic
     Submit(cmd);
 }
 
+void RenderQueue::SubmitSoftBodyChunk(Mesh *mesh, Material *material, VkBuffer particleBuffer, VkDeviceSize particleBufferSize, const ProceduralSoftBody::GPURenderData &data, uint32_t instanceCount, const Mat4 &transform, bool isDebug)
+{
+    if (!mesh || !mesh->IsLoaded() || !mesh->HasBeenSent()) return;
+    if (!material) return;
+
+    RenderCommand cmd;
+    cmd.type = isDebug ? RenderCommand::Type::SoftBodyDebug : RenderCommand::Type::SoftBody;
+    cmd.mesh = mesh;
+    cmd.material = material;
+    cmd.shader = material->GetShader().getPtr();
+    cmd.modelMatrix = transform;
+    cmd.particleBuffer = particleBuffer;
+    cmd.particleBufferSize = particleBufferSize;
+    cmd.particleCount = particleCount;
+    cmd.particleGridSize = gridSize;
+    cmd.albedoTexture = material->GetTexture("albedoSampler");
+    cmd.normalTexture = material->GetTexture("normalSampler");
+    cmd.roughnessTexture = material->GetTexture("roughnessSampler");
+    cmd.metallicTexture = material->GetTexture("metalnessSampler");
+    cmd.AOTexture = material->GetTexture("aoSampler");
+    cmd.heightTexture = material->GetTexture("heightSampler");
+    cmd.GenerateSortKey();
+
+    Submit(cmd);
+}
+
 void RenderQueue::Sort()
 {
     if (m_type == QueueType::Transparent)
