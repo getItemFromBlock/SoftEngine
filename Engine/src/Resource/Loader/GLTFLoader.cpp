@@ -170,7 +170,7 @@ static void ComputeVertices(GLTFLoader::Mesh& mesh)
         }
         else
         {
-            const uint32_t id = mesh.finalVertices.size();
+            const uint32_t id = static_cast<uint32_t>(mesh.finalVertices.size());
             mesh.finalVertices.push_back(v);
             mesh.finalIndices.push_back(id);
             hashed_vertices[v] = id;

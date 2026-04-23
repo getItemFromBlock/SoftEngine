@@ -2,7 +2,6 @@
 
 #ifdef _WIN32
 #pragma comment(lib, "Ws2_32.lib")
-#define NOMINMAX
 #include <WinSock2.h>
 #else
 #include <arpa/inet.h>

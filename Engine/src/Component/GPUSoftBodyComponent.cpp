@@ -118,7 +118,7 @@ void GPUSoftBodyComponent::OnCreate()
         });
 }
 
-void GPUSoftBodyComponent::OnUpdate(float deltaTime)
+void GPUSoftBodyComponent::OnGameUpdate(float deltaTime)
 {
     if (!m_simulationCompute0 || !m_simulationCompute1)
         return;
@@ -751,7 +751,7 @@ void GPUSoftBodyComponent::PlacePointMesh(BoundingBox BBox, Vertex* vertices, ui
 {
     float invDensity = 1 / density;
 
-    Vec3f rayDir = {0.1234, 0.5678, 0.9101};
+    Vec3f rayDir = {0.1234f, 0.5678f, 0.9101f};
     rayDir.Normalize();
 
     for (float currY = BBox.min.y; currY <= BBox.max.y; currY += invDensity)

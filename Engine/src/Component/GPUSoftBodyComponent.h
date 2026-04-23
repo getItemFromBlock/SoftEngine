@@ -77,7 +77,6 @@ public:
 
     void Describe(ClassDescriptor& d) override;
     void OnCreate() override;
-    void OnUpdate(float deltaTime) override;
     void OnGameUpdate(float deltaTime) override;
     void OnRender(VulkanRenderer* renderer) override;
     void OnDestroy() override;

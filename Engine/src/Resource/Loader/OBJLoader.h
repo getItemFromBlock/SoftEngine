@@ -38,9 +38,9 @@ public:
             size_t uv = std::hash<float>()(k.texCoord.x) ^
                 (std::hash<float>()(k.texCoord.y) << 1);
 
-            return ((std::hash<float>()(pos)
-                ^ (std::hash<float>()(nor) << 1)) >> 1)
-                ^ (std::hash<float>()(uv) << 1);
+            return ((std::hash<float>()((float)pos)
+                ^ (std::hash<float>()((float)nor) << 1)) >> 1)
+                ^ (std::hash<float>()((float)uv) << 1);
         }
     };
 
