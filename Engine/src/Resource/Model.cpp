@@ -68,36 +68,36 @@ bool Model::Load(ResourceManager* resourceManager)
                 normal = resourceManager->GetDefaultNormal();
             }
 
-            if (mat.metallic.has_value())
-            {
-                metallic = resourceManager->Load<Texture>(p_path.parent_path() / mat.metallic.value());
-                matResource->SetAttribute("material.metalnessFactor", 1.f);
-            }
-            else
-            {
-                metallic = resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png");
-                matResource->SetAttribute("material.metalnessFactor", 0.f);
-            }
-            metallic->SetTextureParameters(param);
+                if (mat.metallic.has_value())
+                {
+                    metallic = resourceManager->Load<Texture>(p_path.parent_path() / mat.metallic.value());
+                    matResource->SetAttribute("material.metalnessFactor", 1.f);
+                }
+                else
+                {
+                    metallic = resourceManager->GetBlackTexture();
+                    matResource->SetAttribute("material.metalnessFactor", 0.f);
+                }
+                metallic->SetTextureParameters(param);
 
-            if (mat.roughness.has_value())
-            {
-                roughness = resourceManager->Load<Texture>(p_path.parent_path() / mat.roughness.value());
-                matResource->SetAttribute("material.roughnessFactor", 1.f);
-            }
-            else
-            {
-                roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png");
-                matResource->SetAttribute("material.roughnessFactor", 0.f);
-            }
+                if (mat.roughness.has_value())
+                {
+                    roughness = resourceManager->Load<Texture>(p_path.parent_path() / mat.roughness.value());
+                    matResource->SetAttribute("material.roughnessFactor", 1.f);
+                }
+                else
+                {
+                    roughness = resourceManager->GetBlackTexture();
+                    matResource->SetAttribute("material.roughnessFactor", 0.f);
+                }
 
-            roughness->SetTextureParameters(param);
-            matResource->SetAttribute("normalSampler", normal);
-            matResource->SetAttribute("metalnessSampler", metallic);
-            matResource->SetAttribute("roughnessSampler", roughness);
-            matResource->SetAttribute("aoSampler",
-                                      resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png"));
-            matResource->SetAttribute("material.color", static_cast<Vec4f>(Color(mat.diffuse, mat.transparency)));
+                roughness->SetTextureParameters(param);
+                matResource->SetAttribute("normalSampler", normal);
+                matResource->SetAttribute("metalnessSampler", metallic);
+                matResource->SetAttribute("roughnessSampler", roughness);
+                matResource->SetAttribute("aoSampler",
+                                          resourceManager->GetBlackTexture());
+                matResource->SetAttribute("material.color", static_cast<Vec4f>(Color(mat.diffuse, mat.transparency)));
 
             materials[mat.name.generic_string()] = matResource;
         }
@@ -137,7 +137,10 @@ bool Model::Load(ResourceManager* resourceManager)
 
             m_meshes.push_back(meshResource);
 
-            meshResource->m_vertices = mesh.finalVertices;
+            static_assert(sizeof(OBJLoader::Vertex) == sizeof(Vertex));
+            meshResource->m_vertices.resize(mesh.finalVertices.size() * (sizeof(OBJLoader::Vertex) / sizeof(float)));
+            std::memcpy(meshResource->m_vertices.data(), mesh.finalVertices.data(), sizeof(OBJLoader::Vertex) * mesh.finalVertices.size());
+            meshResource->m_indices = mesh.finalIndices;
             meshResource->SetLoaded();
             ASSERT(!meshResource->m_vertices.empty())
             resourceManager->AddResourceToSend(meshResource.getPtr());
@@ -161,7 +164,6 @@ bool Model::Load(ResourceManager* resourceManager)
             std::string matName = mat.name.generic_string();
             ASSERT(!matName.empty())
             
-            //TODO: Fix with OBJ
             std::filesystem::path matPath = p_path / (matName + ".mat");
 
             SafePtr<Material> matResource = {};
@@ -174,7 +176,6 @@ bool Model::Load(ResourceManager* resourceManager)
             {
                 matResource = resourceManager->CreateMaterial(matPath);
             }
-
 
             TextureParam linearParam;
             linearParam.format = TextureFormat::UNORM;
@@ -208,7 +209,7 @@ bool Model::Load(ResourceManager* resourceManager)
             }
             else
             {
-                metallic = resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png");
+                metallic = resourceManager->GetBlackTexture();
                 matResource->SetAttribute("material.metalnessFactor", 0.f);
             }
             metallic->SetTextureParameters(linearParam);
@@ -222,7 +223,7 @@ bool Model::Load(ResourceManager* resourceManager)
             }
             else
             {
-                roughness = resourceManager->Load<Texture>(RESOURCE_PATH"textures/black.png");
+                roughness = resourceManager->GetBlackTexture();
                 matResource->SetAttribute("material.roughnessFactor", 0.f);
             }
             roughness->SetTextureParameters(linearParam);
@@ -294,7 +295,10 @@ bool Model::Load(ResourceManager* resourceManager)
                 }
             }
 
-            meshResource->m_vertices = mesh.finalVertices;
+            static_assert(sizeof(OBJLoader::Vertex) == sizeof(Vertex));
+            meshResource->m_vertices.resize(mesh.finalVertices.size() * (sizeof(OBJLoader::Vertex) / sizeof(float)));
+            std::memcpy(meshResource->m_vertices.data(), mesh.finalVertices.data(), sizeof(OBJLoader::Vertex) * mesh.finalVertices.size());
+            meshResource->m_indices = mesh.finalIndices;
             meshResource->SetLoaded();
             ASSERT(!meshResource->m_vertices.empty())
             resourceManager->AddResourceToSend(meshResource.getPtr());

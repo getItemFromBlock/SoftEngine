@@ -287,6 +287,13 @@ void ResourceManager::LoadBlankTexture(const std::filesystem::path& texturePath)
     m_blankTexture = texture->GetUUID();
 }
 
+void ResourceManager::LoadBlackTexture(const std::filesystem::path& texturePath)
+{
+    SafePtr<Texture> texture = Load<Texture>(texturePath, false);
+
+    m_blackTexture = texture->GetUUID();
+}
+
 void ResourceManager::LoadDefaultNormal(const std::filesystem::path& texturePath)
 {
     SafePtr<Texture> texture = Load<Texture>(texturePath, false);
@@ -357,6 +364,11 @@ std::shared_ptr<Texture> ResourceManager::GetDefaultTexture() const
 std::shared_ptr<Texture> ResourceManager::GetBlankTexture() const
 {
     return GetResource<Texture>(m_blankTexture);
+}
+
+std::shared_ptr<Texture> ResourceManager::GetBlackTexture() const
+{
+    return GetResource<Texture>(m_blackTexture);
 }
 
 std::shared_ptr<Texture> ResourceManager::GetDefaultNormal() const

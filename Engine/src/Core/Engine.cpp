@@ -61,6 +61,7 @@ bool Engine::Initialize(EngineDesc desc)
     {
         m_resourceManager->LoadDefaultTexture(RESOURCE_PATH"/textures/debug.jpeg");
         m_resourceManager->LoadBlankTexture(RESOURCE_PATH"/textures/blank.png");
+        m_resourceManager->LoadBlackTexture(RESOURCE_PATH"/textures/black.png");
         m_resourceManager->LoadDefaultNormal(RESOURCE_PATH"/textures/defaultNormal.png");
         m_resourceManager->LoadDefaultCubeMap(RESOURCE_PATH"/envMap/newport_loft.hdr");
         m_resourceManager->LoadBlankCubeMap(RESOURCE_PATH"/envMap/blank.hdr");

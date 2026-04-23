@@ -45,6 +45,8 @@ public:
     VulkanDescriptorSet* GetDescriptorSet(uint32_t set) const;
     void SetStorageBuffer(uint32_t set, uint32_t binding, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range,
                           VulkanRenderer* renderer);
+    void SetStorageBuffer(VkDescriptorSet target, uint32_t set, uint32_t binding, VkBuffer buffer, VkDeviceSize offset,
+                          VkDeviceSize range, VulkanRenderer* renderer);
     void BindForCompute(VkCommandBuffer commandBuffer, uint32_t frameIndex);
     void DispatchCompute(VulkanRenderer* renderer, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
     void SetPushConstants(VulkanRenderer* renderer, const void* data, uint32_t size, uint32_t offset);

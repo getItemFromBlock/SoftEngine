@@ -474,8 +474,10 @@ void Inspector::ShowProperty(const Property& property)
     switch (property.type)
     {
     case PropertyType::None:
-        ImGui::Text("None");
-        break;
+        {
+            ImGui::Text("None");
+            break;
+        }
     case PropertyType::Button:
         {
             RenderButtonProperty(property, "X" + id);
@@ -577,8 +579,10 @@ void Inspector::ShowProperty(const Property& property)
             break;
         }
     default:
-        PrintWarning("Property type not handle on Inspector");
-        break;
+        {
+            PrintWarning("Property type not handle on Inspector");
+            break;
+        }
     }
 }
 
@@ -627,7 +631,8 @@ void Inspector::UpdateProperty(const Property& property, void* newValue)
 
 void Inspector::RenderButtonProperty(const Property& property, const std::string& id)
 {
-    if (ImGui::Button(id.c_str()))
+    ImVec2 button_sz(17, 17);
+    if (ImGui::Button(id.c_str(), button_sz))
     {
         UpdateProperty(property, nullptr);
     }

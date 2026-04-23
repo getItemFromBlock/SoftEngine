@@ -28,6 +28,11 @@ void Mesh::CreateFrom(float *vertices, uint32_t verticeCount, uint32_t *indices,
         m_indices.resize(indiceCount);
         std::copy(indices, indices + indiceCount, m_indices.data());
     }
+    SubMesh m;
+    m.count = m_vertices.size();
+    m.startIndex = 0;
+    m_subMeshes.clear();
+    m_subMeshes.push_back(m);
 
     SendToGPU(Engine::Get()->GetRenderer());
     

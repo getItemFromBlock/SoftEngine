@@ -29,6 +29,41 @@ public:
         std::optional<std::filesystem::path> ao;
     };
 
+    struct Vertex
+    {
+        Vec3f position;
+        Vec2f texCoord;
+        Vec3f normal;
+        Vec4f tangent;
+    };
+
+    struct VertexHash
+    {
+        size_t operator()(const Vertex& k) const
+        {
+            size_t pos = ((std::hash<float>()(k.position.x)
+                ^ (std::hash<float>()(k.position.y) << 1)) >> 1)
+                ^ (std::hash<float>()(k.position.z) << 1);
+            size_t nor = ((std::hash<float>()(k.normal.x)
+                ^ (std::hash<float>()(k.normal.y) << 1)) >> 1)
+                ^ (std::hash<float>()(k.normal.z) << 1);
+            size_t uv = std::hash<float>()(k.texCoord.x) ^
+                (std::hash<float>()(k.texCoord.y) << 1);
+
+            return ((std::hash<float>()(pos)
+                ^ (std::hash<float>()(nor) << 1)) >> 1)
+                ^ (std::hash<float>()(uv) << 1);
+        }
+    };
+
+    struct VertexEqual
+    {
+        bool operator()(const Vertex &lhs, const Vertex &rhs) const
+        {
+            return lhs.position == rhs.position && lhs.texCoord == rhs.texCoord && lhs.normal == rhs.normal;
+        }
+    };
+
     struct Mesh
     {
         std::filesystem::path name;
@@ -38,7 +73,9 @@ public:
         std::vector<Vec3f> normals;
         std::vector<Vec4f> tangents;
         std::vector<Vec3i> indices;
-        std::vector<float> finalVertices;
+        std::vector<float> intermediateVertices;
+        std::vector<uint32_t> finalIndices;
+        std::vector<Vertex> finalVertices;
     };
 
     struct NodeTransform
