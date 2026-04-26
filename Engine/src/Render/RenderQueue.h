@@ -7,7 +7,6 @@
 #include "Resource/Mesh.h"
 #include "Resource/Shader.h"
 #include "Utils/Type.h"
-#include "Component/ProceduralSoftBodyComponent.h"
 
 class VulkanRenderer;
 class GameObject;
@@ -15,6 +14,7 @@ class Mesh;
 class Material;
 class Shader;
 class Renderer;
+class ProceduralSoftBodyComponent;
 
 struct RenderCommand
 {
@@ -22,7 +22,22 @@ struct RenderCommand
     {
         Mesh,
         SoftBody,
-        SoftBodyDebug
+        SoftBodyDebug,
+        SoftBodyChunk,
+        SoftBodyChunkDebug
+    };
+
+    struct ChunkNeighborData
+    {
+        Vec3f pos;
+        int offset;
+    };
+
+    struct ChunkRenderData
+    {
+        Vec3f   chunkPos;
+        int     offset;
+        ChunkNeighborData neighbors[8];
     };
 
     Type type = Type::Mesh;
@@ -45,6 +60,9 @@ struct RenderCommand
     VkDeviceSize particleBufferSize = 0;
     uint32_t particleCount = 0;
     Vec3i particleGridSize = {};
+
+    // Soft body chunk data
+    ChunkRenderData chunkData;
 
     void GenerateSortKey();
     void GenerateSortKeyWithDepth(float depth);
@@ -70,7 +88,7 @@ public:
                         uint32_t particleCount, const Vec3i& gridSize,
                         const Mat4& transform, bool isDebug);
     void SubmitSoftBodyChunk(   Mesh* mesh, Material* material, VkBuffer particleBuffer, VkDeviceSize particleBufferSize,
-                                const ProceduralSoftBody::GPURenderData &data, uint32_t instanceCount,
+                                const RenderCommand::ChunkRenderData &data, uint32_t instanceCount,
                                 const Mat4& transform, bool isDebug);
 
     void Sort();
@@ -92,9 +110,17 @@ private:
         uint32_t offset = 0; // current write head in bytes
     };
 
+    struct PerFrameChunkBuffer
+    {
+        std::unique_ptr<VulkanUniformBuffer> buffer;
+        uint32_t offset = 0; // current write head in bytes
+    };
+
     std::vector<PerFrameMaterialBuffer> m_materialDataBuffers;
+    std::vector<PerFrameChunkBuffer> m_chunkDataBuffers;
     bool m_materialBuffersInitialized = false;
     uint32_t m_materialDataStride = 0;
+    uint32_t m_chunkDataStride = 0;
 
     struct MaterialData
     {

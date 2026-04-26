@@ -12,6 +12,8 @@
 
 #include "Scene/GameObject.h"
 
+#include "Component/ProceduralSoftBodyComponent.h"
+
 void RenderCommand::GenerateSortKey()
 {
     uint64_t shaderKey = shader->GetUUID() >> 4;
@@ -116,21 +118,21 @@ void RenderQueue::SubmitSoftBody(Mesh* mesh, Material* material, VkBuffer partic
     Submit(cmd);
 }
 
-void RenderQueue::SubmitSoftBodyChunk(Mesh *mesh, Material *material, VkBuffer particleBuffer, VkDeviceSize particleBufferSize, const ProceduralSoftBody::GPURenderData &data, uint32_t instanceCount, const Mat4 &transform, bool isDebug)
+void RenderQueue::SubmitSoftBodyChunk(Mesh *mesh, Material *material, VkBuffer particleBuffer, VkDeviceSize particleBufferSize, const RenderCommand::ChunkRenderData &data, uint32_t instanceCount, const Mat4 &transform, bool isDebug)
 {
     if (!mesh || !mesh->IsLoaded() || !mesh->HasBeenSent()) return;
     if (!material) return;
 
     RenderCommand cmd;
-    cmd.type = isDebug ? RenderCommand::Type::SoftBodyDebug : RenderCommand::Type::SoftBody;
+    cmd.type = isDebug ? RenderCommand::Type::SoftBodyChunkDebug : RenderCommand::Type::SoftBodyChunk;
     cmd.mesh = mesh;
     cmd.material = material;
     cmd.shader = material->GetShader().getPtr();
     cmd.modelMatrix = transform;
     cmd.particleBuffer = particleBuffer;
     cmd.particleBufferSize = particleBufferSize;
-    cmd.particleCount = particleCount;
-    cmd.particleGridSize = gridSize;
+    cmd.particleCount = instanceCount;
+    cmd.chunkData = data;
     cmd.albedoTexture = material->GetTexture("albedoSampler");
     cmd.normalTexture = material->GetTexture("normalSampler");
     cmd.roughnessTexture = material->GetTexture("roughnessSampler");
@@ -239,6 +241,8 @@ void RenderQueue::Execute(VulkanRenderer* renderer)
                 lastMesh = nullptr; // soft body doesn't go through BindVertexBuffers, invalidate
                 break;
             }
+        default:
+            PrintError("Not implemented");
         }
     }
 }
@@ -246,7 +250,7 @@ void RenderQueue::Execute(VulkanRenderer* renderer)
 void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMaterial)
 {
     const int NUM_TEXTURE = 6;
-    const int NUM_UBO = 2;
+    const int NUM_UBO = 3;
 
     constexpr uint32_t TEXTURE_SET_INDEX = 0;
 
@@ -274,8 +278,10 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
         VkPhysicalDeviceProperties props;
         vkGetPhysicalDeviceProperties(renderer->GetDevice()->GetPhysicalDevice(), &props);
         VkDeviceSize alignment = props.limits.minUniformBufferOffsetAlignment;
-        VkDeviceSize rawSize = sizeof(MaterialData);
-        m_materialDataStride = (uint32_t)((rawSize + alignment - 1) & ~(alignment - 1));
+        VkDeviceSize rawSizeM = sizeof(MaterialData);
+        m_materialDataStride = (uint32_t)((rawSizeM + alignment - 1) & ~(alignment - 1));
+        VkDeviceSize rawSizeC = sizeof(RenderCommand::ChunkRenderData);
+        m_chunkDataStride = (uint32_t)((rawSizeC + alignment - 1) & ~(alignment - 1));
 
         m_materialDataBuffers.resize(maxFrames);
         for (uint32_t i = 0; i < maxFrames; ++i)
@@ -285,6 +291,17 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
                 renderer->GetDevice(), m_materialDataStride * 512,
                 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
             m_materialDataBuffers[i].buffer->MapAll();
+        }
+        m_materialBuffersInitialized = true;
+
+        m_chunkDataBuffers.resize(maxFrames);
+        for (uint32_t i = 0; i < maxFrames; ++i)
+        {
+            m_chunkDataBuffers[i].buffer = std::make_unique<VulkanUniformBuffer>();
+            m_chunkDataBuffers[i].buffer->Initialize(
+                renderer->GetDevice(), m_chunkDataStride * 512,
+                1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+            m_chunkDataBuffers[i].buffer->MapAll();
         }
         m_materialBuffersInitialized = true;
     }
@@ -299,8 +316,11 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
         return;
     }
 
-    auto& matFrameBuffer = m_materialDataBuffers[frameIndex];
-    VkBuffer matVkBuffer = matFrameBuffer.buffer->GetBuffer(0);
+    auto& matBuffer = m_materialDataBuffers[frameIndex];
+    VkBuffer matVkBuffer = matBuffer.buffer->GetBuffer(0);
+
+    auto &chunkBuffer = m_chunkDataBuffers[frameIndex];
+    VkBuffer chunkVkBuffer = chunkBuffer.buffer->GetBuffer(0);
 
     Mesh* lastMesh = nullptr;
 
@@ -352,9 +372,9 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
         matData.aoFactor = cmd.material->GetFloatAttribute("material.aoFactor");
         matData.heightScale = cmd.material->GetFloatAttribute("material.heightScale");
 
-        uint32_t matOffset = matFrameBuffer.offset;
-        matFrameBuffer.buffer->UpdateDataAtOffset(&matData, sizeof(MaterialData), matOffset, 0);
-        matFrameBuffer.offset += m_materialDataStride;
+        uint32_t matOffset = matBuffer.offset;
+        matBuffer.buffer->UpdateDataAtOffset(&matData, sizeof(MaterialData), matOffset, 0);
+        matBuffer.offset += m_materialDataStride;
 
         VkDescriptorSet drawSet = m_gBufferPools[frameIndex]->Allocate(setLayout);
         if (drawSet == VK_NULL_HANDLE)
@@ -385,6 +405,15 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
 
         PushUBO(0, camUBO->GetBuffer(frameIndex), 0, camUBO->GetSize());
         PushUBO(1, matVkBuffer, matOffset, sizeof(MaterialData));
+
+        if (cmd.type == RenderCommand::Type::SoftBodyChunk || cmd.type == RenderCommand::Type::SoftBodyChunkDebug)
+        {
+            uint32_t chunkOffset = chunkBuffer.offset;
+            chunkBuffer.buffer->UpdateDataAtOffset(&cmd.chunkData, sizeof(RenderCommand::ChunkRenderData), chunkOffset, 0);
+            chunkBuffer.offset += m_chunkDataStride;
+
+            PushUBO(2, chunkVkBuffer, chunkOffset, sizeof(RenderCommand::ChunkRenderData));
+        }
 
         auto PushTexture = [&](SafePtr<Texture>& tex, uint32_t binding)
         {
@@ -442,10 +471,6 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
         case RenderCommand::Type::SoftBody:
         case RenderCommand::Type::SoftBodyDebug:
         {
-            // Per-draw: bind the specific particle buffer for this object
-            vulkanMaterial->SetStorageBuffer(
-                drawSet, 0, 8, cmd.particleBuffer, 0, cmd.particleBufferSize, renderer);
-
             struct SoftBodyPush
             {
                 Mat4 transform;
@@ -457,6 +482,13 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
             vkCmdPushConstants(renderer->GetCommandBuffer(),
                 pipeline->GetPipelineLayout(),
                 VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(SoftBodyPush), &push);
+        }
+        case RenderCommand::Type::SoftBodyChunk:
+        case RenderCommand::Type::SoftBodyChunkDebug:
+        {
+            // Per-draw: bind the specific particle buffer for this object
+            vulkanMaterial->SetStorageBuffer(
+                drawSet, 0, 8, cmd.particleBuffer, 0, cmd.particleBufferSize, renderer);
 
             uint32_t instanceCount = (cmd.type == RenderCommand::Type::SoftBodyDebug)
                 ? cmd.particleCount

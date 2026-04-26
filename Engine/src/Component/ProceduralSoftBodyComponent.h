@@ -55,10 +55,11 @@ namespace ProceduralSoftBody
 
 	struct PConnectionData1
 	{
-		uint32_t chunkID;
-		float initialLength;
 		Vec3f originalPos;
+		uint32_t chunkID;
 		uint32_t particleID;
+		float initialLength;
+		float _padding[2];
 	};
 
 	struct GPUNeighborData
@@ -87,13 +88,6 @@ namespace ProceduralSoftBody
 		float   damping;
 		float   strength;
 		float   _padding[2];
-	};
-
-	struct GPURenderData
-	{
-		Vec3f   chunkPos;
-		int     offset;
-		GPUNeighborData neighbors[8];
 	};
 
 	struct CPUChunkData
@@ -133,6 +127,22 @@ namespace ProceduralSoftBody
 		VkDeviceSize sizeC;
 		VkDeviceSize offsetL;
 		VkDeviceSize sizeL;
+	};
+
+	struct Vec2iHash
+	{
+		size_t operator()(const Vec2i &k) const
+		{
+			return (size_t)(k.x) | ((size_t)(k.y) << 32);
+		}
+	};
+	struct Vec3iHash
+	{
+		size_t operator()(const Vec3i &k) const
+		{
+			return ((size_t)(k.x) | ((size_t)(k.y) << 32)) ^
+				(std::hash<int>()(k.z) << 1);
+		}
 	};
 }
 
@@ -187,8 +197,8 @@ private:
 	uint32_t m_globalChunkOffset[3];
 	std::vector<ProceduralSoftBody::CopyRequest> copyRequests;
 
-	std::unordered_map<Vec2i, ProceduralSoftBody::CPUChunkData> m_chunks;
-	std::unordered_map<Vec2i, std::vector<ProceduralSoftBody::HeightPointData>> m_heightData;
+	std::unordered_map<Vec2i, ProceduralSoftBody::CPUChunkData, ProceduralSoftBody::Vec2iHash> m_chunks;
+	std::unordered_map<Vec2i, std::vector<ProceduralSoftBody::HeightPointData>, ProceduralSoftBody::Vec2iHash> m_heightData;
 
 	SafePtr<Mesh> m_billboardMesh;
 	SafePtr<Material> m_material;

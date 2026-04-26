@@ -318,13 +318,11 @@ void ProceduralSoftBodyComponent::OnRender(VulkanRenderer* renderer)
 
     const Mat4 transform = GetGameObject()->GetTransform()
                                ->GetWorldMatrix().GetTranspose();
-    const Vec3f spherePos = m_particleSettings.sphereData.position;
-    const float sphereRad = m_particleSettings.sphereData.radius;
 
     for (const auto& chunk : m_chunks)
     {
         const CPUChunkData &source = chunk.second;
-        GPURenderData data;
+        RenderCommand::ChunkRenderData data;
         data.chunkPos = source.localPosition;
         data.offset = source.globalOffsetP;
         uint32_t index = 0;
@@ -353,14 +351,14 @@ void ProceduralSoftBodyComponent::OnRender(VulkanRenderer* renderer)
             queue->SubmitSoftBodyChunk(
                 m_billboardMesh.getPtr(), m_billboardMaterial.getPtr(),
                 m_particleBuffer.GetBuffer(), m_particleBuffer.GetSize(),
-                data, 1, transform, true);
+                data, source.particleCount, transform, true);
         }
         else
         {
             queue->SubmitSoftBodyChunk(
                 source.mesh, m_material.getPtr(),
                 m_particleBuffer.GetBuffer(), m_particleBuffer.GetSize(),
-                data, source.particleCount, transform, false);
+                data, 1, transform, false);
         }
     }
 }
@@ -561,7 +559,7 @@ void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParti
     const int32_t maxL = m_particleSettings.general.connectionStrength;
     const float heightDelta = 1.0f / std::max(amount.x, amount.y);
 
-    std::unordered_map<Vec3i, uint32_t> tmpParticles;
+    std::unordered_map<Vec3i, uint32_t, Vec3iHash> tmpParticles;
     std::vector<HeightPointData> heightMap;
     const bool exist = m_heightData.contains(chunkID);
 
