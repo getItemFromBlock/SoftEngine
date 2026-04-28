@@ -37,7 +37,7 @@ struct NeighborData
 struct ChunkData
 {
 	vec3 chunkPos;
-	int offset;
+	uint offset;
 	NeighborData neighbors[8];
 	uint particleCount;
 	uint connectionOffset;
@@ -71,20 +71,36 @@ layout(set = 0, binding = 3) uniform ChunkHeader {
 void main()
 {
     uint id = gl_GlobalInvocationID.x;
-    if (id >= pc.particleCount)
+	
+	uint chunkID = MAX_CHUNK_BUFFER_SIZE;
+	uint particleID = 0;
+	uint counter = 0;
+	for	(uint i = 0; i < MAX_CHUNK_BUFFER_SIZE; i++)
+	{
+		if (chunkData.chunks[i].particleCount + counter > id)
+		{
+			chunkID = i;
+			particleID = chunkData.chunks[i].offset + id - counter;
+			break;
+		}
+		counter += chunkData.chunks[i].particleCount;
+	}
+	
+    if (chunkID == MAX_CHUNK_BUFFER_SIZE)
         return;
 	
-    vec3 vel = particles[id].velocity;
-	vec3 pos = particles[id].position;
+    vec3 vel = particles[particleID].velocity;
+	vec3 pos = particles[particleID].position;
     
 	vel -= pc.gravity * pc.deltaTime;
 	
-	const uint cCount = particles[id].connectionsCount;
-	const uint cOff = particles[id].connectionsOffset;
+	const uint cCount = particles[particleID].connectionsCount;
+	const uint lCount = particles[particleID].connectionsCou;
+	const uint cOff = particles[particleID].connectionsOffset + chunkData.chunks[chunkID].connectionOffset;
 	
 	if (cCount == 0)
 	{
-		particles[id].velocity = vec3(0);
+		particles[particleID].velocity = vec3(0);
 		return;
 	}
 	

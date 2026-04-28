@@ -448,7 +448,7 @@ void ProceduralSoftBodyComponent::CreateSkinnedMesh(CPUChunkData &data)
 
 void ProceduralSoftBodyComponent::MapMeshToParticles(CPUChunkData &data, std::vector<WeightedVertex> &vertices)
 {
-    const std::vector<HeightPointData> *maps[4];
+    const PreChunkData *maps[4];
 
     uint32_t counter = 0;
     for (int i = 0; i < 2; i++)
@@ -456,9 +456,9 @@ void ProceduralSoftBodyComponent::MapMeshToParticles(CPUChunkData &data, std::ve
         for (int j = 0; j < 2; j++)
         {
             Vec2i iPos = data.iPos + Vec2i(i, j);
-            if (!m_heightData.contains(iPos))
-                CreateHeightMap(iPos);
-            maps[counter++] = &m_heightData[iPos];
+            if (!m_preChunkData.contains(iPos))
+                PrecreateChunk(iPos);
+            maps[counter++] = &m_preChunkData[iPos];
         }
     }
 
@@ -604,6 +604,7 @@ void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParti
             continue;
 
         particle.connectionsOffset = (uint32_t)connections0.size();
+        particle.connectionsLOffset = (uint32_t)connections1.size();
 
         for (int32_t l = -maxL; l <= maxL; l++)
         {
@@ -618,6 +619,12 @@ void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParti
                     if (!tmpParticles.contains(p))
                     {
                         // TODO deal with neighbor chunk particles
+                        Vec2i otherChunk = chunkID + Vec2i(l > 0 ? );
+                        PConnectionData1 c;
+                        c.particleID = index1;
+                        c.initialLength = (particle.originalPos - particles[index1].originalPos).Length();
+                        connections0.push_back(c);
+
                         continue;
                     }
 
@@ -665,9 +672,9 @@ void ProceduralSoftBodyComponent::CreateChunkAt(Vec2i pos)
 
     CreateSkinnedMesh(data);
 
-    m_particleBuffer.UpdateData(particles.data(), newChunkP.offset, particles.size() * sizeof(PSBParticleData));
-    m_particleBuffer.UpdateData(particles.data(), newChunkP.offset, particles.size() * sizeof(PSBParticleData));
-    m_particleBuffer.UpdateData(particles.data(), newChunkP.offset, particles.size() * sizeof(PSBParticleData));
+    m_particleBuffer.UpdateData(particles.data(), newChunkP.offset, totalSizeP);
+    m_particleBuffer.UpdateData(connections0.data(), newChunkC.offset, totalSizeC);
+    m_particleBuffer.UpdateData(connections1.data(), newChunkL.offset, totalSizeL);
     
     CopyRequest cr = {};
     cr.offsetP = newChunkP.offset;
@@ -681,14 +688,15 @@ void ProceduralSoftBodyComponent::CreateChunkAt(Vec2i pos)
     m_chunks[pos] = data;
 }
 
-void ProceduralSoftBodyComponent::CreateHeightMap(const Vec2i &chunkID)
+void ProceduralSoftBodyComponent::PrecreateChunk(const Vec2i &chunkID)
 {
+    if (m_preChunkData.contains(chunkID))
+        return;
+
     const Vec2i amount = m_particleSettings.general.particleAmount;
     const float heightDelta = 1.0f / std::max(amount.x, amount.y);
 
-    std::vector<HeightPointData> heightMap;
-    uint32_t counter = 0;
-    const bool exist = m_heightData.contains(chunkID);
+    PreChunkData chunkData;
 
     for (int32_t i = 0; i < amount.x; i++)
     {
@@ -701,20 +709,16 @@ void ProceduralSoftBodyComponent::CreateHeightMap(const Vec2i &chunkID)
             for (float posY = -0.5f; posY < height; posY += heightDelta)
             {
                 const Vec3f pos = Vec3f(posX, posY, posZ);
-                if (!exist && posY + heightDelta >= height)
+                if (posY + heightDelta >= height)
                 {
-                    HeightPointData d;
-                    d.id = counter;
-                    d.pos = pos;
-                    heightMap.push_back(d);
+                    chunkData.heightMap.push_back(chunkData.positions.size());
                 }
-                counter++;
+                chunkData.positions.push_back(pos);
             }
         }
     }
 
-    if (!exist)
-        m_heightData[chunkID] = heightMap;
+    m_preChunkData[chunkID] = chunkData;
 }
 
 void ProceduralSoftBodyComponent::DeleteChunk(Vec2i iPos)
