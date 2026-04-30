@@ -683,22 +683,27 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
     m_totalParticleCount = uint32_t(m_particles.size());
 }
 
+struct Vec3iHash
+{
+    size_t operator()(const Vec3i& k) const
+    {
+        return ((std::hash<int>()(k.x)
+                ^ (std::hash<int>()(k.y) << 1)) >> 1)
+                ^ (std::hash<int>()(k.z) << 1);
+    }
+};
+
 struct SpatialGrid 
 {
     float cellSize;
-    std::unordered_map<long long, std::vector<int>> cells;
-
-    static long long Hash(int x, int y, int z) 
-    {
-        return ((long long)x * 73856093) ^ ((long long)y * 19349663) ^ ((long long)z * 83492791);
-    }
+    std::unordered_map<Vec3i, std::vector<int>, Vec3iHash> cells;
 
     void Add(const Vec3f& pos, int particleIndex) 
     {
         int ix = (int)floor(pos.x / cellSize);
         int iy = (int)floor(pos.y / cellSize);
         int iz = (int)floor(pos.z / cellSize);
-        cells[Hash(ix, iy, iz)].push_back(particleIndex);
+        cells[{ix, iy, iz}].push_back(particleIndex);
     }
 };
 
@@ -736,10 +741,9 @@ void GPUSoftBodyComponent::GenerateConnection(const BoundingBox& BBox, const flo
             {
                 for (int z = iz - 1; z <= iz + 1; ++z) 
                 {
-                    long long h = SpatialGrid::Hash(x, y, z);
-                    if (grid.cells.count(h)) 
+                    if (grid.cells.count({ x, y, z }))
                     {
-                        const auto& cell = grid.cells[h];
+                        const auto& cell = grid.cells[{ x, y, z }];
 
                         for (int j : cell) 
                         {
