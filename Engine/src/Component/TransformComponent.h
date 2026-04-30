@@ -54,6 +54,9 @@ public:
     Vec3f TransformDirection(Vec3f dir) const;
     
     void SetDirty() { m_dirty = true; }
+    
+    nlohmann::json Serialize() const override;
+    void Deserialize(const nlohmann::json& json) override;
 public:
     Event<> EOnUpdateModelMatrix;
 private:

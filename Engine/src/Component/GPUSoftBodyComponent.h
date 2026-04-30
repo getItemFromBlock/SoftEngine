@@ -94,6 +94,9 @@ public:
     
     SafePtr<Material> GetMaterial() const { return m_material; }
     SafePtr<Mesh> GetMesh() const { return m_mesh; }
+    
+    nlohmann::json Serialize() const override;
+    void Deserialize(const nlohmann::json& json) override;
 private:
     friend class SceneSerializer;
 

@@ -7,6 +7,7 @@
 
 #include "Resource/Mesh.h"
 #include "Scene/GameObject.h"
+#include "Scene/SceneSerializer.h"
 #include "Utils/Color.h"
 #include "Utils/Random.h"
 
@@ -267,6 +268,74 @@ void GPUSoftBodyComponent::OnDestroy()
     Engine::Get()->GetRenderer()->WaitForGPU();
 
     if (m_particleBuffer) m_particleBuffer->Cleanup();
+}
+
+nlohmann::json GPUSoftBodyComponent::Serialize() const
+{
+    const BodySettings& settings = const_cast<GPUSoftBodyComponent*>(this)->GetSettings();
+    return {
+        {"loadedFromMesh", IsLoadedFromMesh()},
+        {"initializerMesh", SceneSerializer::SerializeResourcePath(GetInitializerMesh())},
+        {"drawDebug", GetDrawDebug()},
+        {"settings", {
+            {"general", {
+                {"particleAmount", SceneSerializer::ToJson(settings.general.particleAmount)},
+                {"solidLayers", settings.general.solidLayers},
+                {"boneCount", SceneSerializer::ToJson(settings.general.boneCount)},
+                {"surfacePoints", SceneSerializer::ToJson(settings.general.surfacePoints)},
+                {"surfaceHeightBounds", SceneSerializer::ToJson(settings.general.surfaceHeightBounds)},
+                {"damping", settings.general.damping},
+                {"strength", settings.general.strength},
+                {"connectionStrength", settings.general.connectionStrength}
+            }},
+            {"shape", {
+                {"type", static_cast<int>(settings.shape.type)},
+                {"scale", settings.shape.scale}
+            }}
+        }}
+    };
+}
+
+void GPUSoftBodyComponent::Deserialize(const nlohmann::json& json)
+{
+    BodySettings& settings = GetSettings();
+    const nlohmann::json settingsData = json.contains("settings") ? json["settings"] : nlohmann::json::object();
+
+    if (settingsData.contains("general"))
+    {
+        const nlohmann::json& general = settingsData["general"];
+        if (general.contains("particleAmount"))
+            SceneSerializer::FromJson(general["particleAmount"], settings.general.particleAmount);
+        settings.general.solidLayers = general.value("solidLayers", settings.general.solidLayers);
+        if (general.contains("boneCount"))
+            SceneSerializer::FromJson(general["boneCount"], settings.general.boneCount);
+        if (general.contains("surfacePoints"))
+            SceneSerializer::FromJson(general["surfacePoints"], settings.general.surfacePoints);
+        if (general.contains("surfaceHeightBounds"))
+            SceneSerializer::FromJson(general["surfaceHeightBounds"], settings.general.surfaceHeightBounds);
+        settings.general.damping = general.value("damping", settings.general.damping);
+        settings.general.strength = general.value("strength", settings.general.strength);
+        settings.general.connectionStrength = general.value("connectionStrength", settings.general.connectionStrength);
+    }
+    if (settingsData.contains("shape"))
+    {
+        const nlohmann::json& shape = settingsData["shape"];
+        settings.shape.type = static_cast<BodySettings::Shape::Type>(shape.value("type", static_cast<int>(settings.shape.type)));
+        settings.shape.scale = shape.value("scale", settings.shape.scale);
+    }
+
+    SetDrawDebug(json.value("drawDebug", GetDrawDebug()));
+    SafePtr<Mesh> initializerMesh = SceneSerializer::LoadResource<Mesh>(
+        Engine::Get()->GetResourceManager(),
+        json.contains("initializerMesh") ? json["initializerMesh"] : nlohmann::json());
+
+    if (json.value("loadedFromMesh", false) && initializerMesh)
+    {
+        initializerMesh->EOnSentToGPU += [initializerMesh, this]{
+            CreateFromMesh(initializerMesh);
+        };
+    }
+    ApplySettings();
 }
 
 void GPUSoftBodyComponent::CreateParticleBuffers()

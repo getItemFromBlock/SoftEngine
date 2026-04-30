@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include <galaxymath/Maths.h>
+#include <nlohmann/json_fwd.hpp>
 
 #include "Core/UUID.h"
 #include "Scene/ClassDescriptor.h"
@@ -48,6 +49,9 @@ public:
     
     Core::UUID GetUUID() const { return p_uuid; }
     GameObject* GetGameObject() const { return p_gameObject; }
+    
+    virtual nlohmann::json Serialize() const;
+    virtual void Deserialize(const nlohmann::json& json) {}
 protected:
     friend class SceneSerializer;
 

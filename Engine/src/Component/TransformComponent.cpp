@@ -1,5 +1,6 @@
 ﻿#include "TransformComponent.h"
 #include "Scene/GameObject.h"
+#include "Scene/SceneSerializer.h"
 
 void TransformComponent::Describe(ClassDescriptor& d)
 {
@@ -223,6 +224,26 @@ void TransformComponent::RotateAround(const Vec3f axis, const float angle)
 Vec3f TransformComponent::TransformDirection(Vec3f dir) const
 {
     return GetWorldRotation() * dir;
+}
+
+nlohmann::json TransformComponent::Serialize() const
+{
+    return {
+        {"localPosition", SceneSerializer::ToJson(GetLocalPosition())},
+        {"localRotationEuler", SceneSerializer::ToJson(GetLocalEulerAngles())},
+        {"localScale", SceneSerializer::ToJson(GetLocalScale())}
+    };
+}
+
+void TransformComponent::Deserialize(const nlohmann::json& json)
+{
+    if (json.contains("localPosition"))
+        SceneSerializer::FromJson(json["localPosition"], m_localPosition);
+    if (json.contains("localRotationEuler"))
+        SceneSerializer::FromJson(json["localRotationEuler"], m_localRotation);
+    if (json.contains("localScale"))
+        SceneSerializer::FromJson(json["localScale"], m_localScale);
+    m_dirty = true;
 }
 
 void TransformComponent::UpdateMatrix(bool force)
