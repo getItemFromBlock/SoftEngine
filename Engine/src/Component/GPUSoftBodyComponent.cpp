@@ -127,7 +127,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
     {
         if (m_loadedFromMesh)
         {
-            InitializeParticleDataFromMesh(5, 0.5);
+            InitializeParticleDataFromMesh(m_meshDensity, 0.5);
         }
         CreateParticleBuffers();
         m_needsRecreation = false;
@@ -668,6 +668,8 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
     int itConnectionOffset = 0;
     UNUSED(itConnectionOffset);
 
+    m_meshDensity = density;
+
     BoundingBox BBox = m_initializerMesh.getPtr()->m_boundingBox;
 
     int pointCount = static_cast<int>(m_initializerMesh->m_indices.size());
@@ -681,27 +683,83 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
     m_totalParticleCount = uint32_t(m_particles.size());
 }
 
-void GPUSoftBodyComponent::GenerateConnection(BoundingBox BBox, float maxDistToConnect)
+struct Vec3iHash
 {
+    size_t operator()(const Vec3i& k) const
+    {
+        return ((std::hash<int>()(k.x)
+                ^ (std::hash<int>()(k.y) << 1)) >> 1)
+                ^ (std::hash<int>()(k.z) << 1);
+    }
+};
+
+struct SpatialGrid 
+{
+    float cellSize;
+    std::unordered_map<Vec3i, std::vector<int>, Vec3iHash> cells;
+
+    void Add(const Vec3f& pos, int particleIndex) 
+    {
+        int ix = (int)floor(pos.x / cellSize);
+        int iy = (int)floor(pos.y / cellSize);
+        int iz = (int)floor(pos.z / cellSize);
+        cells[{ix, iy, iz}].push_back(particleIndex);
+    }
+};
+
+void GPUSoftBodyComponent::GenerateConnection(const BoundingBox& BBox, const float& maxDistToConnect)
+{
+    float maxDistSqrt = maxDistToConnect * maxDistToConnect;
+    m_connections.clear();
+
+    SpatialGrid grid;
+    grid.cellSize = maxDistToConnect;
+    for (int i = 0; i < m_particles.size(); i++)
+    {
+        grid.Add(m_particles[i].position, i);
+    }
+
     for (int i = 0; i < m_particles.size(); i++)
     {
         m_particles[i].connectionsOffset = static_cast<uint32_t>(m_connections.size());
-        if (m_particles[i].position.y <= BBox.min.y + 0.2f) continue;
 
-        for (int j = 0; j < m_particles.size(); j++)
+        // Debug condion, not meant to remain on released project
+        if (m_particles[i].position.y <= BBox.min.y + 0.2f) 
         {
-            if (i == j) continue;
+            m_particles[i].connectionsCount = 0;
+            continue;
+        }
 
-            float dist = m_particles[j].position.Distance(m_particles[i].position);
+        Vec3f posI = m_particles[i].position;
+        int ix = (int)floor(posI.x / grid.cellSize);
+        int iy = (int)floor(posI.y / grid.cellSize);
+        int iz = (int)floor(posI.z / grid.cellSize);
 
-            if (dist <= maxDistToConnect)
+        for (int x = ix - 1; x <= ix + 1; ++x) 
+        {
+            for (int y = iy - 1; y <= iy + 1; ++y) 
             {
-                ConnectionData connectionData;
+                for (int z = iz - 1; z <= iz + 1; ++z) 
+                {
+                    if (grid.cells.count({ x, y, z }))
+                    {
+                        const auto& cell = grid.cells[{ x, y, z }];
 
-                connectionData.initialLength = dist;
-                connectionData.particleID = j;
+                        for (int j : cell) 
+                        {
+                            if (i == j) continue;
 
-                m_connections.push_back(connectionData);
+                            float distSq = Vec3f::LengthSquared(m_particles[j].position - posI);
+                            if (distSq <= maxDistSqrt) 
+                            {
+                                ConnectionData connectionData;
+                                connectionData.initialLength = sqrtf(distSq);
+                                connectionData.particleID = j;
+                                m_connections.push_back(connectionData);
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -717,29 +775,78 @@ struct Ray
     Vec3f direction;
 };
 
-bool RayIntersectTriangle(const Ray& ray, const Vec3f& a, const Vec3f& b, const Vec3f& c, float& dist)
+struct Triangle
+{
+    Vec3f v[3];
+    Vec3f center;
+};
+
+struct BVHNode 
+{
+    BoundingBox bbox;
+    BVHNode* left = nullptr;
+    BVHNode* right = nullptr;
+    std::vector<Triangle> triangles;
+    bool isLeaf = false;
+};
+
+bool RayIntersectsBox(const Ray& ray, const BoundingBox& box) 
+{
+    float tmin = -FLT_MAX, tmax = FLT_MAX;
+
+    float dir[3] = { ray.direction.x, ray.direction.y, ray.direction.z };
+    float ori[3] = { ray.origin.x, ray.origin.y, ray.origin.z };
+    float bmin[3] = { box.min.x, box.min.y, box.min.z };
+    float bmax[3] = { box.max.x, box.max.y, box.max.z };
+
+    for (int i = 0; i < 3; ++i) 
+    {
+        if (abs(dir[i]) < 1e-6f) 
+        { 
+            if (ori[i] < bmin[i] || ori[i] > bmax[i]) 
+                return false;
+        }
+        else 
+        {
+            float invDir = 1.0f / dir[i];
+            float t1 = (bmin[i] - ori[i]) * invDir;
+            float t2 = (bmax[i] - ori[i]) * invDir;
+            if (t1 > t2) 
+                std::swap(t1, t2);
+
+            tmin = std::max(tmin, t1);
+            tmax = std::min(tmax, t2);
+
+            if (tmin > tmax) 
+                return false;
+        }
+    }
+    return tmax > 0;
+}
+
+bool RayIntersectTriangle(const Ray& ray, const Triangle& tri, float& dist)
 {
     const float EPSILON = 0.0000001f;
-    Vec3f edge1 = b - a;
-    Vec3f edge2 = c - a;
+    Vec3f edge1 = tri.v[1] - tri.v[0];
+    Vec3f edge2 = tri.v[2] - tri.v[0];
 
     Vec3f h = ray.direction.Cross(edge2);
     float det = ray.direction.Dot(edge1, h);
 
-    if (det > -EPSILON && det < EPSILON) 
+    if (det > -EPSILON && det < EPSILON)
         return false;
 
     float inv_det = 1.0f / det;
-    Vec3f s = ray.origin - a;
+    Vec3f s = ray.origin - tri.v[0];
     float u = inv_det * s.Dot(h);
 
-    if (u < 0.0f || u > 1.0f) 
+    if (u < 0.0f || u > 1.0f)
         return false;
 
     Vec3f q = s.Cross(edge1);
     float v = inv_det * ray.direction.Dot(q);
 
-    if (v < 0.0f || u + v > 1.0f) 
+    if (v < 0.0f || u + v > 1.0f)
         return false;
 
     dist = inv_det * edge2.Dot(q);
@@ -747,12 +854,101 @@ bool RayIntersectTriangle(const Ray& ray, const Vec3f& a, const Vec3f& b, const 
     return dist > EPSILON;
 }
 
+void ExpandBBox(BoundingBox& box, const Vec3f& p) 
+{
+    box.min.x = std::min(box.min.x, p.x);
+    box.min.y = std::min(box.min.y, p.y);
+    box.min.z = std::min(box.min.z, p.z);
+    box.max.x = std::max(box.max.x, p.x);
+    box.max.y = std::max(box.max.y, p.y);
+    box.max.z = std::max(box.max.z, p.z);
+}
+
+BVHNode* BuildBVH(std::vector<Triangle>& tris) 
+{
+    BVHNode* node = new BVHNode();
+
+    node->bbox = BoundingBox();
+
+    for (const auto& tri : tris) 
+    {
+        ExpandBBox(node->bbox, tri.v[0]);
+        ExpandBBox(node->bbox, tri.v[1]);
+        ExpandBBox(node->bbox, tri.v[2]);
+    }
+
+    if (tris.size() <= 8) 
+    {
+        node->isLeaf = true;
+        node->triangles = std::move(tris);
+        return node;
+    }
+
+    Vec3f size = node->bbox.max - node->bbox.min;
+    int axis = 0;
+    if (size.y > size.x) axis = 1;
+    if (size.z > (axis == 1 ? size.y : size.x)) axis = 2;
+
+    std::sort(tris.begin(), tris.end(), [axis](const Triangle& a, const Triangle& b) 
+    {
+        if (axis == 0) return a.center.x < b.center.x;
+        if (axis == 1) return a.center.y < b.center.y;
+        return a.center.z < b.center.z;
+    });
+
+    size_t mid = tris.size() / 2;
+    std::vector<Triangle> leftTris(tris.begin(), tris.begin() + mid);
+    std::vector<Triangle> rightTris(tris.begin() + mid, tris.end());
+
+    node->left = BuildBVH(leftTris);
+    node->right = BuildBVH(rightTris);
+
+    return node;
+}
+
+void DeleteBVH(BVHNode* node) 
+{
+    if (!node) return;
+    if (node->left) DeleteBVH(node->left);
+    if (node->right) DeleteBVH(node->right);
+    delete node;
+}
+
+void RayIntersectBVH(BVHNode* node, const Ray& ray, int& count) 
+{
+    if (!RayIntersectsBox(ray, node->bbox)) 
+        return;
+
+    if (node->isLeaf) 
+    {
+        for (const auto& tri : node->triangles) 
+        {
+            float dist;
+            if (RayIntersectTriangle(ray, tri, dist)) 
+            {
+                if (dist > 0.0001f) 
+                    count++;
+            }
+        }
+    }
+    else 
+    {
+        RayIntersectBVH(node->left, ray, count);
+        RayIntersectBVH(node->right, ray, count);
+    }
+}
+
 void GPUSoftBodyComponent::PlacePointMesh(BoundingBox BBox, Vertex* vertices, uint32_t* indices, int pointCount, float density)
 {
     float invDensity = 1 / density;
 
-    Vec3f rayDir = {0.1234, 0.5678, 0.9101};
-    rayDir.Normalize();
+    std::vector<Triangle> meshTriangles;
+    for (int i = 0; i < pointCount; i += 3)
+    {
+        meshTriangles.push_back({ vertices[indices[i]].position, vertices[indices[i + 1]].position, vertices[indices[i + 2]].position });
+    }
+
+    BVHNode* root = BuildBVH(meshTriangles);
 
     for (float currY = BBox.min.y; currY <= BBox.max.y; currY += invDensity)
     {
@@ -760,23 +956,15 @@ void GPUSoftBodyComponent::PlacePointMesh(BoundingBox BBox, Vertex* vertices, ui
         {
             for (float currX = BBox.min.x; currX <= BBox.max.x; currX += invDensity)
             {
+
+                Vec3f rayDir = { static_cast <float> (rand()), static_cast <float> (rand()), static_cast <float>(rand())};
+                rayDir.Normalize();
                 Vec3f pos = { currX, currY, currZ };
-                Ray ray = { pos, rayDir };
+
+                Ray ray = { pos , rayDir};
 
                 int intersect = 0;
-                for (int i = 0; i < pointCount / 3; i++)
-                {
-                    Vec3f a = vertices[indices[i * 3    ]].position;
-                    Vec3f b = vertices[indices[i * 3 + 1]].position;
-                    Vec3f c = vertices[indices[i * 3 + 2]].position;
-                    
-                    float dist = 0;
-                    if (RayIntersectTriangle(ray, a, b, c, dist))
-                    {
-                        if (dist > 0)
-                            intersect++;
-                    }
-                }
+                RayIntersectBVH(root, ray, intersect);
 
                 if (intersect % 2 != 0)
                 {
@@ -790,4 +978,6 @@ void GPUSoftBodyComponent::PlacePointMesh(BoundingBox BBox, Vertex* vertices, ui
             }
         }
     }
+
+    DeleteBVH(root);
 }

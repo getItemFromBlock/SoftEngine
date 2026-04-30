@@ -99,7 +99,7 @@ private:
 
     void PlacePointMesh(BoundingBox BBox, Vertex* vertices, uint32_t* indices, int pointCount, float density);
 
-    void GenerateConnection(BoundingBox BBox, float maxDistToConnect);
+    void GenerateConnection(const BoundingBox& BBox, const float& maxDistToConnect);
 
 private:
     bool m_loadedFromMesh = false;
@@ -128,4 +128,6 @@ private:
 
     Seed m_seed;
     BodySettings m_particleSettings;
+
+    int m_meshDensity;
 };
