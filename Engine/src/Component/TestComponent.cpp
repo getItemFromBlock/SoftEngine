@@ -17,7 +17,7 @@ void TestComponent::OnCreate()
     m_startPosition = GetGameObject()->GetTransform()->GetLocalPosition();
 }
 
-void TestComponent::OnUpdate(float deltaTime)
+void TestComponent::OnGameUpdate(float deltaTime)
 {
     auto transform = GetGameObject()->GetTransform();
     if (m_attachToCamera)

@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "EngineAPI.h"
 #include <memory>
+#include <optional>
 
 #include "Core/Window.h"
 #include "Resource/ResourceManager.h"
@@ -16,15 +17,26 @@ struct ENGINE_API EngineDesc
 class ENGINE_API Engine
 {
 public:
+    enum class RuntimeMode
+    {
+        Edit,
+        Play,
+        Pause,
+        Count
+    };
+
     static Engine* Create();
     
     bool Initialize(EngineDesc desc);
-    bool BeginFrame() const;
+    bool BeginFrame();
     void Update();
     void Render();
     void EndFrame();
     void WaitBeforeClean();
     void Cleanup();
+
+    void SetRuntimeMode(RuntimeMode mode);
+    RuntimeMode GetRuntimeMode() const { return m_runtimeMode; }
     
     static Engine* Get();
 
@@ -34,6 +46,8 @@ public:
     ResourceManager* GetResourceManager() const { return m_resourceManager.get(); }
     ComponentRegister* GetComponentRegister() const { return m_componentRegister.get(); }
 private:
+    void ApplyRuntimeMode(RuntimeMode mode);
+
     Window* m_window;
     std::unique_ptr<VulkanRenderer> m_renderer;
     std::unique_ptr<ResourceManager> m_resourceManager;
@@ -43,4 +57,8 @@ private:
     inline static std::unique_ptr<Engine> s_instance = nullptr;
     
     float m_deltaTime = 0.0f;
+    RuntimeMode m_runtimeMode = RuntimeMode::Edit;
+    RuntimeMode m_pendingRuntimeMode = RuntimeMode::Count;
+    Core::UUID m_pendingRuntimeModeCallback = UUID_INVALID;
+    bool m_frameInProgress = false;
 };

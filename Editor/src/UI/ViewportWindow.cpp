@@ -5,13 +5,10 @@
 #include "Core/ImGuiHandler.h"
 #include "Resource/RenderTargetTexture.h"
 
-ViewportWindow::ViewportWindow(ImGuiHandler* imguiHandler, Camera* camera) : EditorWindow(imguiHandler),
+ViewportWindow::ViewportWindow(ImGuiHandler* imguiHandler, Camera* camera) : EditorWindow("ViewportWindow", imguiHandler),
                                                                              m_camera(camera)
 {
-    m_camera->OnRenderTargetResized += [this](const Vec2i& size)
-    {
-        m_imguiHandler->UpdateTextureID(m_camera->GetRenderTarget().getPtr());
-    };
+    SetCamera(camera);
 }
 
 void ViewportWindow::RenderMenuBar() const
@@ -38,6 +35,11 @@ void ViewportWindow::OnRender()
 {
     if (ImGui::Begin("Viewport", nullptr, ImGuiWindowFlags_MenuBar))
     {
+        if (!m_camera)
+        {
+            auto sceneHolder = Engine::Get()->GetSceneHolder();
+            SetCamera(sceneHolder->GetCurrentScene()->GetEditorCamera());
+        }
         RenderMenuBar();
 
         const float contentWidth = ImGui::GetContentRegionAvail().x;
@@ -75,7 +77,7 @@ void ViewportWindow::OnRender()
 
         ImGui::SetCursorPos(ImVec2(cursorPos.x + xPos, cursorPos.y + yPos));
 
-        ImTextureRef textureID = m_imguiHandler->GetTextureID(m_camera->GetRenderTarget().getPtr());
+        ImTextureRef textureID = p_imguiHandler->GetTextureID(m_camera->GetRenderTarget().getPtr());
 
         ImGui::Image(textureID, ImVec2(int(width), int(height)));
         ImGui::SetCursorPos(ImVec2(cursorPos.x + xPos, cursorPos.y + yPos));
@@ -89,4 +91,24 @@ void ViewportWindow::OnRender()
         }
     }
     ImGui::End();
+}
+
+void ViewportWindow::SetCamera(Camera* camera)
+{
+    if (m_camera)
+    {
+        m_camera->EOnRenderTargetResized.Unbind(m_renderTargetResizedHandle);
+        m_camera->EOnDestroy.Unbind(m_destroyHandle);
+    }
+    m_camera = camera;
+    if (!m_camera)
+        return;
+    m_renderTargetResizedHandle = m_camera->EOnRenderTargetResized += [this](const Vec2i& size)
+    {
+        p_imguiHandler->UpdateTextureID(m_camera->GetRenderTarget().getPtr());
+    };
+    m_destroyHandle = m_camera->EOnDestroy += [this]()
+    {
+        m_camera = nullptr;
+    };
 }

@@ -21,6 +21,7 @@
 
 class VulkanRenderer;
 class GameObject;
+class SceneSerializer;
 
 class IComponent : public IDescribe
 {
@@ -37,6 +38,7 @@ public:
 
     virtual void OnCreate() {}
     virtual void OnStart() {}
+    virtual void OnGameUpdate(float deltaTime) {}
     virtual void OnUpdate(float deltaTime) {}
     virtual void OnRender(VulkanRenderer* renderer) {}
     virtual void OnDestroy() {}
@@ -47,6 +49,8 @@ public:
     Core::UUID GetUUID() const { return p_uuid; }
     GameObject* GetGameObject() const { return p_gameObject; }
 protected:
+    friend class SceneSerializer;
+
     bool p_enable = true;
     Core::UUID p_uuid;
     GameObject* p_gameObject = nullptr;

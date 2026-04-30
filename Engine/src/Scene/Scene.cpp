@@ -16,8 +16,8 @@ Scene::Scene()
 
     m_lightManager = std::make_unique<LightManager>(this);
     m_editorCamera = std::make_unique<Camera>();
+    
     m_editorCamera->GetTransform()->SetLocalPosition(Vec3f::Zero());
-
     m_editorCamera->GetTransform()->EOnUpdateModelMatrix += [this]()
     {
         m_editorCamera->UpdateFrustum();
@@ -93,10 +93,26 @@ void Scene::OnRender(VulkanRenderer* renderer)
 
 void Scene::OnUpdate(float deltaTime)
 {
-    UpdateCamera(deltaTime);
+    OnUpdateEditor(deltaTime);
+    OnUpdateRuntime(deltaTime);
+}
 
+void Scene::OnStart()
+{
     std::scoped_lock lock(m_componentsMutex);
+    for (const std::vector<std::shared_ptr<IComponent>>& componentList : m_components | std::views::values)
+    {
+        for (const std::shared_ptr<IComponent>& component : componentList)
+        {
+            if (component->IsEnable())
+                component->OnStart();
+        }
+    }
+}
 
+void Scene::OnUpdateEditor(float deltaTime)
+{
+    std::scoped_lock lock(m_componentsMutex);
     for (const std::vector<std::shared_ptr<IComponent>>& componentList : m_components | std::views::values)
     {
         for (const std::shared_ptr<IComponent>& component : componentList)
@@ -107,9 +123,24 @@ void Scene::OnUpdate(float deltaTime)
     }
 }
 
-SafePtr<GameObject> Scene::CreateGameObject(GameObject* parent)
+void Scene::OnUpdateRuntime(float deltaTime)
+{
+    UpdateEditorCamera(deltaTime);
+    std::scoped_lock lock(m_componentsMutex);
+    for (const std::vector<std::shared_ptr<IComponent>>& componentList : m_components | std::views::values)
+    {
+        for (const std::shared_ptr<IComponent>& component : componentList)
+        {
+            if (component->IsEnable())
+                component->OnGameUpdate(deltaTime);
+        }
+    }
+}
+
+SafePtr<GameObject> Scene::CreateGameObject(GameObject* parent, Core::UUID uuid)
 {
     std::shared_ptr object = std::make_shared<GameObject>(*this);
+    object->m_uuid = uuid;
     object->SetName("GameObject");
 
     {
@@ -141,21 +172,59 @@ SafePtr<GameObject> Scene::GetRootObject() const
 
 void Scene::DestroyGameObject(GameObject* gameObject)
 {
-    std::scoped_lock lock(m_gameObjectsMutex);
-
-    auto it = m_gameObjects.find(gameObject->GetUUID());
-    if (it == m_gameObjects.end())
+    if (!gameObject)
         return;
 
-    for (auto& childUUID : gameObject->m_childrenUUID)
+    const std::vector<Core::UUID> children(gameObject->m_childrenUUID.begin(), gameObject->m_childrenUUID.end());
+    for (const Core::UUID& childUUID : children)
     {
-        GameObject* object = GetGameObject(childUUID).getPtr();
-        DestroyGameObject(object);
+        SafePtr<GameObject> object = GetGameObject(childUUID);
+        if (object)
+            DestroyGameObject(object.getPtr());
     }
+
+    if (gameObject->m_parentUUID != UUID_INVALID)
+    {
+        SafePtr<GameObject> parent = GetGameObject(gameObject->m_parentUUID);
+        if (parent)
+            parent->m_childrenUUID.erase(gameObject->GetUUID());
+    }
+
+    gameObject->m_childrenUUID.clear();
+    gameObject->m_parentUUID = UUID_INVALID;
 
     RemoveAllComponents(gameObject);
 
-    m_gameObjects.erase(it);
+    std::scoped_lock lock(m_gameObjectsMutex);
+    m_gameObjects.erase(gameObject->GetUUID());
+}
+
+void Scene::Clear()
+{
+    SafePtr<GameObject> root = GetRootObject();
+    if (!root)
+        return;
+
+    const std::vector<Core::UUID> children(root->m_childrenUUID.begin(), root->m_childrenUUID.end());
+    for (const Core::UUID& childUUID : children)
+    {
+        SafePtr<GameObject> child = GetGameObject(childUUID);
+        if (child)
+            DestroyGameObject(child.getPtr());
+    }
+
+    const std::vector<SafePtr<IComponent>> components = root->GetComponents();
+    for (const SafePtr<IComponent>& component : components)
+    {
+        if (!component || component->GetTypeName() == TransformComponent::GetStaticTypeName())
+            continue;
+        RemoveComponent(component->GetUUID());
+    }
+
+    root->SetName("Root");
+    root->GetTransform()->SetLocalPosition(Vec3f::Zero());
+    root->GetTransform()->SetLocalRotation(Vec3f::Zero());
+    root->GetTransform()->SetLocalScale(Vec3f::One());
 }
 
 void Scene::SetParent(GameObject* object, GameObject* parent)
@@ -266,7 +335,7 @@ void Scene::RemoveAllComponents(GameObject* gameObject)
     }
 }
 
-void Scene::UpdateCamera(float deltaTime) const
+void Scene::UpdateEditorCamera(float deltaTime) const
 {
     static float speed = 10.f;
     static Vec2f startClickPos;

@@ -170,7 +170,7 @@ static void ComputeVertices(GLTFLoader::Mesh& mesh)
         }
         else
         {
-            const uint32_t id = mesh.finalVertices.size();
+            const uint32_t id = static_cast<uint32_t>(mesh.finalVertices.size());
             mesh.finalVertices.push_back(v);
             mesh.finalIndices.push_back(id);
             hashed_vertices[v] = id;
@@ -275,12 +275,19 @@ bool GLTFLoader::Load(const std::filesystem::path& fullPath, Model& model)
     // Meshes
     if (file.contains("meshes"))
     {
+        size_t index = 0;
         for (const auto& meshJson : file["meshes"])
         {
             Mesh mesh;
 
             if (meshJson.contains("name"))
+            {
                 mesh.name = meshJson["name"].get<std::string>();
+            }
+            else
+            {
+                mesh.name = fullPath.filename().stem().generic_string() + "_Mesh_" + std::to_string(index++);
+            }
 
             if (!meshJson.contains("primitives"))
             {

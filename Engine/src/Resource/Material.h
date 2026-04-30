@@ -83,6 +83,8 @@ public:
 
     void Describe(ClassDescriptor& descriptor) override;
 
+    bool Exists() const override;
+    
     void SetShader(const SafePtr<Shader>& shader);
     SafePtr<Shader> GetShader() const { return m_shader; }
 

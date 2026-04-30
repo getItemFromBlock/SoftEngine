@@ -1,0 +1,259 @@
+{
+    "root": {
+        "children": [
+            {
+                "children": [
+                    {
+                        "children": [],
+                        "components": [
+                            {
+                                "data": {
+                                    "localPosition": [
+                                        0.0,
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "localRotationEuler": [
+                                        0.0,
+                                        -0.0,
+                                        0.0
+                                    ],
+                                    "localScale": [
+                                        0.00800000037997961,
+                                        0.00800000037997961,
+                                        0.00800000037997961
+                                    ]
+                                },
+                                "enabled": true,
+                                "type": "TransformComponent",
+                                "uuid": 3852405912651874399
+                            },
+                            {
+                                "data": {
+                                    "drawBounds": false,
+                                    "materials": [
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_0.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_3.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_1.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_4.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_5.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_6.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_7.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_8.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_6.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_9.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_7.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_6.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_10.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_5.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_7.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_5.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_6.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_7.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_6.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_7.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_6.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_7.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_6.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_7.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_6.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_7.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_6.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_7.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_6.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_7.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_6.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_7.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_6.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_7.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_6.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_5.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_6.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_5.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_11.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_5.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_11.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_5.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_11.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_5.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_10.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_5.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_9.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_8.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_6.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_12.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_2.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_5.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_13.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_0.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_14.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_15.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_16.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_14.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_15.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_14.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_16.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_15.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_13.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_17.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_18.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_19.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_18.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_19.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_18.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_17.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_19.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_18.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_17.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_20.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_21.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_20.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_21.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_20.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_21.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_20.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_21.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_3.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_1.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_3.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_1.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_3.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_1.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_3.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_1.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_3.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_1.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_3.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_1.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_3.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_1.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_22.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_23.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_4.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_23.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_4.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_5.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_24.mat",
+                                        "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Material_5.mat"
+                                    ],
+                                    "mesh": "Engine/resources/models/Sponza/Sponza.gltf/Sponza_Mesh_0.mesh"
+                                },
+                                "enabled": true,
+                                "type": "MeshComponent",
+                                "uuid": 8147947076193617889
+                            }
+                        ],
+                        "name": "Sponza",
+                        "uuid": 9427285307540464883
+                    }
+                ],
+                "components": [
+                    {
+                        "data": {
+                            "localPosition": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "localRotationEuler": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "localScale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "enabled": true,
+                        "type": "TransformComponent",
+                        "uuid": 8395233884673857195
+                    }
+                ],
+                "name": "Sponza",
+                "uuid": 8705183073023428897
+            },
+            {
+                "children": [],
+                "components": [
+                    {
+                        "data": {
+                            "localPosition": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "localRotationEuler": [
+                                -33.70000076293945,
+                                0.0,
+                                0.0
+                            ],
+                            "localScale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "enabled": true,
+                        "type": "TransformComponent",
+                        "uuid": 11846310916013438882
+                    },
+                    {
+                        "data": {
+                            "angleFactors": [
+                                45.0,
+                                40.0
+                            ],
+                            "attenuation": 10.0,
+                            "color": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ],
+                            "intensity": 1.0,
+                            "lightType": 0,
+                            "otherPosition": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ]
+                        },
+                        "enabled": true,
+                        "type": "LightComponent",
+                        "uuid": 2228820773024848960
+                    }
+                ],
+                "name": "Directional",
+                "uuid": 17155649260020513110
+            }
+        ],
+        "components": [
+            {
+                "data": {
+                    "localPosition": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "localRotationEuler": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "localScale": [
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                },
+                "enabled": true,
+                "type": "TransformComponent",
+                "uuid": 16391598825324661223
+            }
+        ],
+        "name": "Root",
+        "uuid": 7902818855012435049
+    },
+    "version": 1
+}

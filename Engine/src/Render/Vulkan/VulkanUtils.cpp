@@ -149,11 +149,12 @@ void VulkanUtils::TransitionGBufferToShaderRead(VkCommandBuffer commandBuffer, V
         b.dstAccessMask       = VK_ACCESS_SHADER_READ_BIT;
         return b;
     };
-
-    std::array<VkImageMemoryBarrier, 3> barriers = {
+    
+    std::array<VkImageMemoryBarrier, 4> barriers = {
         makeBarrier(gBuffer.GetPosition().image),
         makeBarrier(gBuffer.GetNormal().image),
         makeBarrier(gBuffer.GetAlbedo().image),
+        makeBarrier(gBuffer.GetMetallicRoughness().image),
     };
 
     vkCmdPipelineBarrier(commandBuffer,

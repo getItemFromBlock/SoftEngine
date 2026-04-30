@@ -20,6 +20,7 @@
 #include "Component/TransformComponent.h"
 #include "Component/LightComponent.h"
 #include "Component/ParticleSystemComponent.h"
+#include "Component/GPUSoftBodyComponent.h"
 
 
 #include "Utils/Color.h"
@@ -69,9 +70,11 @@ bool Engine::Initialize(EngineDesc desc)
 
         SafePtr<Shader> unlit = m_resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/Unlit/Unlit.shader");
         SafePtr<Material> mat = m_resourceManager->CreateMaterial(RESOURCE_PATH"/materials/unlit.mat");
+        mat->SetAttribute("material.color", Vec4f::One());
         mat->SetShader(unlit);
     }
-
+    m_resourceManager->InitializeResources();
+    
     m_renderer->GetLineRenderer()->Initialize(m_renderer.get());
     m_renderer->GetSkyboxRenderer()->Initialize();
     
@@ -81,13 +84,14 @@ bool Engine::Initialize(EngineDesc desc)
     m_componentRegister->RegisterComponent<TestComponent>();
     m_componentRegister->RegisterComponent<LightComponent>();
     m_componentRegister->RegisterComponent<ParticleSystemComponent>();
+    m_componentRegister->RegisterComponent<GPUSoftBodyComponent>();
     
     m_sceneHolder = std::make_unique<SceneHolder>();
     m_sceneHolder->Initialize();
     return true;
 }
 
-bool Engine::BeginFrame() const
+bool Engine::BeginFrame()
 {
     m_resourceManager->UpdateResourceToSend();
     m_sceneHolder->PreFrame(m_renderer.get());
@@ -95,6 +99,7 @@ bool Engine::BeginFrame() const
     if (!m_renderer->BeginFrame())
         return false;
 
+    m_frameInProgress = true;
     return true;
 }
 
@@ -104,8 +109,21 @@ void Engine::Update()
     auto currentTime = std::chrono::high_resolution_clock::now();
     m_deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
     lastTime = currentTime;
-    
-    m_sceneHolder->Update(m_deltaTime);
+
+    if (!m_sceneHolder->GetCurrentScene())
+        return;
+    m_sceneHolder->GetCurrentScene()->UpdateEditorCamera(m_deltaTime);
+    switch (m_runtimeMode)
+    {
+    case RuntimeMode::Edit:
+        m_sceneHolder->UpdateEditor(m_deltaTime);
+        break;
+    case RuntimeMode::Play:
+        m_sceneHolder->UpdateRuntime(m_deltaTime);
+        break;
+    case RuntimeMode::Pause:
+        break;
+    }
 }
 
 void Engine::Render()
@@ -116,6 +134,7 @@ void Engine::Render()
 void Engine::EndFrame()
 {
     m_renderer->EndFrame();
+    m_frameInProgress = false;
 }
 
 void Engine::WaitBeforeClean()
@@ -136,6 +155,57 @@ void Engine::Cleanup()
     ThreadPool::Terminate();
 
     m_window->Terminate();
+}
+
+void Engine::ApplyRuntimeMode(RuntimeMode mode)
+{
+    if (m_runtimeMode == mode)
+        return;
+
+    if (m_sceneHolder)
+    {
+        if (mode == RuntimeMode::Play && m_runtimeMode == RuntimeMode::Edit)
+            m_sceneHolder->BeginPlay();
+        else if (mode == RuntimeMode::Edit && m_runtimeMode != RuntimeMode::Edit)
+            m_sceneHolder->EndPlay();
+    }
+
+    m_runtimeMode = mode;
+}
+
+void Engine::SetRuntimeMode(RuntimeMode mode)
+{
+    if (m_runtimeMode == mode && m_pendingRuntimeMode == RuntimeMode::Count)
+        return;
+
+    if (m_pendingRuntimeMode == mode)
+        return;
+
+    if (m_frameInProgress)
+    {
+        m_pendingRuntimeMode = mode;
+
+        if (m_pendingRuntimeModeCallback == UUID_INVALID)
+        {
+            m_pendingRuntimeModeCallback = m_renderer->AddAfterRenderCallback([this]()
+            {
+                m_pendingRuntimeModeCallback = UUID_INVALID;
+
+                if (m_pendingRuntimeMode == RuntimeMode::Count)
+                    return;
+
+                const RuntimeMode pendingMode = m_pendingRuntimeMode;
+                m_pendingRuntimeMode = RuntimeMode::Count;
+
+                m_renderer->WaitForGPU();
+
+                ApplyRuntimeMode(pendingMode);
+            });
+        }
+        return;
+    }
+
+    ApplyRuntimeMode(mode);
 }
 
 Engine* Engine::Get()

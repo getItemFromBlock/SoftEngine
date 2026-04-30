@@ -9,7 +9,7 @@
 #include "Scene/GameObject.h"
 #include "Scene/Scene.h"
 
-Hierarchy::Hierarchy(Engine* engine, ImGuiHandler* handler): EditorWindow(handler)
+Hierarchy::Hierarchy(Engine* engine, ImGuiHandler* handler): EditorWindow("Hierarchy", handler)
 {
     m_sceneHolder = engine->GetSceneHolder();
     EOnObjectRightClicked.Bind(std::bind(&Hierarchy::SetRightClickedObject, this, std::placeholders::_1));

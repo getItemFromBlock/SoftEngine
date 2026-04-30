@@ -29,7 +29,7 @@ void Mesh::CreateFrom(float *vertices, uint32_t verticeCount, uint32_t *indices,
         std::copy(indices, indices + indiceCount, m_indices.data());
     }
     SubMesh m;
-    m.count = m_vertices.size();
+    m.count = static_cast<uint32_t>(m_vertices.size());
     m.startIndex = 0;
     m_subMeshes.clear();
     m_subMeshes.push_back(m);
@@ -89,7 +89,7 @@ void Mesh::Unload()
 
 bool Mesh::Exists() const
 {
-    return File::Exist(p_path.parent_path());
+    return File::Exists(p_path.parent_path());
 }
 
 void Mesh::ComputeBoundingBox(const std::vector<Vec3f>& positionVertices)

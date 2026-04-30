@@ -30,6 +30,11 @@ void TransformComponent::OnUpdate(float deltaTime)
     UpdateMatrix();
 }
 
+void TransformComponent::OnGameUpdate(float deltaTime)
+{
+    OnUpdate(deltaTime);
+}
+
 Mat4 TransformComponent::GetWorldMatrix() const
 {
     return m_modelMatrix;

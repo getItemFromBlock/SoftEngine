@@ -12,6 +12,7 @@
 
 class Material;
 class Mesh;
+class SceneSerializer;
 
 struct BodySettings
 {
@@ -62,7 +63,7 @@ struct ConnectionData
     float initialLength;
 };
 
-struct InstanceData
+struct SoftBodyInstanceData
 {
     Vec3f localPosition;
     float localScale;
@@ -76,7 +77,7 @@ public:
 
     void Describe(ClassDescriptor& d) override;
     void OnCreate() override;
-    void OnUpdate(float deltaTime) override;
+    void OnGameUpdate(float deltaTime) override;
     void OnRender(VulkanRenderer* renderer) override;
     void OnDestroy() override;
 
@@ -85,9 +86,22 @@ public:
     
     void CreateFromMesh(SafePtr<Mesh> inputMesh);
 
+    bool IsLoadedFromMesh() const { return m_loadedFromMesh; }
+    SafePtr<Mesh> GetInitializerMesh() const { return m_initializerMesh; }
+    
+    bool GetDrawDebug() const { return m_drawDebug; }
+    void SetDrawDebug(bool drawDebug) { m_drawDebug = drawDebug; }
+    
     SafePtr<Material> GetMaterial() const { return m_material; }
     SafePtr<Mesh> GetMesh() const { return m_mesh; }
 private:
+    friend class SceneSerializer;
+
+    void ReleaseGPUResources(std::unique_ptr<VulkanBuffer> particleBuffer,
+        std::shared_ptr<Mesh> mesh = {},
+        std::unique_ptr<ComputeDispatch> simulationCompute0 = {},
+        std::unique_ptr<ComputeDispatch> simulationCompute1 = {});
+    
     void CreateParticleBuffers();
     void CreateSkinnedMesh(std::vector<WeightedVertex> &vertices, std::vector<uint32_t> &indices);
     void MapMeshToParticles(std::vector<WeightedVertex> &vertices);
@@ -129,5 +143,5 @@ private:
     Seed m_seed;
     BodySettings m_particleSettings;
 
-    int m_meshDensity;
+    float m_meshDensity;
 };
