@@ -143,5 +143,5 @@ private:
     Seed m_seed;
     BodySettings m_particleSettings;
 
-    int m_meshDensity;
+    float m_meshDensity;
 };

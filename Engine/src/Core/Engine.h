@@ -21,7 +21,8 @@ public:
     {
         Edit,
         Play,
-        Pause
+        Pause,
+        Count
     };
 
     static Engine* Create();
@@ -57,7 +58,7 @@ private:
     
     float m_deltaTime = 0.0f;
     RuntimeMode m_runtimeMode = RuntimeMode::Edit;
-    std::optional<RuntimeMode> m_pendingRuntimeMode;
+    RuntimeMode m_pendingRuntimeMode = RuntimeMode::Count;
     Core::UUID m_pendingRuntimeModeCallback = UUID_INVALID;
     bool m_frameInProgress = false;
 };

@@ -801,7 +801,7 @@ void Inspector::RenderFVec3Property(const Property& property, const std::string&
         changed = ImGui::SliderFloat3(id.c_str(), &value.x, property.range.floatRange.minFloat,
                                       property.range.floatRange.maxFloat);
     else
-        changed = ImGui::DragFloat3(id.c_str(), &value.x, 0.1f);
+        changed = ImGui::DragFloat3(id.c_str(), &value.x, 0.01f);
 
     if (changed)
     {
@@ -1305,7 +1305,7 @@ void Inspector::AddListElement(const Property& property)
 
 void Inspector::DisplayAddComponentPopup() const
 {
-    std::unordered_map<ComponentID, ComponentTypeInfo> componentList = Engine::Get()->GetComponentRegister()->
+    const std::unordered_map<ComponentID, ComponentTypeInfo>& componentList = Engine::Get()->GetComponentRegister()->
         GetComponentTypes();
     if (ImGui::BeginPopup("Add Component"))
     {

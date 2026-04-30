@@ -102,12 +102,6 @@ std::string Platform::SaveDialog(const std::vector<Filter>& filters,
     {
         resultString = std::string(outPath.get());
     }
-    else if (result == NFD_CANCEL)
-    {
-    }
-    else
-    {
-    }
 
     // NFD::Guard will automatically quit NFD.
     return resultString;
@@ -135,20 +129,13 @@ std::string Platform::OpenDialog(const std::vector<Filter>& filters,
     }
 
     // show the dialog
-
     const nfdresult_t result = NFD::OpenDialog(outPath, filterItems.data(), static_cast<uint32_t>(count),
                                                defaultOpenPath.generic_string().c_str());
     if (result == NFD_OKAY)
     {
         resultString = std::string(outPath.get());
     }
-    else if (result == NFD_CANCEL)
-    {
-    }
-    else
-    {
-    }
-
+    
     // NFD::Guard will automatically quit NFD.
     return resultString;
 }

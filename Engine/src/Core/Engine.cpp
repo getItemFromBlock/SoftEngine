@@ -175,10 +175,10 @@ void Engine::ApplyRuntimeMode(RuntimeMode mode)
 
 void Engine::SetRuntimeMode(RuntimeMode mode)
 {
-    if (m_runtimeMode == mode && !m_pendingRuntimeMode.has_value())
+    if (m_runtimeMode == mode && m_pendingRuntimeMode == RuntimeMode::Count)
         return;
 
-    if (m_pendingRuntimeMode.has_value() && *m_pendingRuntimeMode == mode)
+    if (m_pendingRuntimeMode == mode)
         return;
 
     if (m_frameInProgress)
@@ -191,11 +191,11 @@ void Engine::SetRuntimeMode(RuntimeMode mode)
             {
                 m_pendingRuntimeModeCallback = UUID_INVALID;
 
-                if (!m_pendingRuntimeMode.has_value())
+                if (m_pendingRuntimeMode == RuntimeMode::Count)
                     return;
 
-                const RuntimeMode pendingMode = *m_pendingRuntimeMode;
-                m_pendingRuntimeMode.reset();
+                const RuntimeMode pendingMode = m_pendingRuntimeMode;
+                m_pendingRuntimeMode = RuntimeMode::Count;
 
                 m_renderer->WaitForGPU();
 
