@@ -20,7 +20,7 @@
 using namespace ProceduralSoftBody;
 
 // Aligns an integer to the next nearest memory aligned value. Alignement MUST be a power of two!
-uint64_t align(uint64_t value, uint64_t alignement)
+size_t align(size_t value, size_t alignement)
 {
     ASSERT(((alignement-1) & alignement) == 0);
     return (value + alignement - 1) & ~(alignement - 1);
@@ -196,6 +196,9 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
         {
             for (int j = -1; j < 2; j++)
             {
+                if (i == 0 && j == 0)
+                    continue;
+
                 const auto &neighbor = m_chunks.find(source.iPos + Vec2i(i, j));
                 if (neighbor != m_chunks.end())
                 {
@@ -457,7 +460,7 @@ void ProceduralSoftBodyComponent::MapMeshToParticles(CPUChunkData &data, std::ve
         {
             Vec2i iPos = data.iPos + Vec2i(i, j);
             if (!m_preChunkData.contains(iPos))
-                PrecreateChunk(iPos);
+                PreGenChunk(iPos);
             maps[counter++] = &m_preChunkData[iPos];
         }
     }
@@ -488,15 +491,16 @@ void ProceduralSoftBodyComponent::MapMeshToParticles(CPUChunkData &data, std::ve
                 if (cu && y > 0)
                     break;
 
-                const std::vector<HeightPointData> &particles = *(maps[x*2+y]);
-                for (uint32_t l = 0; l < particles.size(); l++)
+                const ProceduralSoftBody::PreChunkData &chunkData = *(maps[x*2+y]);
+                for (uint32_t l = 0; l < chunkData.heightMap.size(); l++)
                 {
-                    Vec3f pos2 = particles[l].pos;
+                    const uint32_t particleID = chunkData.heightMap[l];
+                    Vec3f pos2 = chunkData.positions[particleID];
                     float d = pos2.Distance(pos);
                     if (count < closests.size())
                     {
                         ParticleDist p;
-                        p.id = particles[l].id;
+                        p.id = particleID;
                         p.dist = d;
                         p.pos = pos2;
                         closests[count] = p;
@@ -511,7 +515,7 @@ void ProceduralSoftBodyComponent::MapMeshToParticles(CPUChunkData &data, std::ve
                             {
                                 closests[count - n] = closests[count - n - 1];
                             }
-                            closests[m].id = particles[l].id;
+                            closests[m].id = particleID;
                             closests[m].dist = d;
                             closests[m].pos = pos2;
                             break;
@@ -559,48 +563,15 @@ void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParti
     const int32_t maxL = m_particleSettings.general.connectionStrength;
     const float heightDelta = 1.0f / std::max(amount.x, amount.y);
 
-    std::unordered_map<Vec3i, uint32_t, Vec3iHash> tmpParticles;
-    std::vector<HeightPointData> heightMap;
-    const bool exist = m_heightData.contains(chunkID);
+    if (!m_preChunkData.contains(chunkID))
+        PreGenChunk(chunkID);
+    const ProceduralSoftBody::PreChunkData &data = m_preChunkData[chunkID];
 
-    for (int32_t i = 0; i < amount.x; i++)
-    {
-        float posX = (i + 0.5f) / amount.x;
-        for (int32_t k = 0; k < amount.y; k++)
-        {
-            float posZ = (k + 0.5f) / amount.y;
-            float height = GetHeightAt(posX + chunkID.x * CHUNK_SIZE, posZ + chunkID.y * CHUNK_SIZE);
-
-            int j = 0;
-            for (float posY = -0.5f; posY < height; posY += heightDelta)
-            {
-                const Vec3f pos = Vec3f(posX, posY, posZ);
-                if (!exist && posY + heightDelta >= height)
-                {
-                    HeightPointData d;
-                    d.id = particles.size();
-                    d.pos = pos;
-                    heightMap.push_back(d);
-                }
-
-                PSBParticleData particle = {};
-                particle.position = pos;
-                particle.originalPos = pos;
-
-                tmpParticles[Vec3i(i, j++, k)] = particles.size();
-                particles.push_back(particle);
-            }
-        }
-    }
-
-    if (!exist)
-        m_heightData[chunkID] = heightMap;
-
-    for (auto particleID : tmpParticles)
+    for (const auto &particleID : data.positionsMap)
     {
         auto &particle = particles[particleID.second];
 
-        if (particle.originalPos.y == -0.5f)
+        if (particle.originalPos.y <= -0.5f)
             continue;
 
         particle.connectionsOffset = (uint32_t)connections0.size();
@@ -615,20 +586,50 @@ void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParti
                     if (l == 0 && m == 0 && n == 0)
                         continue;
 
-                    const Vec3f p = Vec3f(l, m, n) + particleID.first;
-                    if (!tmpParticles.contains(p))
+                    const Vec3i p = Vec3f(l, m, n) + particleID.first;
+                    if (!data.positionsMap.contains(p))
                     {
-                        // TODO deal with neighbor chunk particles
-                        Vec2i otherChunk = chunkID + Vec2i(l > 0 ? );
+                        const Vec2i amount = m_particleSettings.general.particleAmount;
+                        Vec2i otherChunk;
+                        Vec3i otherP = p;
+                        if (p.x < 0)
+                        {
+                            otherChunk.x--;
+                            otherP.x += amount.x;
+                        }
+                        else if (p.x >= amount.x)
+                        {
+                            otherChunk.x++;
+                            otherP.x -= amount.x;
+                        }
+                        if (p.z < 0)
+                        {
+                            otherChunk.y--;
+                            otherP.z += amount.y;
+                        }
+                        else if (p.z >= amount.y)
+                        {
+                            otherChunk.y++;
+                            otherP.z -= amount.y;
+                        }
+
+                        ASSERT(otherChunk != p);
+                        if (!m_preChunkData.contains(otherChunk + chunkID))
+                            PreGenChunk(otherChunk + chunkID);
+                        const ProceduralSoftBody::PreChunkData &otherChunkData = m_preChunkData[otherChunk + chunkID];
+                        ASSERT(otherChunkData.positionsMap.contains(otherP));
+
                         PConnectionData1 c;
-                        c.particleID = index1;
-                        c.initialLength = (particle.originalPos - particles[index1].originalPos).Length();
-                        connections0.push_back(c);
+                        c.particleID = otherChunkData.positionsMap[otherP];
+                        c.chunkID = otherChunk;
+                        c.originalPos = otherChunkData.positions[c.particleID];
+                        c.initialLength = (particle.originalPos - c.originalPos + Vec3f()).Length();
+                        connections1.push_back(c);
 
                         continue;
                     }
 
-                    const uint32_t index1 = tmpParticles[p];
+                    const uint32_t index1 = data.positionsMap[p];
                     if (particleID.second == index1)
                         continue;
 
@@ -688,7 +689,7 @@ void ProceduralSoftBodyComponent::CreateChunkAt(Vec2i pos)
     m_chunks[pos] = data;
 }
 
-void ProceduralSoftBodyComponent::PrecreateChunk(const Vec2i &chunkID)
+void ProceduralSoftBodyComponent::PreGenChunk(const Vec2i &chunkID)
 {
     if (m_preChunkData.contains(chunkID))
         return;
@@ -706,6 +707,7 @@ void ProceduralSoftBodyComponent::PrecreateChunk(const Vec2i &chunkID)
             const float posZ = (k + 0.5f) / amount.y;
             const float height = GetHeightAt(posX + chunkID.x * CHUNK_SIZE, posZ + chunkID.y * CHUNK_SIZE);
 
+            int j = 0;
             for (float posY = -0.5f; posY < height; posY += heightDelta)
             {
                 const Vec3f pos = Vec3f(posX, posY, posZ);
@@ -713,6 +715,7 @@ void ProceduralSoftBodyComponent::PrecreateChunk(const Vec2i &chunkID)
                 {
                     chunkData.heightMap.push_back(chunkData.positions.size());
                 }
+                chunkData.positionsMap[Vec3i(i, j++, k)] = chunkData.positions.size();
                 chunkData.positions.push_back(pos);
             }
         }

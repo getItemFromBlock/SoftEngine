@@ -115,12 +115,6 @@ namespace ProceduralSoftBody
         uint32_t occupied;
     };
 
-    struct PreChunkData
-    {
-        std::vector<uint32_t>   heightMap;
-        std::vector<Vec3f>      positions;
-    };
-
     struct CopyRequest
     {
         VkDeviceSize offsetP;
@@ -146,6 +140,13 @@ namespace ProceduralSoftBody
                 (std::hash<int>()(k.z) << 1);
         }
     };
+
+    struct PreChunkData
+    {
+        std::vector<uint32_t>   heightMap;
+        std::vector<Vec3f>      positions;
+        std::unordered_map<Vec3i, uint32_t, Vec3iHash> positionsMap;
+    };
 }
 
 class ProceduralSoftBodyComponent : public IComponent
@@ -169,7 +170,7 @@ private:
     void InitializeParticleData(std::vector<ProceduralSoftBody::PSBParticleData> &particles,
                                 std::vector<ProceduralSoftBody::PConnectionData0> &connections0,
                                 std::vector<ProceduralSoftBody::PConnectionData1> &connections1, const Vec2i &chunkID);
-    void PrecreateChunk(const Vec2i &chunkID);
+    void PreGenChunk(const Vec2i &chunkID);
 
     Vec2i GetChunkPos(Vec3f pos);
     float GetHeightAt(float posX, float posZ);
