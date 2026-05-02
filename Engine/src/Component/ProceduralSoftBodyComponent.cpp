@@ -471,6 +471,7 @@ void ProceduralSoftBodyComponent::MapMeshToParticles(CPUChunkData &data, std::ve
         {
             Vec3f pos;
             uint32_t id;
+            uint32_t neighbor;
             float dist;
         };
 
@@ -503,6 +504,9 @@ void ProceduralSoftBodyComponent::MapMeshToParticles(CPUChunkData &data, std::ve
                         p.id = particleID;
                         p.dist = d;
                         p.pos = pos2;
+                        p.neighbor = (x+1) * 3 + (y+1);
+                        if (p.neighbor == 4)
+                            p.neighbor = -1;
                         closests[count] = p;
                         count++;
                         continue;
@@ -516,6 +520,9 @@ void ProceduralSoftBodyComponent::MapMeshToParticles(CPUChunkData &data, std::ve
                                 closests[count - n] = closests[count - n - 1];
                             }
                             closests[m].id = particleID;
+                            closests[m].neighbor = (x + 1) * 3 + (y + 1);
+                            if (closests[m].neighbor == 4)
+                                closests[m].neighbor = -1;
                             closests[m].dist = d;
                             closests[m].pos = pos2;
                             break;
@@ -553,6 +560,7 @@ void ProceduralSoftBodyComponent::MapMeshToParticles(CPUChunkData &data, std::ve
         else
             vertices[i].weights = Vec4f(weights / l, 0.0f);
         vertices[i].indices = Vec4i(closests[0].id, closests[1].id, closests[2].id, -1);
+        vertices[i].neightbor = Vec4i(closests[0].neighbor, closests[1].neighbor, closests[2].neighbor, -1);
     }
 }
 
@@ -620,8 +628,9 @@ void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParti
                         ASSERT(otherChunkData.positionsMap.contains(otherP));
 
                         PConnectionData1 c;
-                        c.particleID = otherChunkData.positionsMap[otherP];
-                        c.chunkID = otherChunk;
+                        c.particleID = otherChunkData.positionsMap.at(otherP);
+                        c.chunkID = (otherChunk.x+1)*3+(otherChunk.y+1);
+                        if (c.chunkID > 4) c.chunkID--;
                         c.originalPos = otherChunkData.positions[c.particleID];
                         c.initialLength = (particle.originalPos - c.originalPos + Vec3f()).Length();
                         connections1.push_back(c);
@@ -629,7 +638,7 @@ void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParti
                         continue;
                     }
 
-                    const uint32_t index1 = data.positionsMap[p];
+                    const uint32_t index1 = data.positionsMap.at(p);
                     if (particleID.second == index1)
                         continue;
 

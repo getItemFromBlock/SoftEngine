@@ -29,6 +29,7 @@ struct WeightedVertex
     Vec4f tangent;
     Vec4i indices;
     Vec4f weights;
+    Vec4i neightbor;
 };
 
 struct SubMesh

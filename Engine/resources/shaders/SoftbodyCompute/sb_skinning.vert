@@ -6,6 +6,7 @@ layout(location = 2) in vec3 inNormal;
 layout(location = 3) in vec4 inTangent;
 layout(location = 4) in ivec4 inIndices;
 layout(location = 5) in vec4 inWeights;
+layout(location = 6) in ivec4 inChunks;
 
 struct ParticleData {
     vec3 position;
