@@ -3,6 +3,7 @@
 
 #include "Component/MeshComponent.h"
 #include "Component/GPUSoftBodyComponent.h"
+#include "Component/ProceduralSoftBodyComponent.h"
 #include "Component/TestComponent.h"
 #include "Component/TransformComponent.h"
 #include "Component/LightComponent.h"
@@ -155,9 +156,13 @@ void Editor::Run()
 
             auto go1 = currentScene->CreateGameObject();
             go1->SetName("SoftBody");
-            auto soft = go1->AddComponent<GPUSoftBodyComponent>();
-            soft->CreateFromMesh(
+            auto soft1 = go1->AddComponent<GPUSoftBodyComponent>();
+            soft1->CreateFromMesh(
                 m_engine->GetResourceManager()->Load<Mesh>(RESOURCE_PATH"/models/Barrel.obj/Cylinder.mesh"));
+
+            auto go2 = currentScene->CreateGameObject();
+            go2->SetName("ProceduralSoftBody");
+            auto soft2 = go2->AddComponent<ProceduralSoftBodyComponent>();
         }
 
         m_window->PollEvents();

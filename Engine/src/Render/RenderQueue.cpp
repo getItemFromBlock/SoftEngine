@@ -48,12 +48,14 @@ void RenderQueue::Submit(const RenderCommand& command)
 void RenderQueue::SubmitMeshRenderer(GameObject* gameObject, Mesh* mesh,
                                      const std::vector<SafePtr<Material>>& materials)
 {
+    SubmitMeshRenderer(gameObject->GetTransform()->GetWorldMatrix(), mesh, materials);
+}
+
+void RenderQueue::SubmitMeshRenderer(const Mat4 &modelMat, Mesh *mesh, const std::vector<SafePtr<Material>> &materials)
+{
     if (!mesh || !mesh->IsLoaded() || !mesh->HasBeenSent() ||
         !mesh->GetVertexBuffer() || !mesh->GetIndexBuffer())
         return;
-
-    auto transformComponent = gameObject->GetComponent<TransformComponent>();
-    auto model = transformComponent->GetWorldMatrix();
 
     size_t materialCount = materials.size();
     auto subMeshes = mesh->GetSubMeshes();
@@ -63,7 +65,7 @@ void RenderQueue::SubmitMeshRenderer(GameObject* gameObject, Mesh* mesh,
         if (subMeshes[i].count == 0 || materialCount == 0)
             continue;
         size_t materialIndex = i % materialCount;
-        auto& material = materials[materialIndex];
+        auto &material = materials[materialIndex];
 
         if (!material)
             continue;
@@ -76,7 +78,7 @@ void RenderQueue::SubmitMeshRenderer(GameObject* gameObject, Mesh* mesh,
         cmd.indexCount = subMeshes[i].count;
         cmd.material = material.getPtr();
         cmd.shader = material->GetShader().getPtr();
-        cmd.modelMatrix = model;
+        cmd.modelMatrix = modelMat;
         cmd.albedoTexture = material->GetTexture("albedoSampler");
         cmd.normalTexture = material->GetTexture("normalSampler");
         cmd.roughnessTexture = material->GetTexture("roughnessSampler");
@@ -412,7 +414,7 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
             chunkBuffer.buffer->UpdateDataAtOffset(&cmd.chunkData, sizeof(RenderCommand::ChunkRenderData), chunkOffset, 0);
             chunkBuffer.offset += m_chunkDataStride;
 
-            PushUBO(2, chunkVkBuffer, chunkOffset, sizeof(RenderCommand::ChunkRenderData));
+            PushUBO(9, chunkVkBuffer, chunkOffset, sizeof(RenderCommand::ChunkRenderData));
         }
 
         auto PushTexture = [&](SafePtr<Texture>& tex, uint32_t binding)

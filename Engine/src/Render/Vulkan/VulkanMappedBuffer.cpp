@@ -47,6 +47,7 @@ void VulkanMappedBuffer::FlushData(VkDeviceSize offset, VkDeviceSize size)
     ASSERT(m_mappedBuffer != nullptr);
 
     VkMappedMemoryRange stagingRange = {};
+    stagingRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
     stagingRange.memory = m_stagingBuffer.GetBufferMemory();
     stagingRange.offset = offset;
     stagingRange.size = size;

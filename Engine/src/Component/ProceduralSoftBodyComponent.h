@@ -26,7 +26,7 @@ namespace ProceduralSoftBody
             Vec2i surfacePoints = Vec2i(8, 8);
             float damping = 1.0f;
             float strength = 300.0f;
-            uint32_t connectionStrength = 2;
+            uint32_t connectionStrength = 1;
         } general;
 
         struct SphereData
@@ -46,7 +46,7 @@ namespace ProceduralSoftBody
         Vec3f originalPos;
         uint32_t connectionsLOffset;
         uint32_t connectionsLCount;
-        uint32_t _padding[3];
+        uint32_t _paddingA, _paddingB, _paddingC;
     };
 
     struct PConnectionData0
@@ -61,7 +61,7 @@ namespace ProceduralSoftBody
         uint32_t chunkID;
         uint32_t particleID;
         float initialLength;
-        float _padding[2];
+        uint32_t _paddingA, _paddingB;
     };
 
     struct GPUNeighborData
@@ -78,7 +78,7 @@ namespace ProceduralSoftBody
         uint32_t    particleCount;
         uint32_t    connectionOffset;
         uint32_t    connectionLOffset;
-        float       _padding;
+        uint32_t       _padding;
     };
 
     struct GPUCommonData
@@ -89,7 +89,7 @@ namespace ProceduralSoftBody
         float   deltaTime;
         float   damping;
         float   strength;
-        float   _padding[2];
+        uint32_t   _paddingA, _paddingB;
     };
 
     struct CPUChunkData
@@ -103,8 +103,8 @@ namespace ProceduralSoftBody
         uint32_t globalOffsetP;
         uint32_t globalOffsetC;
         uint32_t globalOffsetL;
-        uint32_t neighbors[8];
         uint32_t particleCount;
+        uint32_t neighbors[8];
     };
 
     struct BufferChunk
@@ -204,7 +204,9 @@ private:
     std::unordered_map<Vec2i, ProceduralSoftBody::PreChunkData, ProceduralSoftBody::Vec2iHash> m_preChunkData;
 
     SafePtr<Mesh> m_billboardMesh;
+    SafePtr<Mesh> m_sphereMesh;
     SafePtr<Material> m_material;
+    std::vector<SafePtr<Material>> m_sphereMaterial;
     SafePtr<Material> m_billboardMaterial;
 
     bool m_drawDebug = false;

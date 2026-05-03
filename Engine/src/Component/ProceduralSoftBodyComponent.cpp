@@ -9,22 +9,16 @@
 #include "Scene/GameObject.h"
 #include "Utils/Color.h"
 #include "Utils/Random.h"
+#include "Utils/Memory.h"
 
 #define MAX_PARTICLE_COUNT 0x100000
-#define MAX_CONNECTION_COUNT 0x400000
-#define MAX_CONNECTIONL_COUNT 0x40000
+#define MAX_CONNECTION_COUNT 0x1000000
+#define MAX_CONNECTIONL_COUNT 0x100000
 #define MAX_CHUNK_BUFFER_SIZE 0x10
 #define MAX_CHUNK_BUFFER_COUNT 0x40
 #define CHUNK_SIZE 2.0f
 
 using namespace ProceduralSoftBody;
-
-// Aligns an integer to the next nearest memory aligned value. Alignement MUST be a power of two!
-size_t align(size_t value, size_t alignement)
-{
-    ASSERT(((alignement-1) & alignement) == 0);
-    return (value + alignement - 1) & ~(alignement - 1);
-}
 
 void ProceduralSoftBodyComponent::Describe(ClassDescriptor& d)
 {
@@ -61,11 +55,10 @@ void ProceduralSoftBodyComponent::OnCreate()
     auto instancingShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/sb_instancing.shader");
     auto skinnedShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/sb_skinning.shader");
 
-    m_billboardMaterial = resourceManager->CreateMaterial("PSoftbodyInstancing");
-    m_billboardMaterial->SetShader(instancingShader);
+    m_billboardMaterial = resourceManager->CreateMaterial("PSoftbodyInstancing", instancingShader);
     m_billboardMaterial->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
     
-    m_material = resourceManager->CreateMaterial("SoftbodySkinned", skinnedShader);
+    m_material = resourceManager->CreateMaterial("PSoftbodySkinned", skinnedShader);
     m_material->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
     m_material->SetAttribute("normalSampler", resourceManager->GetDefaultNormal());
     m_material->SetAttribute("roughnessSampler", resourceManager->GetBlankTexture());
@@ -80,6 +73,8 @@ void ProceduralSoftBodyComponent::OnCreate()
     m_material->SetAttribute("material.heightScale", 0.0f);
 
     m_billboardMesh = resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cube.obj/Cube.mesh");
+    m_sphereMesh = resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Sphere.obj/Sphere.mesh");
+    m_sphereMaterial = { resourceManager->Load<Material>(RESOURCE_PATH"/materials/pbr.mat") };
 
     computeShader0->EOnSentToGPU.Bind([this, computeShader0, renderer]()
         {
@@ -90,6 +85,16 @@ void ProceduralSoftBodyComponent::OnCreate()
         {
             m_simulationCompute1 = computeShader1->CreateDispatch(renderer);
         });
+
+    CreateParticleBuffers();
+
+    for (int i = -5; i <= 5; i++)
+    {
+        for (int j = -5; j <= 5; j++)
+        {
+            CreateChunkAt(Vec2i(i, j));
+        }
+    }
 }
 
 void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
@@ -99,6 +104,7 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
 
     Vec3f cameraPos = Engine::Get()->GetSceneHolder()->GetCurrentScene()->GetCameraData().position;
 
+    /*
     for (auto &chunk : m_chunks)
     {
         Vec3f delta = chunk.second.localPosition - cameraPos;
@@ -108,7 +114,7 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
             DeleteChunk(chunk.second.iPos);
         }
     }
-
+    */
     auto renderer = Engine::Get()->GetRenderer();
     VkCommandBuffer cmd = renderer->GetCommandBuffer();
 
@@ -118,19 +124,19 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
         VkBufferCopy *regions = reinterpret_cast<VkBufferCopy*>(malloc(stride * 3));
         for (uint32_t i = 0; i < copyRequests.size(); i++)
         {
-            regions[i].size = copyRequests[i].sizeP;
-            regions[i + stride].size = copyRequests[i].sizeC;
-            regions[i + stride*2].size = copyRequests[i].sizeL;
-            regions[i].srcOffset = copyRequests[i].offsetP;
-            regions[i + stride].srcOffset = copyRequests[i].offsetC;
-            regions[i + stride*2].srcOffset = copyRequests[i].offsetL;
-            regions[i].dstOffset = copyRequests[i].offsetP;
-            regions[i + stride].dstOffset = copyRequests[i].offsetC;
-            regions[i + stride*2].dstOffset = copyRequests[i].offsetL;
+            regions[i * 3].size = copyRequests[i].sizeP;
+            regions[i * 3 + 1].size = copyRequests[i].sizeC;
+            regions[i * 3 + 2].size = copyRequests[i].sizeL;
+            regions[i * 3].srcOffset = copyRequests[i].offsetP;
+            regions[i * 3 + 1].srcOffset = copyRequests[i].offsetC;
+            regions[i * 3 + 2].srcOffset = copyRequests[i].offsetL;
+            regions[i * 3].dstOffset = copyRequests[i].offsetP;
+            regions[i * 3 + 1].dstOffset = copyRequests[i].offsetC;
+            regions[i * 3 + 2].dstOffset = copyRequests[i].offsetL;
         }
-        vkCmdCopyBuffer(cmd, m_particleBuffer.GetStagingBuffer(), m_particleBuffer.GetBuffer(), copyRequests.size(), regions);
-        vkCmdCopyBuffer(cmd, m_connectionBuffer.GetStagingBuffer(), m_connectionBuffer.GetBuffer(), copyRequests.size(), regions + stride);
-        vkCmdCopyBuffer(cmd, m_connectionBufferL.GetStagingBuffer(), m_connectionBufferL.GetBuffer(), copyRequests.size(), regions + stride*2);
+        vkCmdCopyBuffer(cmd, m_particleBuffer.GetStagingBuffer(), m_particleBuffer.GetBuffer(), (uint32_t)copyRequests.size(), regions);
+        vkCmdCopyBuffer(cmd, m_connectionBuffer.GetStagingBuffer(), m_connectionBuffer.GetBuffer(), (uint32_t)copyRequests.size(), regions + copyRequests.size());
+        vkCmdCopyBuffer(cmd, m_connectionBufferL.GetStagingBuffer(), m_connectionBufferL.GetBuffer(), (uint32_t)copyRequests.size(), regions + copyRequests.size()*2);
 
         VkBufferMemoryBarrier barriers[3] = {};
         barriers[0].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
@@ -155,6 +161,8 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
             VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             0, 0, nullptr, 3, barriers, 0, nullptr);
+
+        free(regions);
     }
 
     VulkanMaterial* mat0 = m_simulationCompute0->GetMaterial();
@@ -342,7 +350,8 @@ void ProceduralSoftBodyComponent::OnRender(VulkanRenderer* renderer)
                 }
                 else
                 {
-                    data.neighbors[index].pos = Vec3f();
+                    // Making sure that particles depending on this chunk can still compute forces properly using the originalPos field of the connection
+                    data.neighbors[index].pos = Vec3f((source.iPos.x + i) * CHUNK_SIZE, 0.0f, (source.iPos.y + j) * CHUNK_SIZE);
                     data.neighbors[index].offset = -1;
                 }
                 index++;
@@ -364,6 +373,9 @@ void ProceduralSoftBodyComponent::OnRender(VulkanRenderer* renderer)
                 data, 1, transform, false);
         }
     }
+
+    Mat4 worldMat = GetGameObject()->GetTransform()->GetWorldMatrix() * Mat4::CreateTranslationMatrix(Vec3f(m_particleSettings.sphereData.position));
+    queue->SubmitMeshRenderer(worldMat, m_sphereMesh.getPtr(), m_sphereMaterial);
 }
 
 void ProceduralSoftBodyComponent::OnDestroy()
@@ -387,14 +399,14 @@ void ProceduralSoftBodyComponent::CreateParticleBuffers()
 
     renderer->WaitForGPU();
 
-    VkDeviceSize alignedSizeP = align(MAX_PARTICLE_COUNT * sizeof(PSBParticleData), m_atomicBufferAlignement);
-    VkDeviceSize alignedSizeC = align(MAX_PARTICLE_COUNT * sizeof(PConnectionData0), m_atomicBufferAlignement);
-    VkDeviceSize alignedSizeL = align(MAX_PARTICLE_COUNT * sizeof(PConnectionData1), m_atomicBufferAlignement);
+    VkDeviceSize alignedSizeP = Memory::align(MAX_PARTICLE_COUNT * sizeof(PSBParticleData), m_atomicBufferAlignement);
+    VkDeviceSize alignedSizeC = Memory::align(MAX_CONNECTION_COUNT * sizeof(PConnectionData0), m_atomicBufferAlignement);
+    VkDeviceSize alignedSizeL = Memory::align(MAX_CONNECTIONL_COUNT * sizeof(PConnectionData1), m_atomicBufferAlignement);
     m_particleBuffer.Initialize(device, alignedSizeP);
     m_connectionBuffer.Initialize(device, alignedSizeC);
     m_connectionBufferL.Initialize(device, alignedSizeL);
 
-    m_chunkSize = align(sizeof(GPUCommonData) + sizeof(GPUChunkData) * MAX_CHUNK_BUFFER_SIZE, m_atomicBufferAlignement);
+    m_chunkSize = (uint32_t)Memory::align(sizeof(GPUCommonData) + sizeof(GPUChunkData) * MAX_CHUNK_BUFFER_SIZE, m_atomicBufferAlignement);
     m_chunkDataBuffer.Initialize(device, m_chunkSize * MAX_CHUNK_BUFFER_COUNT, false);
     
     m_chunkBufferOffset = 0;
@@ -471,7 +483,7 @@ void ProceduralSoftBodyComponent::MapMeshToParticles(CPUChunkData &data, std::ve
         {
             Vec3f pos;
             uint32_t id;
-            uint32_t neighbor;
+            int neighbor;
             float dist;
         };
 
@@ -567,13 +579,13 @@ void ProceduralSoftBodyComponent::MapMeshToParticles(CPUChunkData &data, std::ve
 void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParticleData> &particles, std::vector<PConnectionData0> &connections0,
                                                             std::vector<PConnectionData1> &connections1, const Vec2i &chunkID)
 {
-    const Vec2i amount = m_particleSettings.general.particleAmount;
     const int32_t maxL = m_particleSettings.general.connectionStrength;
-    const float heightDelta = 1.0f / std::max(amount.x, amount.y);
 
     if (!m_preChunkData.contains(chunkID))
         PreGenChunk(chunkID);
     const ProceduralSoftBody::PreChunkData &data = m_preChunkData[chunkID];
+
+    particles.resize(data.positions.size());
 
     for (const auto &particleID : data.positionsMap)
     {
@@ -585,16 +597,16 @@ void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParti
         particle.connectionsOffset = (uint32_t)connections0.size();
         particle.connectionsLOffset = (uint32_t)connections1.size();
 
-        for (int32_t l = -maxL; l <= maxL; l++)
+        for (int l = -maxL; l <= maxL; l++)
         {
-            for (int32_t m = -maxL; m <= maxL; m++)
+            for (int m = -maxL; m <= maxL; m++)
             {
-                for (int32_t n = -maxL; n <= maxL; n++)
+                for (int n = -maxL; n <= maxL; n++)
                 {
                     if (l == 0 && m == 0 && n == 0)
                         continue;
 
-                    const Vec3i p = Vec3f(l, m, n) + particleID.first;
+                    const Vec3i p = Vec3i(l, m, n) + particleID.first;
                     if (!data.positionsMap.contains(p))
                     {
                         const Vec2i amount = m_particleSettings.general.particleAmount;
@@ -621,11 +633,13 @@ void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParti
                             otherP.z -= amount.y;
                         }
 
-                        ASSERT(otherChunk != p);
+                        if (otherP == p)
+                            continue;
                         if (!m_preChunkData.contains(otherChunk + chunkID))
                             PreGenChunk(otherChunk + chunkID);
                         const ProceduralSoftBody::PreChunkData &otherChunkData = m_preChunkData[otherChunk + chunkID];
-                        ASSERT(otherChunkData.positionsMap.contains(otherP));
+                        if (!otherChunkData.positionsMap.contains(otherP))
+                            continue;
 
                         PConnectionData1 c;
                         c.particleID = otherChunkData.positionsMap.at(otherP);
@@ -662,9 +676,9 @@ void ProceduralSoftBodyComponent::CreateChunkAt(Vec2i pos)
     std::vector<PConnectionData1> connections1;
     InitializeParticleData(particles, connections0, connections1, pos);
 
-    const uint32_t totalSizeP = sizeof(PSBParticleData) * particles.size();
-    const uint32_t totalSizeC = sizeof(PConnectionData0) * connections0.size();
-    const uint32_t totalSizeL = sizeof(PConnectionData1) * connections1.size();
+    const uint32_t totalSizeP = (uint32_t)(sizeof(PSBParticleData) * particles.size());
+    const uint32_t totalSizeC = (uint32_t)(sizeof(PConnectionData0) * connections0.size());
+    const uint32_t totalSizeL = (uint32_t)(sizeof(PConnectionData1) * connections1.size());
 
     const BufferChunk newChunkP = AllocChunk(totalSizeP, 0);
     const BufferChunk newChunkC = AllocChunk(totalSizeC, 1);
@@ -722,9 +736,9 @@ void ProceduralSoftBodyComponent::PreGenChunk(const Vec2i &chunkID)
                 const Vec3f pos = Vec3f(posX, posY, posZ);
                 if (posY + heightDelta >= height)
                 {
-                    chunkData.heightMap.push_back(chunkData.positions.size());
+                    chunkData.heightMap.push_back((uint32_t)chunkData.positions.size());
                 }
-                chunkData.positionsMap[Vec3i(i, j++, k)] = chunkData.positions.size();
+                chunkData.positionsMap[Vec3i(i, j++, k)] = (uint32_t)chunkData.positions.size();
                 chunkData.positions.push_back(pos);
             }
         }
@@ -748,12 +762,12 @@ Vec2i ProceduralSoftBodyComponent::GetChunkPos(Vec3f pos)
 {
     const float x = pos.x / CHUNK_SIZE;
     const float y = pos.y / CHUNK_SIZE;
-    return Vec2i(std::floor(x), std::floor(y));
+    return Vec2i((int)std::floor(x), (int)std::floor(y));
 }
 
 float ProceduralSoftBodyComponent::GetHeightAt(float posX, float posZ)
 {
-    return sinf(posX * 0.4687435f + 0.76543f * posZ) * 0.25f + cosf(posX * 0.61354313 - 0.2684354 * posZ) * 0.2f + sinf(-posX * 1.23384643f + 1.4687351f * posZ) * 0.15f;
+    return 0.25f + sinf(posX * 0.4687435f + 0.76543f * posZ) * 0.25f + cosf(posX * 0.61354313f - 0.2684354f * posZ) * 0.2f + sinf(-posX * 1.23384643f + 1.4687351f * posZ) * 0.15f;
 }
 
 Vec3f ProceduralSoftBodyComponent::GetNormalAt(const Vec3f &pos, float dt)
@@ -775,7 +789,7 @@ Vec3f ProceduralSoftBodyComponent::GetNormalAt(const Vec3f &pos, float dt)
 BufferChunk ProceduralSoftBodyComponent::AllocChunk(uint32_t size, uint32_t page)
 {
     ASSERT(page < 3);
-    size = align(size, m_atomicBufferAlignement);
+    size = (uint32_t)Memory::align(size, m_atomicBufferAlignement);
     for (auto &chunk : m_memChunks[page])
     {
         if (!chunk.occupied && chunk.size >= size)
@@ -788,7 +802,7 @@ BufferChunk ProceduralSoftBodyComponent::AllocChunk(uint32_t size, uint32_t page
                 BufferChunk newChunk;
                 newChunk.offset = chunk.offset + chunk.size;
                 newChunk.size = chunk.size - size;
-                ASSERT(align(newChunk.size, m_atomicBufferAlignement) == newChunk.size);
+                ASSERT(Memory::align(newChunk.size, m_atomicBufferAlignement) == newChunk.size);
                 newChunk.occupied = 0;
                 newChunk.id = m_globalChunkCount[page]++;
                 m_memChunks[page].push_back(newChunk);

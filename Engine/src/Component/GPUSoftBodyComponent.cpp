@@ -9,13 +9,7 @@
 #include "Scene/GameObject.h"
 #include "Utils/Color.h"
 #include "Utils/Random.h"
-
-// Aligns an integer to the next nearest memory aligned value. Alignement MUST be a power of two!
-uint64_t align(uint64_t value, uint64_t alignement)
-{
-    ASSERT(((alignement-1) & alignement) == 0);
-    return (value + alignement - 1) & ~(alignement - 1);
-}
+#include "Utils/Memory.h"
 
 void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
 {
@@ -273,9 +267,9 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
 
     VkDeviceSize PBufSize = sizeof(SBParticleData) * m_particles.size();
     VkDeviceSize CBufSize = sizeof(ConnectionData) * m_connections.size();
-    PBufSizeAligned = align(PBufSize, 0x40);
+    PBufSizeAligned = Memory::align(PBufSize, 0x40);
     PBufSizeAligned = std::max(0x40llu, PBufSize);
-    CBufSizeAligned = align(CBufSize, 0x40);
+    CBufSizeAligned = Memory::align(CBufSize, 0x40);
     CBufSizeAligned = std::max(0x40llu, CBufSize);
 
     auto particleBuffer = std::make_unique<VulkanBuffer>();
