@@ -32,11 +32,7 @@ struct ChunkData
 	uint _padding;
 };
 
-layout(set = 0, binding = 0) buffer Particles {
-    ParticleData particles[];
-};
-
-layout(set = 0, binding = 3) buffer ChunkHeader {
+struct ChunkHeader {
 	vec3    spherePos;
 	float   sphereRadius;
 	vec3   gravity;
@@ -45,7 +41,19 @@ layout(set = 0, binding = 3) buffer ChunkHeader {
 	float   strength;
 	uint   _paddingA, _paddingB;
     ChunkData chunks[MAX_CHUNK_BUFFER_SIZE];
-} chunkData;
+};
+
+layout(set = 0, binding = 0) buffer Particles {
+    ParticleData particles[];
+};
+
+layout(set = 0, binding = 3) buffer ChunkHeaders {
+	ChunkHeader chunkData[];
+};
+
+layout(push_constant) uniform Push {
+    uint bufferOffset;
+} pc;
 
 
 void main()
@@ -57,13 +65,13 @@ void main()
 	uint counter = 0;
 	for	(uint i = 0; i < MAX_CHUNK_BUFFER_SIZE; i++)
 	{
-		if (chunkData.chunks[i].particleCount + counter > id)
+		if (chunkData[pc.bufferOffset].chunks[i].particleCount + counter > id)
 		{
 			chunkID = i;
-			particleID = chunkData.chunks[i].offset + id - counter;
+			particleID = chunkData[pc.bufferOffset].chunks[i].offset + id - counter;
 			break;
 		}
-		counter += chunkData.chunks[i].particleCount;
+		counter += chunkData[pc.bufferOffset].chunks[i].particleCount;
 	}
 	
     if (chunkID == MAX_CHUNK_BUFFER_SIZE)
@@ -74,17 +82,17 @@ void main()
 	
 	// Collide with sphere
 	
-	vec3 spPos = chunkData.spherePos - chunkData.chunks[chunkID].chunkPos;
+	vec3 spPos = chunkData[pc.bufferOffset].spherePos - chunkData[pc.bufferOffset].chunks[chunkID].chunkPos;
 	vec3 ab = spPos - pos;
 	
 	float f = length(ab);
-	if (f <= chunkData.sphereRadius)
+	if (f <= chunkData[pc.bufferOffset].sphereRadius)
 	{
-		vec3 dif = -normalize(ab) * (chunkData.sphereRadius - f);
-		vel += dif * chunkData.strength * 0.01;
+		vec3 dif = -normalize(ab) * (chunkData[pc.bufferOffset].sphereRadius - f);
+		vel += dif * chunkData[pc.bufferOffset].strength * 0.01;
 		pos += dif;
     }
-	pos += vel * chunkData.deltaTime;
+	pos += vel * chunkData[pc.bufferOffset].deltaTime;
 
     particles[particleID].position = pos;
 }

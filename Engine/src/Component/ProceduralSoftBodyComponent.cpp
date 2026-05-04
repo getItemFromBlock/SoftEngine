@@ -266,11 +266,12 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
         m_connectionBuffer.GetSize(), renderer);
     mat0->SetStorageBuffer( 0, 2, m_connectionBufferL.GetBuffer(), 0,
         m_connectionBufferL.GetSize(), renderer);
+    mat0->SetStorageBuffer( 0, 3, m_chunkDataBuffer.GetBuffer(), 0,
+        m_chunkSize * particleCounts.size(), renderer);
 
     for (uint32_t i = 0; i < particleCounts.size(); i++)
     {
-        mat0->SetStorageBuffer( 0, 3, m_chunkDataBuffer.GetBuffer(), i * m_chunkSize,
-            m_chunkSize, renderer);
+        mat0->SetPushConstants(renderer, &i, sizeof(uint32_t), 0);
 
         uint32_t groups = (particleCounts[i] + 63) / 64;
         mat0->DispatchCompute(renderer, groups, 1, 1);
@@ -294,11 +295,12 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
 
     mat1->SetStorageBuffer( 0, 0, m_particleBuffer.GetBuffer(), 0,
         m_particleBuffer.GetSize(), renderer);
+    mat1->SetStorageBuffer( 0, 3, m_chunkDataBuffer.GetBuffer(), 0,
+        m_chunkSize * particleCounts.size(), renderer);
 
     for (uint32_t i = 0; i < particleCounts.size(); i++)
     {
-        mat1->SetStorageBuffer( 0, 3, m_chunkDataBuffer.GetBuffer(), i * m_chunkSize,
-            m_chunkSize, renderer);
+        mat1->SetPushConstants(renderer, &i, sizeof(uint32_t), 0);
 
         uint32_t groups = (particleCounts[i] + 63) / 64;
         mat1->DispatchCompute(renderer, groups, 1, 1);
@@ -317,6 +319,8 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
         0, 0, nullptr, 1, &barrier1, 0, nullptr);
+
+    m_chunkBufferOffset = 0;
 }
 
 void ProceduralSoftBodyComponent::OnRender(VulkanRenderer* renderer)

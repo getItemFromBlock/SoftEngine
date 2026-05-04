@@ -310,6 +310,7 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
 
     m_gBufferPools[frameIndex]->Reset();
     m_materialDataBuffers[frameIndex].offset = 0;
+    m_chunkDataBuffers[frameIndex].offset = 0;
 
     auto blank = Engine::Get()->GetResourceManager()->GetBlankTexture();
     if (!blank || !blank->HasBeenSent())
