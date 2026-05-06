@@ -1,11 +1,14 @@
-﻿#include "GPUSoftBodyComponent.h"
+﻿#include <string>
+#include <format>
+
+#include "GPUSoftBodyComponent.h"
 #include "Core/Engine.h"
 
 #include "Render/Vulkan/VulkanIndexBuffer.h"
 #include "Render/Vulkan/VulkanRenderer.h"
 #include "Render/Vulkan/VulkanVertexBuffer.h"
 
-#include "Resource/Mesh.h"
+#include "Resource/Model.h"
 #include "Scene/GameObject.h"
 #include "Utils/Color.h"
 #include "Utils/Random.h"
@@ -57,11 +60,13 @@ void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
         };
 }
 
-void GPUSoftBodyComponent::CreateFromMesh(SafePtr<Mesh> inputMesh)
+void GPUSoftBodyComponent::CreateFromModel(SafePtr<Model> inputModel)
 {
-    m_initializerMesh = inputMesh;
-    m_loadedFromMesh = true;
-    InitializeParticleDataFromMesh(5, 0.5);
+    m_initializerModel = inputModel;
+    m_loadedFromModel = true;
+    InitializeParticleDataFromModel(5, m_particleSettings.general.connectionStrength);
+    InitializeMaterialsFromModel(inputModel);
+
     CreateParticleBuffers();
 }
 
@@ -90,19 +95,19 @@ void GPUSoftBodyComponent::OnCreate()
     m_billboardMaterial->SetAttribute("material.aoFactor", 1.f);
     m_billboardMaterial->SetAttribute("material.heightScale", 0.0f);
     
-    m_material = resourceManager->CreateMaterial("SoftbodySkinned", skinnedShader);
-    m_material->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
-    m_material->SetAttribute("normalSampler", resourceManager->GetDefaultNormal());
-    m_material->SetAttribute("roughnessSampler", resourceManager->GetBlankTexture());
-    m_material->SetAttribute("metalnessSampler", resourceManager->GetBlankTexture());
-    m_material->SetAttribute("aoSampler", resourceManager->GetBlankTexture());
-    m_material->SetAttribute("heightSampler", resourceManager->GetBlackTexture());
+    m_defaultMaterial = resourceManager->CreateMaterial("SoftbodySkinned default", skinnedShader);
+    m_defaultMaterial->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
+    m_defaultMaterial->SetAttribute("normalSampler", resourceManager->GetDefaultNormal());
+    m_defaultMaterial->SetAttribute("roughnessSampler", resourceManager->GetBlankTexture());
+    m_defaultMaterial->SetAttribute("metalnessSampler", resourceManager->GetBlankTexture());
+    m_defaultMaterial->SetAttribute("aoSampler", resourceManager->GetBlankTexture());
+    m_defaultMaterial->SetAttribute("heightSampler", resourceManager->GetBlackTexture());
 
-    m_material->SetAttribute("material.color", Vec4f(0.05f, 0.3f, 0.05f, 1.0f));
-    m_material->SetAttribute("material.roughnessFactor", 0.05f);
-    m_material->SetAttribute("material.metalnessFactor", 0.8f);
-    m_material->SetAttribute("material.aoFactor", 1.f);
-    m_material->SetAttribute("material.heightScale", 0.0f);
+    m_defaultMaterial->SetAttribute("material.color", Vec4f(1.0f, 0.0f, 1.0f, 1.0f));
+    m_defaultMaterial->SetAttribute("material.roughnessFactor", 0.05f);
+    m_defaultMaterial->SetAttribute("material.metalnessFactor", 0.8f);
+    m_defaultMaterial->SetAttribute("material.aoFactor", 1.f);
+    m_defaultMaterial->SetAttribute("material.heightScale", 0.0f);
 
     m_mesh = std::make_shared<Mesh>("internal");
     m_billboardMesh = resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cube.obj/Cube.mesh");
@@ -125,9 +130,9 @@ void GPUSoftBodyComponent::OnGameUpdate(float deltaTime)
     
     if (m_needsRecreation)
     {
-        if (m_loadedFromMesh)
+        if (m_loadedFromModel)
         {
-            InitializeParticleDataFromMesh(m_meshDensity, 0.5);
+            InitializeParticleDataFromModel(m_meshDensity, m_particleSettings.general.connectionStrength);
         }
         CreateParticleBuffers();
         m_needsRecreation = false;
@@ -222,7 +227,7 @@ void GPUSoftBodyComponent::OnGameUpdate(float deltaTime)
         0, 0, nullptr, 1, &barrier1, 0, nullptr);
 
     CameraData cam = p_gameObject->GetScene()->GetCameraData();
-    m_material->SetAttribute("cameraUBO.viewProj", cam.VP);
+    m_defaultMaterial->SetAttribute("cameraUBO.viewProj", cam.VP);
     if (m_drawDebug)
     {
         m_billboardMaterial->SetAttribute("cameraUBO.viewProj", cam.VP);
@@ -233,7 +238,7 @@ void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
 {
     if (!m_mesh || !m_mesh->IsLoaded() || !m_mesh->HasBeenSent()) 
         return;
-    if (!m_particleBuffer || !m_material) 
+    if (!m_particleBuffer || !m_defaultMaterial) 
         return;
 
     auto* rqm = Engine::Get()->GetRenderer()->GetRenderQueueManager();
@@ -245,17 +250,19 @@ void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
     {
         // Skinned soft body mesh
         queue->SubmitSoftBody(
-            m_mesh.get(), m_material.getPtr(),
+            m_mesh.get(), m_materials,
             m_particleBuffer->GetBuffer(), PBufSizeAligned,
             m_totalParticleCount, m_particleSettings.general.particleAmount,
             transform, /*isDebug=*/false);
     }
 
     // Debug billboard instancing (one cube per particle)
-    if (m_drawDebug && m_billboardMaterial && m_billboardMesh)
+    else if (m_billboardMaterial && m_billboardMesh)
     {
+        std::vector<SafePtr<Material>> mat;
+        mat.push_back(m_billboardMaterial);
         queue->SubmitSoftBody(
-            m_billboardMesh.getPtr(), m_billboardMaterial.getPtr(),
+            m_billboardMesh.getPtr(), mat,
             m_particleBuffer->GetBuffer(), PBufSizeAligned,
             m_totalParticleCount, m_particleSettings.general.particleAmount,
             transform, /*isDebug=*/true);
@@ -350,32 +357,35 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
 
     std::vector<WeightedVertex> vertices;
     std::vector<uint32_t> indices;
-    if (m_initializerMesh)
+    if (m_initializerModel)
     {
-        static_assert(offsetof(Vertex, position) == offsetof(WeightedVertex, position));
-        static_assert(offsetof(Vertex, texCoord) == offsetof(WeightedVertex, texCoord));
-        static_assert(offsetof(Vertex, normal) == offsetof(WeightedVertex, normal));
-        static_assert(offsetof(Vertex, tangent) == offsetof(WeightedVertex, tangent));
-
-        const uint32_t stride = (m_initializerMesh->m_isWeighted ? sizeof(WeightedVertex) : sizeof(Vertex)) / sizeof(float);
-        const uint32_t vertCount = static_cast<uint32_t>(m_initializerMesh->m_vertices.size() / stride);
-        const uint32_t dataStride = sizeof(Vertex) / sizeof(float);
-
-        vertices.resize(vertCount);
-        const float *ptrSource = m_initializerMesh->m_vertices.data();
-        float *ptrDest = reinterpret_cast<float*>(vertices.data());
-
-        for (uint32_t i = 0; i < vertCount; i++)
+        for (const SafePtr<Mesh> mesh : m_initializerModel->GetMeshes())
         {
-            ASSERT(ptrSource < m_initializerMesh->m_vertices.data() + m_initializerMesh->m_vertices.size());
-            ASSERT(reinterpret_cast<WeightedVertex*>(ptrDest) < vertices.data() + vertices.size());
+            static_assert(offsetof(Vertex, position) == offsetof(WeightedVertex, position));
+            static_assert(offsetof(Vertex, texCoord) == offsetof(WeightedVertex, texCoord));
+            static_assert(offsetof(Vertex, normal) == offsetof(WeightedVertex, normal));
+            static_assert(offsetof(Vertex, tangent) == offsetof(WeightedVertex, tangent));
 
-            std::copy(ptrSource, ptrSource + dataStride, ptrDest);
-            ptrSource += stride;
-            ptrDest += sizeof(WeightedVertex) / sizeof(float);
+            const uint32_t stride = (mesh->m_isWeighted ? sizeof(WeightedVertex) : sizeof(Vertex)) / sizeof(float);
+            const uint32_t vertCount = static_cast<uint32_t>(mesh->m_vertices.size() / stride);
+            const uint32_t dataStride = sizeof(Vertex) / sizeof(float);
+
+            vertices.resize(vertCount);
+            const float *ptrSource = mesh->m_vertices.data();
+            float *ptrDest = reinterpret_cast<float*>(vertices.data());
+
+            for (uint32_t i = 0; i < vertCount; i++)
+            {
+                ASSERT(ptrSource < mesh->m_vertices.data() + mesh->m_vertices.size());
+                ASSERT(reinterpret_cast<WeightedVertex*>(ptrDest) < vertices.data() + vertices.size());
+
+                std::copy(ptrSource, ptrSource + dataStride, ptrDest);
+                ptrSource += stride;
+                ptrDest += sizeof(WeightedVertex) / sizeof(float);
+            }
+
+            indices.insert(indices.end(), mesh->m_indices.begin(), mesh->m_indices.end());
         }
-
-        indices = m_initializerMesh->m_indices;
     }
     else
         CreateSkinnedMesh(vertices, indices);
@@ -385,6 +395,22 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
     m_mesh->CreateFrom(reinterpret_cast<float*>(vertices.data()), static_cast<uint32_t>(vertices.size()), indices.data(), 
         static_cast<uint32_t>(indices.size()), true);
     
+    m_mesh->m_subMeshes.clear();
+
+    if (m_initializerModel)
+    {
+        int currIndex = 0;
+        for (const SafePtr<Mesh> mesh : m_initializerModel->GetMeshes())
+        {
+            for (const SubMesh subMesh : mesh->m_subMeshes)
+            {
+                SubMesh newOne{ currIndex, subMesh.count };
+                m_mesh->m_subMeshes.push_back(newOne);
+                currIndex = subMesh.count;
+            }
+        }
+    }
+
     m_particles.clear();
     m_connections.clear();
 }
@@ -660,7 +686,18 @@ void GPUSoftBodyComponent::ApplySettings()
     m_needsRecreation = true;
 }
 
-void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float maxDistToConnect)
+void Encapsulate(BoundingBox& target, const BoundingBox& other)
+{
+    target.min.x = std::min(target.min.x, other.min.x);
+    target.min.y = std::min(target.min.y, other.min.y);
+    target.min.z = std::min(target.min.z, other.min.z);
+
+    target.max.x = std::max(target.max.x, other.max.x);
+    target.max.y = std::max(target.max.y, other.max.y);
+    target.max.z = std::max(target.max.z, other.max.z);
+}
+
+void GPUSoftBodyComponent::InitializeParticleDataFromModel(float density, float maxDistToConnect)
 {
     m_particles.clear();
     m_connections.clear();
@@ -670,17 +707,51 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
 
     m_meshDensity = density;
 
-    BoundingBox BBox = m_initializerMesh.getPtr()->m_boundingBox;
+    BoundingBox globalBBox;
 
-    int pointCount = static_cast<int>(m_initializerMesh->m_indices.size());
+    for (const SafePtr<Mesh> mesh : m_initializerModel->GetMeshes())
+    {
+        BoundingBox BBox = mesh->m_boundingBox;
 
-    Vertex* vertices    = reinterpret_cast<Vertex*>(m_initializerMesh->m_vertices.data());
-    uint32_t* indices   = reinterpret_cast<uint32_t*>(m_initializerMesh->m_indices.data());
+        int pointCount = static_cast<int>(mesh->m_indices.size());
 
-    PlacePointMesh(BBox, vertices, indices, pointCount, density);
-    GenerateConnection(BBox, maxDistToConnect);
+        Vertex* vertices    = reinterpret_cast<Vertex*>(mesh->m_vertices.data());
+        uint32_t* indices   = reinterpret_cast<uint32_t*>(mesh->m_indices.data());
+
+        PlacePointMesh(BBox, vertices, indices, pointCount, density);
+        
+        Encapsulate(globalBBox, BBox);
+    }
+
+    GenerateConnection(globalBBox, maxDistToConnect);
 
     m_totalParticleCount = uint32_t(m_particles.size());
+}
+
+void GPUSoftBodyComponent::InitializeMaterialsFromModel(SafePtr<Model> inputModel)
+{
+    auto resourceManager = Engine::Get()->GetResourceManager();
+    auto skinnedShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/sb_skinning.shader");
+
+    for (SafePtr<Material> mat : inputModel->GetMaterials())
+    {
+        std::string name = std::format("{}_SkinnedMaterial {} ", inputModel->GetName(), m_materials.size());
+        SafePtr<Material> newMat = resourceManager->CreateMaterial(name, skinnedShader);
+        newMat->SetAttribute("albedoSampler",       mat->GetTexture("albedoSampler"));
+        newMat->SetAttribute("normalSampler",       mat->GetTexture("normalSampler"));
+        newMat->SetAttribute("roughnessSampler",    mat->GetTexture("roughnessSampler"));
+        newMat->SetAttribute("metalnessSampler",    mat->GetTexture("metalnessSampler"));
+        newMat->SetAttribute("aoSampler",           mat->GetTexture("aoSampler"));
+        newMat->SetAttribute("heightSampler",       mat->GetTexture("heightSampler"));
+
+        newMat->SetAttribute("material.color",          mat->GetVec4Attribute("material.color"));
+        newMat->SetAttribute("material.roughnessFactor", mat->GetFloatAttribute("material.roughnessFactor"));
+        newMat->SetAttribute("material.metalnessFactor", mat->GetFloatAttribute("material.metalnessFactor"));
+        newMat->SetAttribute("material.aoFactor",       mat->GetFloatAttribute("material.aoFactor"));
+        newMat->SetAttribute("material.heightScale",    mat->GetFloatAttribute("material.heightScale"));
+
+        m_materials.push_back(newMat);
+    }
 }
 
 struct Vec3iHash
@@ -914,7 +985,7 @@ void DeleteBVH(BVHNode* node)
     delete node;
 }
 
-void RayIntersectBVH(BVHNode* node, const Ray& ray, int& count) 
+void RayIntersectBVH(BVHNode* node, const Ray& ray, int& count)
 {
     if (!RayIntersectsBox(ray, node->bbox)) 
         return;

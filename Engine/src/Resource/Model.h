@@ -20,7 +20,8 @@ public:
     void Unload() override;
     
     const std::vector<SafePtr<Mesh>>& GetMeshes() const { return m_meshes; }
-    
+    const std::vector<SafePtr<Material>>& GetMaterials() const { return m_materials; }
+
     static SafePtr<GameObject> CreateGameObject(Model* model, Scene* scene, GameObject* parent = nullptr);
 
 private:
