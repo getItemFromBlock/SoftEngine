@@ -142,6 +142,11 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
         CreateFromModel(m_initializerModel);
         m_needRecreateFromModel = false;
     }
+    else if (m_needsRecreation)
+    {
+        Recreate();
+        m_needsRecreation = false;
+    }
 }
 
 void GPUSoftBodyComponent::OnGameUpdate(float deltaTime)
