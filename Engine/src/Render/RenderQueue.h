@@ -65,7 +65,7 @@ public:
     void Submit(const RenderCommand& command);
 
     void SubmitMeshRenderer(GameObject* gameObject, Mesh* mesh, const std::vector<SafePtr<Material>>& materials);
-    void SubmitSoftBody(Mesh* mesh, Material* material, VkBuffer particleBuffer, VkDeviceSize particleBufferSize,
+    void SubmitSoftBody(Mesh* mesh, const std::vector<SafePtr<Material>>& materials, VkBuffer particleBuffer, VkDeviceSize particleBufferSize,
                         uint32_t particleCount, const Vec3i& gridSize,
                         const Mat4& transform, bool isDebug);
 

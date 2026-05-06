@@ -23,9 +23,9 @@ struct BodySettings
         Vec2i boneCount = Vec2i(4, 4);
         Vec2i surfacePoints = Vec2i(8, 8);
         Vec2f surfaceHeightBounds = Vec2f(-0.3f, 0.3f);
-        float damping = 1.0f;
-        float strength = 300.0f;
-        uint32_t connectionStrength = 2;
+        float damping = 2.0f;
+        float strength = 100.0f;
+        uint32_t connectionStrength = 1.5;
     } general;
 
     struct Shape
@@ -79,20 +79,21 @@ public:
     void OnCreate() override;
     void OnGameUpdate(float deltaTime) override;
     void OnRender(VulkanRenderer* renderer) override;
+    void OnUpdate(float deltaTime) override;
     void OnDestroy() override;
 
     void ApplySettings();
     BodySettings& GetSettings() { return m_particleSettings; }
     
-    void CreateFromMesh(SafePtr<Mesh> inputMesh);
+    void CreateFromModel(SafePtr<Model> inputModel);
 
-    bool IsLoadedFromMesh() const { return m_loadedFromMesh; }
-    SafePtr<Mesh> GetInitializerMesh() const { return m_initializerMesh; }
+    bool IsLoadedFromModel() const { return m_loadedFromModel; }
+    SafePtr<Model> GetInitializerModel() const { return m_initializerModel; }
     
     bool GetDrawDebug() const { return m_drawDebug; }
     void SetDrawDebug(bool drawDebug) { m_drawDebug = drawDebug; }
     
-    SafePtr<Material> GetMaterial() const { return m_material; }
+    std::vector<SafePtr<Material>> GetMaterial() const { return m_materials; }
     SafePtr<Mesh> GetMesh() const { return m_mesh; }
     
     nlohmann::json Serialize() const override;
@@ -110,7 +111,8 @@ private:
     void MapMeshToParticles(std::vector<WeightedVertex> &vertices);
     void InitializeParticleData(std::vector<SBParticleData> &particles, std::vector<ConnectionData> &connections);
     // Pwease dwo not caww at wuntiwe, i am a sweepy method OwO
-    void InitializeParticleDataFromMesh(float density, float maxDistToConnect);
+    void InitializeParticleDataFromModel(float density, float maxDistToConnect);
+    void InitializeMaterialsFromModel(SafePtr<Model> inputModel);
 
     // Generation from meshes methods
 
@@ -118,9 +120,14 @@ private:
 
     void GenerateConnection(const BoundingBox& BBox, const float& maxDistToConnect);
 
+    void Recreate();
+
 private:
-    bool m_loadedFromMesh = false;
-    SafePtr<Mesh> m_initializerMesh;
+    bool m_loadedFromModel = false;
+
+    SafePtr<Model>  m_initializerModel;
+    std::vector<SafePtr<Material>> m_materials;
+
 
     std::unique_ptr<ComputeDispatch> m_simulationCompute0;
     std::unique_ptr<ComputeDispatch> m_simulationCompute1;
@@ -134,7 +141,7 @@ private:
 
     std::shared_ptr<Mesh> m_mesh;
     SafePtr<Mesh> m_billboardMesh;
-    SafePtr<Material> m_material;
+    SafePtr<Material> m_defaultMaterial;
     SafePtr<Material> m_billboardMaterial;
 
     std::vector<SBParticleData> m_particles;
@@ -142,6 +149,8 @@ private:
 
     bool m_needsRecreation = false;
     bool m_drawDebug = false;
+
+    std::atomic<bool> m_needRecreateFromModel = false;
 
     Seed m_seed;
     BodySettings m_particleSettings;

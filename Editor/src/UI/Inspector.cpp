@@ -578,6 +578,12 @@ void Inspector::ShowProperty(const Property& property)
             RenderPostProcessShaderProperty(property, id);
             break;
         }
+
+    case PropertyType::Model:
+        {
+            RenderModelProperty(property, id);
+            break;
+        }
     default:
         {
             PrintWarning("Property type not handle on Inspector");
@@ -1007,6 +1013,22 @@ void Inspector::RenderPostProcessShaderProperty(const Property& property, const 
     if (result.has_value())
     {
         SafePtr<PostProcessShader> newValue = result.value();
+        UpdateProperty(property, &newValue);
+    }
+}
+
+void Inspector::RenderModelProperty(const Property& property, const std::string& id)
+{
+    SafePtr<Model> model = *static_cast<SafePtr<Model>*>(property.data);
+    std::string name = model ? model->GetName() : "None";
+    if (ImGui::Button(name.c_str()))
+    {
+        ImGui::OpenPopup("Resource Popup");
+    }
+    auto result = DisplayResourcePopup<Model>();
+    if (result.has_value())
+    {
+        SafePtr<Model> newValue = result.value();
         UpdateProperty(property, &newValue);
     }
 }
