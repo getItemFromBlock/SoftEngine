@@ -5,7 +5,7 @@
 class ResourcesWindow : public EditorWindow
 {
 public:
-    using EditorWindow::EditorWindow;
+    ResourcesWindow(ImGuiHandler* handler) : EditorWindow("ResourcesWindow", handler) {}
     
     void OnRender() override;
     

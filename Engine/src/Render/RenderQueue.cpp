@@ -63,7 +63,7 @@ void RenderQueue::SubmitMeshRenderer(GameObject* gameObject, Mesh* mesh,
         size_t materialIndex = i % materialCount;
         auto& material = materials[materialIndex];
 
-        if (!material)
+        if (!material || !material->GetShader().getPtr())
             continue;
 
         RenderCommand cmd;

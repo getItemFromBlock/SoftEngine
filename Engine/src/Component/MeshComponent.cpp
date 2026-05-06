@@ -46,8 +46,19 @@ void MeshComponent::OnUpdate(float deltaTime)
     CameraData cameraData = p_gameObject->GetScene()->GetCameraData();
     auto transform = p_gameObject->GetTransform();
     m_visible = m_mesh->GetBoundingBox().IsOnFrustum(cameraData.frustum, transform.getPtr());
-    if (!m_visible)
+}
+
+void MeshComponent::OnGameUpdate(float deltaTime)
+{
+    OnUpdate(deltaTime);
+}
+
+void MeshComponent::OnRender(VulkanRenderer* renderer) 
+{
+    if (!m_mesh || !m_visible)
         return;
+    
+    CameraData cameraData = p_gameObject->GetScene()->GetCameraData();
     Mat4 VP = cameraData.VP;
 
     for (auto& material : m_materials)
@@ -56,15 +67,9 @@ void MeshComponent::OnUpdate(float deltaTime)
             continue;
         material->SetAttribute("cameraUBO.viewProj", VP);
     }
-}
-
-void MeshComponent::OnRender(VulkanRenderer* renderer) 
-{
-    if (!m_visible || !m_mesh)
-        return;
     
     auto queue = renderer->GetRenderQueueManager()->GetOpaqueQueue();
-    if (!m_materials.empty() && m_materials[0]->GetShader().getPtr() != Engine::Get()->GetResourceManager()->GetDefaultShader().get())
+    if (!m_materials.empty() && m_materials[0] && m_materials[0]->GetShader().getPtr() != Engine::Get()->GetResourceManager()->GetDefaultShader().get())
     {
         queue = renderer->GetRenderQueueManager()->GetTransparentQueue(); // Use transparent queue to render in forward pass
     }

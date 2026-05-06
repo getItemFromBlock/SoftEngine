@@ -1,0 +1,101 @@
+{
+    "root": {
+        "children": [
+            {
+                "children": [],
+                "components": [
+                    {
+                        "data": {
+                            "localPosition": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "localRotationEuler": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "localScale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "enabled": true,
+                        "type": "TransformComponent",
+                        "uuid": 9790003604031097520
+                    },
+                    {
+                        "data": {
+                            "drawDebug": false,
+                            "initializerMesh": "Engine/resources/models/Cube.obj/Cube.mesh",
+                            "loadedFromMesh": true,
+                            "settings": {
+                                "general": {
+                                    "boneCount": [
+                                        4,
+                                        4
+                                    ],
+                                    "connectionStrength": 2,
+                                    "damping": 1.0,
+                                    "particleAmount": [
+                                        11,
+                                        11,
+                                        11
+                                    ],
+                                    "solidLayers": 1,
+                                    "strength": 300.0,
+                                    "surfaceHeightBounds": [
+                                        -0.30000001192092896,
+                                        0.30000001192092896
+                                    ],
+                                    "surfacePoints": [
+                                        8,
+                                        8
+                                    ]
+                                },
+                                "shape": {
+                                    "scale": 1.0,
+                                    "type": 0
+                                }
+                            }
+                        },
+                        "enabled": true,
+                        "type": "GPUSoftBodyComponent",
+                        "uuid": 14742284432293365415
+                    }
+                ],
+                "name": "GameObject",
+                "uuid": 6684127918469106590
+            }
+        ],
+        "components": [
+            {
+                "data": {
+                    "localPosition": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "localRotationEuler": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "localScale": [
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                },
+                "enabled": true,
+                "type": "TransformComponent",
+                "uuid": 16841115817560375160
+            }
+        ],
+        "name": "Root",
+        "uuid": 17267184291583716279
+    },
+    "version": 1
+}

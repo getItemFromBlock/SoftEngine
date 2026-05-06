@@ -12,7 +12,14 @@
 
 bool Material::Load(ResourceManager* resourceManager)
 {
-    return true;
+    auto parentModel = p_path.parent_path();
+    
+    if (parentModel.extension() == ".obj" || parentModel.extension() == ".gltf")
+    {
+        resourceManager->Load<Model>(parentModel);
+        return true;
+    }
+    return false;
 }
 
 bool Material::SendToGPU(VulkanRenderer* renderer)
@@ -73,6 +80,18 @@ void Material::Describe(ClassDescriptor& descriptor)
         };
     }
     descriptor.PopID();
+}
+
+bool Material::Exists() const
+{
+    if (!IResource::Exists())
+    {
+        auto parentModel = p_path.parent_path();
+    
+        if (parentModel.extension() == ".obj" || parentModel.extension() == ".gltf")
+            return File::Exists(parentModel);
+    }
+    return false;
 }
 
 void Material::SetShader(const SafePtr<Shader>& shader)

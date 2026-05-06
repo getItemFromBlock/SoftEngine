@@ -16,6 +16,9 @@ public:
     void SetSelectedObject(const Core::UUID& uuid);
 
     static void ShowDescriptor(const ClassDescriptor& descriptor);
+
+    template <typename T>
+    static std::optional<SafePtr<T>> DisplayResourcePopup();
 private:
     static void ShowProperty(const Property& property);
     static void UpdateProperty(const Property& property, void* newValue);
@@ -48,9 +51,6 @@ private:
     static size_t GetListSize(const Property& property);
     static void RemoveListElement(const Property& property, size_t index);
     static void AddListElement(const Property& property);
-
-    template <typename T>
-    static std::optional<SafePtr<T>> DisplayResourcePopup();
 
     template<typename T>
     static ClassDescriptor GetDescriptor(SafePtr<T> descriptorContainer)

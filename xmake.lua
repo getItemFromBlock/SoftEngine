@@ -1,6 +1,6 @@
 add_rules("plugin.vsxmake.autoupdate")
 add_rules("plugin.compile_commands.autoupdate", {outputdir = ".vscode"})
-add_rules("mode.debug", "mode.release")
+add_rules("mode.debug", "mode.release", "mode.releasedbg")
 
 if is_plat("windows") then
     set_runtimes(is_mode("debug") and "MDd" or "MD")
@@ -23,7 +23,7 @@ imgui_configs.glfw = true
 imgui_configs.vulkan = true
 
 add_requires("imgui v1.92.5-docking", {configs = imgui_configs, debug = true})
-add_requires("stb", "nlohmann_json")
+add_requires("stb", "nlohmann_json", "nativefiledialog-extended")
 add_requires("galaxymath", "cpp_serializer")
 
 -- Define macros
@@ -67,7 +67,7 @@ target("Engine")
     add_includedirs("Engine/src")
 
     -- Always add base packages
-    add_packages("galaxymath", "stb", "cpp_serializer", "nlohmann_json")
+    add_packages("galaxymath", "stb", "cpp_serializer", "nlohmann_json", "nativefiledialog-extended")
     
     add_cxxflags("-Wall", "-Wextra")
 target_end()

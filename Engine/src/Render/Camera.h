@@ -104,7 +104,8 @@ public:
     SafePtr<Material> GetGBufferMaterial() const { return m_gBufferMaterial; }
 
 public:
-    Event<Vec2i> OnRenderTargetResized;
+    Event<Vec2i> EOnRenderTargetResized;
+    Event<> EOnDestroy;
 
 private:
     void BeginGBufferPass(RenderTargetTexture* rtt);

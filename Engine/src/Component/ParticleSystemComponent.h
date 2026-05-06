@@ -10,6 +10,7 @@
 
 class Material;
 class Mesh;
+class SceneSerializer;
 
 template <typename T>
 struct MinMax
@@ -134,6 +135,7 @@ public:
 
     void SetParticleCount(int count);
     void SetMesh(SafePtr<Mesh> mesh);
+    void SetMaterial(SafePtr<Material> material) { m_material = std::move(material); }
 
     void ApplySettings();
     ParticleSettings& GetSettings() { return m_particleSettings; }
@@ -151,6 +153,8 @@ public:
     SafePtr<Material> GetMaterial() const { return m_material; }
     SafePtr<Mesh> GetMesh() const { return m_mesh; }
 private:
+    friend class SceneSerializer;
+
     void RecreateParticleBuffers();
     void InitializeParticleData(ParticleData& p, uint32_t index) const;
 
