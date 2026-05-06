@@ -13,6 +13,7 @@ class Material;
 class Mesh;
 class CubeMap;
 class Texture;
+class Model;
 class IResource;
 
 enum class PropertyType
@@ -39,6 +40,7 @@ enum class PropertyType
     Shader,
     PostProcessShader,
     ParticleSystem,
+    Model,
     PushID,
     PopID
 };
@@ -64,6 +66,7 @@ inline size_t GetPropertyTypeSize(PropertyType type)
     case PropertyType::CubeMap: return sizeof(SafePtr<CubeMap>);
     case PropertyType::Mesh: return sizeof(SafePtr<Mesh>);
     case PropertyType::Material: return sizeof(SafePtr<Material>);
+    case PropertyType::Model: return sizeof(SafePtr<Model>);
     default: return 0;
     }
 }
@@ -92,6 +95,7 @@ inline const char* to_string(PropertyType e)
     case PropertyType::Mesh: return "Mesh";
     case PropertyType::Material: return "Material";
     case PropertyType::ParticleSystem: return "ParticleSystem";
+    case PropertyType::Model: return "Model";
     default: return "unknown";
     }
 }
@@ -178,6 +182,7 @@ struct ClassDescriptor
     Property& AddTexture(const char* name, SafePtr<Texture>& value);
     Property& AddCubeMap(const char* name, SafePtr<CubeMap>& value);
     Property& AddMesh(const char* name, SafePtr<Mesh>& value);
+    Property& AddModel(const char* name, SafePtr<Model>& value);
     Property& AddShader(const char* name, SafePtr<Shader>& value);
     Property& AddPostProcessShader(const char* name, SafePtr<PostProcessShader>& value);
 };

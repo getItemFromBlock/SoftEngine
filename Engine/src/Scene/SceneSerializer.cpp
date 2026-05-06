@@ -204,8 +204,8 @@ namespace
         {
             const BodySettings& settings = const_cast<GPUSoftBodyComponent*>(softBody)->GetSettings();
             return {
-                {"loadedFromMesh", softBody->IsLoadedFromMesh()},
-                {"initializerMesh", SerializeResourcePath(softBody->GetInitializerMesh())},
+                {"loadedFromModel", softBody->IsLoadedFromModel()},
+                {"initializerModel", SerializeResourcePath(softBody->GetInitializerModel())},
                 {"drawDebug", softBody->GetDrawDebug()},
                 {"settings", {
                     {"general", {
@@ -388,16 +388,7 @@ namespace
                 }
 
                 softBodyComponent->SetDrawDebug(componentData.value("drawDebug", softBodyComponent->GetDrawDebug()));
-                SafePtr<Mesh> initializerMesh = LoadResource<Mesh>(
-                    resourceManager,
-                    componentData.contains("initializerMesh") ? componentData["initializerMesh"] : json());
 
-                if (componentData.value("loadedFromMesh", false) && initializerMesh)
-                {
-                    initializerMesh->EOnSentToGPU += [softBodyComponent, initializerMesh]{
-                        softBodyComponent->CreateFromMesh(initializerMesh);
-                    };
-                }
                 softBodyComponent->ApplySettings();
             }
         }
