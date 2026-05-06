@@ -45,11 +45,16 @@ void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
 
     d.AddFloat("Connection Strength", m_particleSettings.general.strength).SetRangeFloat(0, 65536);
 
-    auto &res6 = d.AddEnum("Shape", reinterpret_cast<int32_t *>(&m_particleSettings.shape.type), m_particleSettings.shape.to_cstr());
-    res6.onModified = [this](void)
-        {
-            m_needsRecreation = true;
-        };
+    if (!m_needRecreateFromModel)
+    {
+        auto &res6 = d.AddProperty("Model", PropertyType::Model, &m_initializerModel);
+        res6.onModified = [this](void)
+            {
+                m_initializerModel->EOnLoaded.Bind([this](){
+                        m_needRecreateFromModel = true;
+                    });
+            };
+    }
 
     d.AddBool("Debug", m_drawDebug);
 
@@ -66,7 +71,12 @@ void GPUSoftBodyComponent::CreateFromModel(SafePtr<Model> inputModel)
     m_loadedFromModel = true;
     InitializeParticleDataFromModel(5, m_particleSettings.general.connectionStrength);
     InitializeMaterialsFromModel(inputModel);
+    CreateParticleBuffers();
+}
 
+void GPUSoftBodyComponent::Recreate()
+{
+    InitializeParticleDataFromModel(m_meshDensity, m_particleSettings.general.connectionStrength);
     CreateParticleBuffers();
 }
 
@@ -123,6 +133,15 @@ void GPUSoftBodyComponent::OnCreate()
         });
 }
 
+void GPUSoftBodyComponent::OnUpdate(float deltaTime)
+{
+    if (m_needRecreateFromModel)
+    {
+        CreateFromModel(m_initializerModel);
+        m_needRecreateFromModel = false;
+    }
+}
+
 void GPUSoftBodyComponent::OnGameUpdate(float deltaTime)
 {
     if (!m_simulationCompute0 || !m_simulationCompute1)
@@ -130,11 +149,7 @@ void GPUSoftBodyComponent::OnGameUpdate(float deltaTime)
     
     if (m_needsRecreation)
     {
-        if (m_loadedFromModel)
-        {
-            InitializeParticleDataFromModel(m_meshDensity, m_particleSettings.general.connectionStrength);
-        }
-        CreateParticleBuffers();
+        Recreate();
         m_needsRecreation = false;
         return;
     }
@@ -732,6 +747,12 @@ void GPUSoftBodyComponent::InitializeMaterialsFromModel(SafePtr<Model> inputMode
 {
     auto resourceManager = Engine::Get()->GetResourceManager();
     auto skinnedShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/sb_skinning.shader");
+
+    if (inputModel->GetMaterials().size() == 0)
+    {
+        m_materials.push_back(m_defaultMaterial);
+        return;
+    }
 
     for (SafePtr<Material> mat : inputModel->GetMaterials())
     {

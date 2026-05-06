@@ -23,8 +23,8 @@ struct BodySettings
         Vec2i boneCount = Vec2i(4, 4);
         Vec2i surfacePoints = Vec2i(8, 8);
         Vec2f surfaceHeightBounds = Vec2f(-0.3f, 0.3f);
-        float damping = 1.0f;
-        float strength = 300.0f;
+        float damping = 2.0f;
+        float strength = 100.0f;
         uint32_t connectionStrength = 1.5;
     } general;
 
@@ -79,6 +79,7 @@ public:
     void OnCreate() override;
     void OnGameUpdate(float deltaTime) override;
     void OnRender(VulkanRenderer* renderer) override;
+    void OnUpdate(float deltaTime) override;
     void OnDestroy() override;
 
     void ApplySettings();
@@ -116,6 +117,8 @@ private:
 
     void GenerateConnection(const BoundingBox& BBox, const float& maxDistToConnect);
 
+    void Recreate();
+
 private:
     bool m_loadedFromModel = false;
 
@@ -143,6 +146,8 @@ private:
 
     bool m_needsRecreation = false;
     bool m_drawDebug = false;
+
+    std::atomic<bool> m_needRecreateFromModel = false;
 
     Seed m_seed;
     BodySettings m_particleSettings;

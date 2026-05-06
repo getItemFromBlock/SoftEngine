@@ -125,6 +125,11 @@ Property& ClassDescriptor::AddMesh(const char* name, SafePtr<Mesh>& value)
     return AddProperty(name, PropertyType::Mesh, &value);
 }
 
+Property& ClassDescriptor::AddModel(const char* name, SafePtr<Model>& value)
+{
+    return AddProperty(name, PropertyType::Model, &value);
+}
+
 Property& ClassDescriptor::AddShader(const char* name, SafePtr<Shader>& value)
 {
     return AddProperty(name, PropertyType::Shader, &value);

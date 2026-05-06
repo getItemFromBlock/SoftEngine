@@ -45,6 +45,7 @@ private:
     static void RenderShaderProperty(const Property& property, const std::string& id);
     static void RenderPostProcessShaderProperty(const Property& property, const std::string& id);
     static void RenderListProperty(const Property& property, const std::string& id);
+    static void RenderModelProperty(const Property& property, const std::string& id);
     #pragma endregion 
     
     static void* GetListElement(const Property& property, size_t index);
