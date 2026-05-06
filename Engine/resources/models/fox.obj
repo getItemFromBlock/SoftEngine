@@ -1,6 +1,6 @@
 # Blender 5.1.1
 # www.blender.org
-mtllib fox2.mtl
+mtllib fox.mtl
 o Fox
 v -0.163327 1.032718 0.105051
 v -0.115338 0.856452 -0.018513

@@ -49,12 +49,13 @@ void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
     if (!m_needRecreateFromModel)
     {
         auto &res6 = d.AddProperty("Model", PropertyType::Model, &m_initializerModel);
-        res6.onModified = [this](void)
-            {
-                m_initializerModel->EOnLoaded.Bind([this](){
-                        m_needRecreateFromModel = true;
-                    });
+        res6.setter = [this](void* newValue)
+        {
+            m_initializerModel = *(SafePtr<Model>*)newValue;
+            m_initializerModel->EOnLoaded += [this](){
+                m_needRecreateFromModel = true;
             };
+        };
     }
 
     d.AddBool("Debug", m_drawDebug);
@@ -287,17 +288,34 @@ void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
 
 void GPUSoftBodyComponent::OnDestroy()
 {
-    Engine::Get()->GetRenderer()->WaitForGPU();
+    auto renderer = Engine::Get()->GetRenderer();
 
-    if (m_particleBuffer) m_particleBuffer->Cleanup();
+    std::shared_ptr buffer   = std::make_shared<std::unique_ptr<VulkanBuffer>>(std::move(m_particleBuffer));
+    std::shared_ptr compute0 = std::make_shared<std::unique_ptr<ComputeDispatch>>(std::move(m_simulationCompute0));
+    std::shared_ptr compute1 = std::make_shared<std::unique_ptr<ComputeDispatch>>(std::move(m_simulationCompute1));
+    std::shared_ptr mesh = m_mesh;
+
+    renderer->AddAfterRenderCallback([buffer, compute0, compute1, mesh, renderer]()
+    {
+        renderer->WaitForGPU();
+
+        if (*buffer)
+        {
+            (*buffer)->Cleanup(); 
+            buffer->reset();
+        }
+        mesh->Unload();
+        compute0->reset();
+        compute1->reset();
+    });
 }
 
 nlohmann::json GPUSoftBodyComponent::Serialize() const
 {
     const BodySettings& settings = const_cast<GPUSoftBodyComponent*>(this)->GetSettings();
     return {
-        {"loadedFromMesh", IsLoadedFromMesh()},
-        {"initializerMesh", SceneSerializer::SerializeResourcePath(GetInitializerMesh())},
+        {"loadedFromModel", IsLoadedFromModel()},
+        {"initializerModel", SceneSerializer::SerializeResourcePath(GetInitializerModel())},
         {"drawDebug", GetDrawDebug()},
         {"settings", {
             {"general", {
@@ -347,14 +365,15 @@ void GPUSoftBodyComponent::Deserialize(const nlohmann::json& json)
     }
 
     SetDrawDebug(json.value("drawDebug", GetDrawDebug()));
-    SafePtr<Mesh> initializerMesh = SceneSerializer::LoadResource<Mesh>(
+    SafePtr<Model> initializerModel = SceneSerializer::LoadResource<Model>(
         Engine::Get()->GetResourceManager(),
-        json.contains("initializerMesh") ? json["initializerMesh"] : nlohmann::json());
+        json.contains("initializerModel") ? json["initializerModel"] : nlohmann::json());
 
-    if (json.value("loadedFromMesh", false) && initializerMesh)
+    if (json.value("loadedFromModel", false) && initializerModel)
     {
-        initializerMesh->EOnSentToGPU += [initializerMesh, this]{
-            CreateFromMesh(initializerMesh);
+        initializerModel->EOnSentToGPU += [initializerModel, this]{
+            m_needRecreateFromModel = true;
+            m_initializerModel = initializerModel;
         };
     }
     ApplySettings();
@@ -483,12 +502,12 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
 
     if (m_initializerModel)
     {
-        int currIndex = 0;
+        uint32_t currIndex = 0;
         for (const SafePtr<Mesh> mesh : m_initializerModel->GetMeshes())
         {
             for (const SubMesh subMesh : mesh->m_subMeshes)
             {
-                SubMesh newOne{ currIndex, subMesh.count };
+                SubMesh newOne(currIndex, subMesh.count);
                 m_mesh->m_subMeshes.push_back(newOne);
                 currIndex = subMesh.count;
             }
@@ -781,7 +800,7 @@ void Encapsulate(BoundingBox& target, const BoundingBox& other)
     target.max.z = std::max(target.max.z, other.max.z);
 }
 
-void GPUSoftBodyComponent::InitializeParticleDataFromModel(float density, float maxDistToConnect)
+void GPUSoftBodyComponent::InitializeParticleDataFromModel(float density, uint32_t maxDistToConnect)
 {
     m_particles.clear();
     m_connections.clear();
@@ -823,7 +842,8 @@ void GPUSoftBodyComponent::InitializeMaterialsFromModel(SafePtr<Model> inputMode
         return;
     }
 
-    for (SafePtr<Material> mat : inputModel->GetMaterials())
+    const auto& materials = inputModel->GetMaterials();
+    for (SafePtr<Material> mat : materials)
     {
         std::string name = std::format("{}_SkinnedMaterial {} ", inputModel->GetName(), m_materials.size());
         SafePtr<Material> newMat = resourceManager->CreateMaterial(name, skinnedShader);
@@ -868,13 +888,13 @@ struct SpatialGrid
     }
 };
 
-void GPUSoftBodyComponent::GenerateConnection(const BoundingBox& BBox, const float& maxDistToConnect)
+void GPUSoftBodyComponent::GenerateConnection(const BoundingBox& BBox, uint32_t maxDistToConnect)
 {
-    float maxDistSqrt = maxDistToConnect * maxDistToConnect;
+    uint32_t maxDistSqrt = maxDistToConnect * maxDistToConnect;
     m_connections.clear();
 
     SpatialGrid grid;
-    grid.cellSize = maxDistToConnect;
+    grid.cellSize = static_cast<float>(maxDistToConnect);
     for (int i = 0; i < m_particles.size(); i++)
     {
         grid.Add(m_particles[i].position, i);

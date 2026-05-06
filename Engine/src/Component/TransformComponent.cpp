@@ -240,7 +240,10 @@ void TransformComponent::Deserialize(const nlohmann::json& json)
     if (json.contains("localPosition"))
         SceneSerializer::FromJson(json["localPosition"], m_localPosition);
     if (json.contains("localRotationEuler"))
-        SceneSerializer::FromJson(json["localRotationEuler"], m_localRotation);
+    {
+        SceneSerializer::FromJson(json["localRotationEuler"], m_localEulerAngles);
+        SetLocalRotation(m_localEulerAngles);
+    }
     if (json.contains("localScale"))
         SceneSerializer::FromJson(json["localScale"], m_localScale);
     m_dirty = true;
