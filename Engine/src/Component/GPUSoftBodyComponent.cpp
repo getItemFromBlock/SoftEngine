@@ -387,9 +387,10 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
             const uint32_t vertCount = static_cast<uint32_t>(mesh->m_vertices.size() / stride);
             const uint32_t dataStride = sizeof(Vertex) / sizeof(float);
 
-            vertices.resize(vertCount);
+            const uint32_t currentOffset = (uint32_t)vertices.size();
+            vertices.resize(vertCount + currentOffset);
             const float *ptrSource = mesh->m_vertices.data();
-            float *ptrDest = reinterpret_cast<float*>(vertices.data());
+            float *ptrDest = reinterpret_cast<float*>(vertices.data() + currentOffset);
 
             for (uint32_t i = 0; i < vertCount; i++)
             {
@@ -401,7 +402,13 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
                 ptrDest += sizeof(WeightedVertex) / sizeof(float);
             }
 
-            indices.insert(indices.end(), mesh->m_indices.begin(), mesh->m_indices.end());
+            uint32_t prevIndSize = (uint32_t)indices.size();
+            indices.resize(mesh->m_indices.size() + prevIndSize);
+            uint32_t *ptrInd = indices.data() + prevIndSize;
+            for (uint32_t i = 0; i < mesh->m_indices.size(); i++)
+            {
+                ptrInd[i] = (mesh->m_indices[i] + currentOffset);
+            }
         }
     }
     else
