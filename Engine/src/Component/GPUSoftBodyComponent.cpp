@@ -35,6 +35,8 @@ void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
             m_needsRecreation = true;
         };
 
+    d.AddProperty("Density", PropertyType::Float, &m_particleSettings.general.density);
+
     auto &res3 = d.AddInt("Solid Layers", m_particleSettings.general.solidLayers).SetRangeInt(1, 1024);
     res3.onModified = [this](void)
         {
@@ -69,14 +71,14 @@ void GPUSoftBodyComponent::CreateFromModel(SafePtr<Model> inputModel)
 {
     m_initializerModel = inputModel;
     m_loadedFromModel = true;
-    InitializeParticleDataFromModel(5, m_particleSettings.general.connectionStrength);
+    InitializeParticleDataFromModel(m_particleSettings.general.density, m_particleSettings.general.connectionStrength);
     InitializeMaterialsFromModel(inputModel);
     CreateParticleBuffers();
 }
 
 void GPUSoftBodyComponent::Recreate()
 {
-    InitializeParticleDataFromModel(m_meshDensity, m_particleSettings.general.connectionStrength);
+    InitializeParticleDataFromModel(m_particleSettings.general.density, m_particleSettings.general.connectionStrength);
     CreateParticleBuffers();
 }
 
@@ -720,8 +722,6 @@ void GPUSoftBodyComponent::InitializeParticleDataFromModel(float density, float 
     int itConnectionOffset = 0;
     UNUSED(itConnectionOffset);
 
-    m_meshDensity = density;
-
     BoundingBox globalBBox;
 
     for (const SafePtr<Mesh> mesh : m_initializerModel->GetMeshes())
@@ -745,6 +745,7 @@ void GPUSoftBodyComponent::InitializeParticleDataFromModel(float density, float 
 
 void GPUSoftBodyComponent::InitializeMaterialsFromModel(SafePtr<Model> inputModel)
 {
+    m_materials.clear();
     auto resourceManager = Engine::Get()->GetResourceManager();
     auto skinnedShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/sb_skinning.shader");
 

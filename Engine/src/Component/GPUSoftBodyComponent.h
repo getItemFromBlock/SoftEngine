@@ -23,6 +23,7 @@ struct BodySettings
         Vec2i boneCount = Vec2i(4, 4);
         Vec2i surfacePoints = Vec2i(8, 8);
         Vec2f surfaceHeightBounds = Vec2f(-0.3f, 0.3f);
+        float density = 2.0f;
         float damping = 2.0f;
         float strength = 100.0f;
         uint32_t connectionStrength = 1.5;
@@ -151,6 +152,4 @@ private:
 
     Seed m_seed;
     BodySettings m_particleSettings;
-
-    float m_meshDensity;
 };
