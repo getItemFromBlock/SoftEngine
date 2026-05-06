@@ -75,8 +75,8 @@ bool Model::Load(ResourceManager* resourceManager)
                 }
                 else
                 {
-                    metallic = resourceManager->GetBlackTexture();
-                    matResource->SetAttribute("material.metalnessFactor", 0.f);
+                    metallic = resourceManager->GetBlankTexture();
+                    matResource->SetAttribute("material.metalnessFactor", 1.f);
                 }
                 metallic->SetTextureParameters(param);
 
@@ -87,16 +87,18 @@ bool Model::Load(ResourceManager* resourceManager)
                 }
                 else
                 {
-                    roughness = resourceManager->GetBlackTexture();
-                    matResource->SetAttribute("material.roughnessFactor", 0.f);
+                    roughness = resourceManager->GetBlankTexture();
+                    matResource->SetAttribute("material.roughnessFactor", 1.f);
                 }
 
                 roughness->SetTextureParameters(param);
                 matResource->SetAttribute("normalSampler", normal);
                 matResource->SetAttribute("metalnessSampler", metallic);
                 matResource->SetAttribute("roughnessSampler", roughness);
+
+                matResource->SetAttribute("material.aoFactor", 0.05f);
                 matResource->SetAttribute("aoSampler",
-                                          resourceManager->GetBlackTexture());
+                                          resourceManager->GetBlankTexture());
                 matResource->SetAttribute("material.color", static_cast<Vec4f>(Color(mat.diffuse, mat.transparency)));
 
             materials[mat.name.generic_string()] = matResource;
