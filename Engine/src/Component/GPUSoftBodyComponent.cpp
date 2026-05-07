@@ -36,6 +36,8 @@ void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
             m_needsRecreation = true;
         };
 
+    d.AddProperty("Density", PropertyType::Float, &m_particleSettings.general.density);
+
     auto &res3 = d.AddInt("Solid Layers", m_particleSettings.general.solidLayers).SetRangeInt(1, 1024);
     res3.onModified = [this](void)
         {
@@ -71,14 +73,14 @@ void GPUSoftBodyComponent::CreateFromModel(SafePtr<Model> inputModel)
 {
     m_initializerModel = inputModel;
     m_loadedFromModel = true;
-    InitializeParticleDataFromModel(5, m_particleSettings.general.connectionStrength);
+    InitializeParticleDataFromModel(m_particleSettings.general.density, m_particleSettings.general.connectionStrength);
     InitializeMaterialsFromModel(inputModel);
     CreateParticleBuffers();
 }
 
 void GPUSoftBodyComponent::Recreate()
 {
-    InitializeParticleDataFromModel(m_meshDensity, m_particleSettings.general.connectionStrength);
+    InitializeParticleDataFromModel(m_particleSettings.general.density, m_particleSettings.general.connectionStrength);
     CreateParticleBuffers();
 }
 
@@ -141,6 +143,11 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
     {
         CreateFromModel(m_initializerModel);
         m_needRecreateFromModel = false;
+    }
+    else if (m_needsRecreation)
+    {
+        Recreate();
+        m_needsRecreation = false;
     }
 }
 
@@ -473,9 +480,10 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
             const uint32_t vertCount = static_cast<uint32_t>(mesh->m_vertices.size() / stride);
             const uint32_t dataStride = sizeof(Vertex) / sizeof(float);
 
-            vertices.resize(vertCount);
+            const uint32_t currentOffset = (uint32_t)vertices.size();
+            vertices.resize(vertCount + currentOffset);
             const float *ptrSource = mesh->m_vertices.data();
-            float *ptrDest = reinterpret_cast<float*>(vertices.data());
+            float *ptrDest = reinterpret_cast<float*>(vertices.data() + currentOffset);
 
             for (uint32_t i = 0; i < vertCount; i++)
             {
@@ -487,7 +495,13 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
                 ptrDest += sizeof(WeightedVertex) / sizeof(float);
             }
 
-            indices.insert(indices.end(), mesh->m_indices.begin(), mesh->m_indices.end());
+            uint32_t prevIndSize = (uint32_t)indices.size();
+            indices.resize(mesh->m_indices.size() + prevIndSize);
+            uint32_t *ptrInd = indices.data() + prevIndSize;
+            for (uint32_t i = 0; i < mesh->m_indices.size(); i++)
+            {
+                ptrInd[i] = (mesh->m_indices[i] + currentOffset);
+            }
         }
     }
     else
@@ -808,8 +822,6 @@ void GPUSoftBodyComponent::InitializeParticleDataFromModel(float density, uint32
     int itConnectionOffset = 0;
     UNUSED(itConnectionOffset);
 
-    m_meshDensity = density;
-
     BoundingBox globalBBox;
 
     for (const SafePtr<Mesh> mesh : m_initializerModel->GetMeshes())
@@ -833,6 +845,7 @@ void GPUSoftBodyComponent::InitializeParticleDataFromModel(float density, uint32
 
 void GPUSoftBodyComponent::InitializeMaterialsFromModel(SafePtr<Model> inputModel)
 {
+    m_materials.clear();
     auto resourceManager = Engine::Get()->GetResourceManager();
     auto skinnedShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/sb_skinning.shader");
 
