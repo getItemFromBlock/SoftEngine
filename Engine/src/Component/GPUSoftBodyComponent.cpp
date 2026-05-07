@@ -816,7 +816,7 @@ void Encapsulate(BoundingBox& target, const BoundingBox& other)
 
 void GPUSoftBodyComponent::InitializeParticleDataFromModel(float density, uint32_t maxDistToConnect)
 {
-    if (m_initializerModel)
+    if (!m_initializerModel)
         return;
     m_particles.clear();
     m_connections.clear();
