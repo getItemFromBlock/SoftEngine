@@ -7,6 +7,7 @@
 #include "Scene/GameObject.h"
 
 #include "TransformComponent.h"
+#include "Scene/SceneSerializer.h"
 #include "Utils/Color.h"
 
 void MeshComponent::Describe(ClassDescriptor& d)
@@ -122,5 +123,35 @@ SafePtr<Material> MeshComponent::GetMaterial(size_t index)
         return {};
     }
     return m_materials[index];
+}
+
+nlohmann::json MeshComponent::Serialize() const
+{
+    nlohmann::json materials = nlohmann::json::array();
+    for (const auto& material : GetMaterials())
+        materials.push_back(SceneSerializer::SerializeMaterial(material));
+
+    return {
+        {"mesh", SceneSerializer::SerializeResourcePath(GetMesh())},
+        {"materials", materials},
+        {"drawBounds", GetDrawBounds()}
+    };
+}
+
+void MeshComponent::Deserialize(const nlohmann::json& json)
+{
+    auto resourceManager = Engine::Get()->GetResourceManager();
+    SetMesh(SceneSerializer::LoadResource<Mesh>(resourceManager, json.contains("mesh") ? json["mesh"] : nlohmann::json()));
+    SetDrawBounds(json.value("drawBounds", GetDrawBounds()));
+
+    if (json.contains("materials") && json["materials"].is_array())
+    {
+        size_t materialIndex = 0;
+        for (const nlohmann::json& materialData : json["materials"])
+        {
+            SetMaterial(materialIndex, SceneSerializer::DeserializeMaterial(materialData, resourceManager));
+            ++materialIndex;
+        }
+    }
 }
 

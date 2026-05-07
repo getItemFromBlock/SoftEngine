@@ -10,6 +10,7 @@
 
 #include "Resource/Model.h"
 #include "Scene/GameObject.h"
+#include "Scene/SceneSerializer.h"
 #include "Utils/Color.h"
 #include "Utils/Random.h"
 
@@ -50,12 +51,13 @@ void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
     if (!m_needRecreateFromModel)
     {
         auto &res6 = d.AddProperty("Model", PropertyType::Model, &m_initializerModel);
-        res6.onModified = [this](void)
-            {
-                m_initializerModel->EOnLoaded.Bind([this](){
-                        m_needRecreateFromModel = true;
-                    });
+        res6.setter = [this](void* newValue)
+        {
+            m_initializerModel = *(SafePtr<Model>*)newValue;
+            m_initializerModel->EOnLoaded += [this](){
+                m_needRecreateFromModel = true;
             };
+        };
     }
 
     d.AddBool("Debug", m_drawDebug);
@@ -293,9 +295,95 @@ void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
 
 void GPUSoftBodyComponent::OnDestroy()
 {
-    Engine::Get()->GetRenderer()->WaitForGPU();
+    auto renderer = Engine::Get()->GetRenderer();
 
-    if (m_particleBuffer) m_particleBuffer->Cleanup();
+    std::shared_ptr buffer   = std::make_shared<std::unique_ptr<VulkanBuffer>>(std::move(m_particleBuffer));
+    std::shared_ptr compute0 = std::make_shared<std::unique_ptr<ComputeDispatch>>(std::move(m_simulationCompute0));
+    std::shared_ptr compute1 = std::make_shared<std::unique_ptr<ComputeDispatch>>(std::move(m_simulationCompute1));
+    std::shared_ptr mesh = m_mesh;
+
+    renderer->AddAfterRenderCallback([buffer, compute0, compute1, mesh, renderer]()
+    {
+        renderer->WaitForGPU();
+
+        if (*buffer)
+        {
+            (*buffer)->Cleanup(); 
+            buffer->reset();
+        }
+        mesh->Unload();
+        compute0->reset();
+        compute1->reset();
+    });
+}
+
+nlohmann::json GPUSoftBodyComponent::Serialize() const
+{
+    const BodySettings& settings = const_cast<GPUSoftBodyComponent*>(this)->GetSettings();
+    return {
+        {"loadedFromModel", IsLoadedFromModel()},
+        {"initializerModel", SceneSerializer::SerializeResourcePath(GetInitializerModel())},
+        {"drawDebug", GetDrawDebug()},
+        {"settings", {
+            {"general", {
+                {"particleAmount", SceneSerializer::ToJson(settings.general.particleAmount)},
+                {"solidLayers", settings.general.solidLayers},
+                {"boneCount", SceneSerializer::ToJson(settings.general.boneCount)},
+                {"surfacePoints", SceneSerializer::ToJson(settings.general.surfacePoints)},
+                {"surfaceHeightBounds", SceneSerializer::ToJson(settings.general.surfaceHeightBounds)},
+                {"damping", settings.general.damping},
+                {"strength", settings.general.strength},
+                {"connectionStrength", settings.general.connectionStrength}
+            }},
+            {"shape", {
+                {"type", static_cast<int>(settings.shape.type)},
+                {"scale", settings.shape.scale}
+            }}
+        }}
+    };
+}
+
+void GPUSoftBodyComponent::Deserialize(const nlohmann::json& json)
+{
+    BodySettings& settings = GetSettings();
+    const nlohmann::json settingsData = json.contains("settings") ? json["settings"] : nlohmann::json::object();
+
+    if (settingsData.contains("general"))
+    {
+        const nlohmann::json& general = settingsData["general"];
+        if (general.contains("particleAmount"))
+            SceneSerializer::FromJson(general["particleAmount"], settings.general.particleAmount);
+        settings.general.solidLayers = general.value("solidLayers", settings.general.solidLayers);
+        if (general.contains("boneCount"))
+            SceneSerializer::FromJson(general["boneCount"], settings.general.boneCount);
+        if (general.contains("surfacePoints"))
+            SceneSerializer::FromJson(general["surfacePoints"], settings.general.surfacePoints);
+        if (general.contains("surfaceHeightBounds"))
+            SceneSerializer::FromJson(general["surfaceHeightBounds"], settings.general.surfaceHeightBounds);
+        settings.general.damping = general.value("damping", settings.general.damping);
+        settings.general.strength = general.value("strength", settings.general.strength);
+        settings.general.connectionStrength = general.value("connectionStrength", settings.general.connectionStrength);
+    }
+    if (settingsData.contains("shape"))
+    {
+        const nlohmann::json& shape = settingsData["shape"];
+        settings.shape.type = static_cast<BodySettings::Shape::Type>(shape.value("type", static_cast<int>(settings.shape.type)));
+        settings.shape.scale = shape.value("scale", settings.shape.scale);
+    }
+
+    SetDrawDebug(json.value("drawDebug", GetDrawDebug()));
+    SafePtr<Model> initializerModel = SceneSerializer::LoadResource<Model>(
+        Engine::Get()->GetResourceManager(),
+        json.contains("initializerModel") ? json["initializerModel"] : nlohmann::json());
+
+    if (json.value("loadedFromModel", false) && initializerModel)
+    {
+        initializerModel->EOnSentToGPU += [initializerModel, this]{
+            m_needRecreateFromModel = true;
+            m_initializerModel = initializerModel;
+        };
+    }
+    ApplySettings();
 }
 
 void GPUSoftBodyComponent::CreateParticleBuffers()
@@ -428,12 +516,12 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
 
     if (m_initializerModel)
     {
-        int currIndex = 0;
+        uint32_t currIndex = 0;
         for (const SafePtr<Mesh> mesh : m_initializerModel->GetMeshes())
         {
             for (const SubMesh subMesh : mesh->m_subMeshes)
             {
-                SubMesh newOne{ currIndex, subMesh.count };
+                SubMesh newOne(currIndex, subMesh.count);
                 m_mesh->m_subMeshes.push_back(newOne);
                 currIndex = subMesh.count;
             }
@@ -726,8 +814,10 @@ void Encapsulate(BoundingBox& target, const BoundingBox& other)
     target.max.z = std::max(target.max.z, other.max.z);
 }
 
-void GPUSoftBodyComponent::InitializeParticleDataFromModel(float density, float maxDistToConnect)
+void GPUSoftBodyComponent::InitializeParticleDataFromModel(float density, uint32_t maxDistToConnect)
 {
+    if (!m_initializerModel)
+        return;
     m_particles.clear();
     m_connections.clear();
 
@@ -767,7 +857,8 @@ void GPUSoftBodyComponent::InitializeMaterialsFromModel(SafePtr<Model> inputMode
         return;
     }
 
-    for (SafePtr<Material> mat : inputModel->GetMaterials())
+    const auto& materials = inputModel->GetMaterials();
+    for (SafePtr<Material> mat : materials)
     {
         std::string name = std::format("{}_SkinnedMaterial {} ", inputModel->GetName(), m_materials.size());
         SafePtr<Material> newMat = resourceManager->CreateMaterial(name, skinnedShader);
@@ -812,13 +903,13 @@ struct SpatialGrid
     }
 };
 
-void GPUSoftBodyComponent::GenerateConnection(const BoundingBox& BBox, const float& maxDistToConnect)
+void GPUSoftBodyComponent::GenerateConnection(const BoundingBox& BBox, uint32_t maxDistToConnect)
 {
-    float maxDistSqrt = maxDistToConnect * maxDistToConnect;
+    uint32_t maxDistSqrt = maxDistToConnect * maxDistToConnect;
     m_connections.clear();
 
     SpatialGrid grid;
-    grid.cellSize = maxDistToConnect;
+    grid.cellSize = static_cast<float>(maxDistToConnect);
     for (int i = 0; i < m_particles.size(); i++)
     {
         grid.Add(m_particles[i].position, i);

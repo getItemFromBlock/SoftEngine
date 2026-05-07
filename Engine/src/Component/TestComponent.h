@@ -24,6 +24,9 @@ public:
     
     bool IsAttachedToCamera() const { return m_attachToCamera; }
     void AttachToCamera(bool enable) { m_attachToCamera = enable;}
+    
+    nlohmann::json Serialize() const override;
+    void Deserialize(const nlohmann::json& json) override;
 private:
     friend class SceneSerializer;
 

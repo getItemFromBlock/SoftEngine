@@ -29,6 +29,8 @@ public:
     bool GetDrawBounds() const { return m_drawBounds; }
     void SetDrawBounds(bool drawBounds) { m_drawBounds = drawBounds; }
 
+    nlohmann::json Serialize() const override;
+    void Deserialize(const nlohmann::json& json) override;
 private:
     friend class SceneSerializer;
 

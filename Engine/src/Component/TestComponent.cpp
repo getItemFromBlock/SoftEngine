@@ -1,5 +1,7 @@
 ﻿#include "TestComponent.h"
 
+#include <nlohmann/json.hpp>
+
 #include "LightComponent.h"
 #include "MeshComponent.h"
 #include "TransformComponent.h"
@@ -48,4 +50,22 @@ void TestComponent::OnGameUpdate(float deltaTime)
             mat->SetAttribute("material.color", Vec4f(color, 1.f));
         }
     }
+}
+
+nlohmann::json TestComponent::Serialize() const
+{
+    return {
+        {"offset", GetOffset()},
+        {"speed", GetSpeed()},
+        {"colorSpeed", GetColorSpeed()},
+        {"attachToCamera", IsAttachedToCamera()}
+    };
+}
+
+void TestComponent::Deserialize(const nlohmann::json& json)
+{
+    SetOffset(json.value("offset", GetOffset()));
+    SetSpeed(json.value("speed", GetSpeed()));
+    SetColorSpeed(json.value("colorSpeed", GetColorSpeed()));
+    AttachToCamera(json.value("attachToCamera", IsAttachedToCamera()));
 }

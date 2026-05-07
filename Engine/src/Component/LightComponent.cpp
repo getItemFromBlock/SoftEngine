@@ -1,6 +1,7 @@
 #include "LightComponent.h"
 
 #include "Scene/GameObject.h"
+#include "Scene/SceneSerializer.h"
 
 void LightComponent::OnCreate()
 {
@@ -52,4 +53,39 @@ void LightComponent::SerializeData(Vec4f dataOut[4]) const
         dataOut[2] = Vec4f(0, 1, 0, 0);
 
     dataOut[3] = Vec4f(GetColor(), GetIntensity());
+}
+
+nlohmann::json LightComponent::Serialize() const
+{
+    return {
+        {"lightType", GetLightType()},
+        {"color", SceneSerializer::ToJson(GetColor())},
+        {"intensity", GetIntensity()},
+        {"attenuation", GetAttenuation()},
+        {"otherPosition", SceneSerializer::ToJson(GetOtherPosition())},
+        {"angleFactors", SceneSerializer::ToJson(GetAngleFactors())}
+    };
+}
+
+void LightComponent::Deserialize(const nlohmann::json& data)
+{
+    SetLightType(data.value("lightType", GetLightType()));
+    Vec3f color = GetColor();
+    if (data.contains("color"))
+        SceneSerializer::FromJson(data["color"], color);
+    SetColor(Vec4f(color, 1.f));
+    SetIntensity(data.value("intensity", GetIntensity()));
+    SetAttenuation(data.value("attenuation", GetAttenuation()));
+    if (data.contains("otherPosition"))
+    {
+        Vec3f otherPosition = GetOtherPosition();
+        if (SceneSerializer::FromJson(data["otherPosition"], otherPosition))
+            SetOtherPosition(otherPosition);
+    }
+    if (data.contains("angleFactors"))
+    {
+        Vec2f angleFactors = GetAngleFactors();
+        if (SceneSerializer::FromJson(data["angleFactors"], angleFactors))
+            SetAngleFactors(angleFactors);
+    }
 }

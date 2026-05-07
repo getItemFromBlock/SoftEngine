@@ -12,7 +12,7 @@
                                 0.0
                             ],
                             "localRotationEuler": [
-                                0.0,
+                                90.0,
                                 0.0,
                                 0.0
                             ],
@@ -24,13 +24,13 @@
                         },
                         "enabled": true,
                         "type": "TransformComponent",
-                        "uuid": 9790003604031097520
+                        "uuid": 5832878912267002093
                     },
                     {
                         "data": {
                             "drawDebug": false,
-                            "initializerMesh": "Engine/resources/models/Cube.obj/Cube.mesh",
-                            "loadedFromMesh": true,
+                            "initializerModel": "Engine/resources/models/Test/DamagedHelmet.gltf",
+                            "loadedFromModel": true,
                             "settings": {
                                 "general": {
                                     "boneCount": [
@@ -38,14 +38,14 @@
                                         4
                                     ],
                                     "connectionStrength": 2,
-                                    "damping": 1.0,
+                                    "damping": 2.0,
                                     "particleAmount": [
                                         11,
                                         11,
                                         11
                                     ],
                                     "solidLayers": 1,
-                                    "strength": 300.0,
+                                    "strength": 100.0,
                                     "surfaceHeightBounds": [
                                         -0.30000001192092896,
                                         0.30000001192092896
@@ -63,11 +63,11 @@
                         },
                         "enabled": true,
                         "type": "GPUSoftBodyComponent",
-                        "uuid": 14742284432293365415
+                        "uuid": 3392327230419674362
                     }
                 ],
                 "name": "GameObject",
-                "uuid": 6684127918469106590
+                "uuid": 12795302528668450925
             }
         ],
         "components": [
@@ -91,11 +91,11 @@
                 },
                 "enabled": true,
                 "type": "TransformComponent",
-                "uuid": 16841115817560375160
+                "uuid": 15832199037600454467
             }
         ],
         "name": "Root",
-        "uuid": 17267184291583716279
+        "uuid": 1556356093522435257
     },
     "version": 1
 }

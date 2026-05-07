@@ -136,6 +136,25 @@ void VulkanRenderer::WaitForGPU()
 
 void VulkanRenderer::Cleanup()
 {
+    // Callbacks
+    std::unordered_map<Core::UUID, std::function<void()>> callbacks;
+    {
+        std::scoped_lock lock(m_beforeRenderMutex);
+        callbacks.swap(m_beforeRender);
+    }
+
+    for (auto& [id, method] : callbacks)
+        method();
+    
+    callbacks.clear();
+    {
+        std::scoped_lock lock(m_afterRenderMutex);
+        callbacks.swap(m_afterRender);
+    }
+
+    for (auto& [id, method] : callbacks)
+        method();
+    
     m_renderQueueManager->Cleanup();
     m_lineRenderer.Cleanup();
     
