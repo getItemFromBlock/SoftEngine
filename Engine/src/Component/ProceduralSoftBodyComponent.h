@@ -74,11 +74,11 @@ namespace ProceduralSoftBody
     {
         Vec3f		chunkPos;
         uint32_t	offset;
-        GPUNeighborData neighbors[8];
         uint32_t    particleCount;
         uint32_t    connectionOffset;
         uint32_t    connectionLOffset;
         uint32_t       _padding;
+        GPUNeighborData neighbors[8];
     };
 
     struct GPUCommonData

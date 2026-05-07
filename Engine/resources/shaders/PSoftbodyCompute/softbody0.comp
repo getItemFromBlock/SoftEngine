@@ -40,11 +40,11 @@ struct ChunkData
 {
 	vec3 chunkPos;
 	uint offset;
-	NeighborData neighbors[8];
 	uint particleCount;
 	uint connectionOffset;
 	uint connectionLOffset;
 	uint _padding;
+	NeighborData neighbors[8];
 };
 
 struct ChunkHeader {
@@ -100,11 +100,6 @@ void main()
     if (chunkID == MAX_CHUNK_BUFFER_SIZE)
         return;
 	
-    vec3 vel = particles[particleID].velocity;
-	vec3 pos = particles[particleID].position;
-    
-	vel -= chunkData[pc.bufferOffset].gravity * chunkData[pc.bufferOffset].deltaTime;
-	
 	const uint cCount = particles[particleID].connectionsCount;
 	const uint lCount = particles[particleID].connectionsLCount;
 	const uint cOff = particles[particleID].connectionsOffset + chunkData[pc.bufferOffset].chunks[chunkID].connectionOffset;
@@ -116,12 +111,18 @@ void main()
 		return;
 	}
 	
+	vec3 vel = particles[particleID].velocity;
+	vec3 pos = particles[particleID].position;
+    
+	vel -= chunkData[pc.bufferOffset].gravity * chunkData[pc.bufferOffset].deltaTime;
+	
     for (uint i = 0; i < cCount; i++)
 	{
 		ConnectionData c = connections[cOff + i];
 		vec3 dif = particles[c.particleID].position - pos;
-		float f = length(dif) - c.initialLength;
-		vel += normalize(dif) * (f * chunkData[pc.bufferOffset].deltaTime * chunkData[pc.bufferOffset].strength);
+		float l = length(dif);
+		if (l > 0.001)
+			vel += normalize(dif) * ((l - c.initialLength) * chunkData[pc.bufferOffset].deltaTime * chunkData[pc.bufferOffset].strength);
 	}
 	
 	for (uint i = 0; i < lCount; i++)
@@ -137,8 +138,9 @@ void main()
 		{
 			ab = particles[chunkData[pc.bufferOffset].chunks[chunkID].neighbors[c.chunkID].offset + c.particleID].position - dif - pos;
 		}
-		float f = length(ab) - c.initialLength;
-		vel += normalize(ab) * (f * chunkData[pc.bufferOffset].deltaTime * chunkData[pc.bufferOffset].strength);
+		float l = length(ab);
+		if (l > 0.001)
+			vel += normalize(ab) * ((l - c.initialLength) * chunkData[pc.bufferOffset].deltaTime * chunkData[pc.bufferOffset].strength);
 	}
 	
 	vel = vel * max(1 - chunkData[pc.bufferOffset].damping * chunkData[pc.bufferOffset].deltaTime, 0.05);
@@ -147,5 +149,5 @@ void main()
 	if (l > 10.)
 		vel = normalize(vel) * 10.;
 
-    particles[id].velocity = vel;
+    particles[particleID].velocity = vel;
 }

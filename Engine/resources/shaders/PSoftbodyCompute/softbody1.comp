@@ -25,11 +25,11 @@ struct ChunkData
 {
 	vec3 chunkPos;
 	uint offset;
-	NeighborData neighbors[8];
 	uint particleCount;
 	uint connectionOffset;
 	uint connectionLOffset;
 	uint _padding;
+	NeighborData neighbors[8];
 };
 
 struct ChunkHeader {

@@ -120,19 +120,19 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
 
     if (!copyRequests.empty())
     {
-        const size_t stride = copyRequests.size() * sizeof(VkBufferCopy);
-        VkBufferCopy *regions = reinterpret_cast<VkBufferCopy*>(malloc(stride * 3));
+        const size_t stride = copyRequests.size();
+        VkBufferCopy *regions = reinterpret_cast<VkBufferCopy*>(malloc(sizeof(VkBufferCopy) * stride * 3));
         for (uint32_t i = 0; i < copyRequests.size(); i++)
         {
-            regions[i * 3].size = copyRequests[i].sizeP;
-            regions[i * 3 + 1].size = copyRequests[i].sizeC;
-            regions[i * 3 + 2].size = copyRequests[i].sizeL;
-            regions[i * 3].srcOffset = copyRequests[i].offsetP;
-            regions[i * 3 + 1].srcOffset = copyRequests[i].offsetC;
-            regions[i * 3 + 2].srcOffset = copyRequests[i].offsetL;
-            regions[i * 3].dstOffset = copyRequests[i].offsetP;
-            regions[i * 3 + 1].dstOffset = copyRequests[i].offsetC;
-            regions[i * 3 + 2].dstOffset = copyRequests[i].offsetL;
+            regions[i].size = copyRequests[i].sizeP;
+            regions[i + stride].size = copyRequests[i].sizeC;
+            regions[i + 2 * stride].size = copyRequests[i].sizeL;
+            regions[i].srcOffset = copyRequests[i].offsetP;
+            regions[i + stride].srcOffset = copyRequests[i].offsetC;
+            regions[i + 2 * stride].srcOffset = copyRequests[i].offsetL;
+            regions[i].dstOffset = copyRequests[i].offsetP;
+            regions[i + stride].dstOffset = copyRequests[i].offsetC;
+            regions[i + 2 * stride].dstOffset = copyRequests[i].offsetL;
         }
         vkCmdCopyBuffer(cmd, m_particleBuffer.GetStagingBuffer(), m_particleBuffer.GetBuffer(), (uint32_t)copyRequests.size(), regions);
         vkCmdCopyBuffer(cmd, m_connectionBuffer.GetStagingBuffer(), m_connectionBuffer.GetBuffer(), (uint32_t)copyRequests.size(), regions + copyRequests.size());
@@ -163,6 +163,7 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
             0, 0, nullptr, 3, barriers, 0, nullptr);
 
         free(regions);
+        copyRequests.clear();
     }
 
     VulkanMaterial* mat0 = m_simulationCompute0->GetMaterial();
@@ -331,14 +332,13 @@ void ProceduralSoftBodyComponent::OnRender(VulkanRenderer* renderer)
     auto* rqm = Engine::Get()->GetRenderer()->GetRenderQueueManager();
     auto* queue = rqm->GetOpaqueQueue();
 
-    const Mat4 transform = GetGameObject()->GetTransform()
-                               ->GetWorldMatrix().GetTranspose();
+    const Vec3f position = p_gameObject->GetTransform()->GetWorldPosition();
 
     for (const auto& chunk : m_chunks)
     {
         const CPUChunkData &source = chunk.second;
         RenderCommand::ChunkRenderData data;
-        data.chunkPos = source.localPosition;
+        data.chunkPos = source.localPosition + position;
         data.offset = source.globalOffsetP;
         uint32_t index = 0;
         for (int i = -1; i < 2; i++)
@@ -348,14 +348,14 @@ void ProceduralSoftBodyComponent::OnRender(VulkanRenderer* renderer)
                 const auto &neighbor = m_chunks.find(source.iPos + Vec2i(i, j));
                 if (neighbor != m_chunks.end())
                 {
-                    data.neighbors[index].pos = neighbor->second.localPosition;
+                    data.neighbors[index].pos = neighbor->second.localPosition + position;
                     data.neighbors[index].offset = neighbor->second.globalOffsetP;
 
                 }
                 else
                 {
                     // Making sure that particles depending on this chunk can still compute forces properly using the originalPos field of the connection
-                    data.neighbors[index].pos = Vec3f((source.iPos.x + i) * CHUNK_SIZE, 0.0f, (source.iPos.y + j) * CHUNK_SIZE);
+                    data.neighbors[index].pos = Vec3f((source.iPos.x + i) * CHUNK_SIZE, 0.0f, (source.iPos.y + j) * CHUNK_SIZE) + position;
                     data.neighbors[index].offset = -1;
                 }
                 index++;
@@ -367,24 +367,31 @@ void ProceduralSoftBodyComponent::OnRender(VulkanRenderer* renderer)
             queue->SubmitSoftBodyChunk(
                 m_billboardMesh.getPtr(), m_billboardMaterial.getPtr(),
                 m_particleBuffer.GetBuffer(), m_particleBuffer.GetSize(),
-                data, source.particleCount, transform, true);
+                data, source.particleCount, true);
         }
         else
         {
             queue->SubmitSoftBodyChunk(
                 source.mesh, m_material.getPtr(),
                 m_particleBuffer.GetBuffer(), m_particleBuffer.GetSize(),
-                data, 1, transform, false);
+                data, 1, false);
         }
     }
 
-    Mat4 worldMat = GetGameObject()->GetTransform()->GetWorldMatrix() * Mat4::CreateTranslationMatrix(Vec3f(m_particleSettings.sphereData.position));
+    Mat4 worldMat = Mat4::CreateTranslationMatrix(m_particleSettings.sphereData.position + position);
     queue->SubmitMeshRenderer(worldMat, m_sphereMesh.getPtr(), m_sphereMaterial);
 }
 
 void ProceduralSoftBodyComponent::OnDestroy()
 {
     Engine::Get()->GetRenderer()->WaitForGPU();
+
+    for (const auto &chunk : m_chunks)
+    {
+        chunk.second.mesh->Unload();
+        delete chunk.second.mesh;
+    }
+    m_chunks.clear();
 
     if (m_particleBuffer.GetSize())
     {
@@ -410,7 +417,8 @@ void ProceduralSoftBodyComponent::CreateParticleBuffers()
     m_connectionBuffer.Initialize(device, alignedSizeC);
     m_connectionBufferL.Initialize(device, alignedSizeL);
 
-    m_chunkSize = (uint32_t)Memory::align(sizeof(GPUCommonData) + sizeof(GPUChunkData) * MAX_CHUNK_BUFFER_SIZE, m_atomicBufferAlignement);
+    //m_chunkSize = (uint32_t)Memory::align(sizeof(GPUCommonData) + sizeof(GPUChunkData) * MAX_CHUNK_BUFFER_SIZE, m_atomicBufferAlignement);
+    m_chunkSize = (uint32_t)(sizeof(GPUCommonData) + sizeof(GPUChunkData) * MAX_CHUNK_BUFFER_SIZE);
     m_chunkDataBuffer.Initialize(device, m_chunkSize * MAX_CHUNK_BUFFER_COUNT, false);
     
     m_chunkBufferOffset = 0;
@@ -598,6 +606,8 @@ void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParti
         if (particle.originalPos.y <= -0.5f)
             continue;
 
+        particle.position = particleID.first;
+        particle.originalPos = particleID.first;
         particle.connectionsOffset = (uint32_t)connections0.size();
         particle.connectionsLOffset = (uint32_t)connections1.size();
 
@@ -668,6 +678,7 @@ void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParti
             }
         }
         particle.connectionsCount = (uint32_t)connections0.size() - particle.connectionsOffset;
+        particle.connectionsLCount = (uint32_t)connections1.size() - particle.connectionsLOffset;
     }
 }
 
@@ -693,16 +704,20 @@ void ProceduralSoftBodyComponent::CreateChunkAt(Vec2i pos)
     data.cId = newChunkC.id;
     data.lId = newChunkL.id;
     data.iPos = pos;
-    data.globalOffsetP = newChunkP.offset;
-    data.globalOffsetC = newChunkC.offset;
-    data.globalOffsetL = newChunkL.offset;
+    data.globalOffsetP = newChunkP.offset / sizeof(PSBParticleData);
+    data.globalOffsetC = newChunkC.offset / sizeof(PConnectionData0);
+    data.globalOffsetL = newChunkL.offset / sizeof(PConnectionData1);
     data.localPosition = Vec3f(pos.x * CHUNK_SIZE, 0.0f, pos.y * CHUNK_SIZE);
+    // Sanity checks
+    ASSERT(data.globalOffsetP * sizeof(PSBParticleData) == newChunkP.offset);
+    ASSERT(data.globalOffsetC * sizeof(PConnectionData0) == newChunkC.offset);
+    ASSERT(data.globalOffsetL * sizeof(PConnectionData1) == newChunkL.offset);
 
     CreateSkinnedMesh(data);
 
     m_particleBuffer.UpdateData(particles.data(), newChunkP.offset, totalSizeP);
-    m_particleBuffer.UpdateData(connections0.data(), newChunkC.offset, totalSizeC);
-    m_particleBuffer.UpdateData(connections1.data(), newChunkL.offset, totalSizeL);
+    m_connectionBuffer.UpdateData(connections0.data(), newChunkC.offset, totalSizeC);
+    m_connectionBufferL.UpdateData(connections1.data(), newChunkL.offset, totalSizeL);
     
     CopyRequest cr = {};
     cr.offsetP = newChunkP.offset;

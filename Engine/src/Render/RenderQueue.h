@@ -89,8 +89,7 @@ public:
                         uint32_t particleCount, const Vec3i& gridSize,
                         const Mat4& transform, bool isDebug);
     void SubmitSoftBodyChunk(   Mesh* mesh, Material* material, VkBuffer particleBuffer, VkDeviceSize particleBufferSize,
-                                const RenderCommand::ChunkRenderData &data, uint32_t instanceCount,
-                                const Mat4& transform, bool isDebug);
+                                const RenderCommand::ChunkRenderData &data, uint32_t instanceCount, bool isDebug);
 
     void Sort();
 

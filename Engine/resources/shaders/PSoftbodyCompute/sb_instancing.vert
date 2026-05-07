@@ -11,13 +11,22 @@ struct ParticleData {
     vec3 velocity;
 	uint connectionsCount;
 	vec3 originalPos;
-	float unused;
+	uint connectionsLOffset;
+	uint connectionsLCount;
+	uint _paddingA, _paddingB, _paddingC;
 };
 
-layout(push_constant) uniform Push {
-	mat4 transform;
-    ivec3 size;
-} pc;
+struct NeighborData
+{
+	vec3 pos;
+	int offset;
+};
+
+layout(set = 0, binding = 9) uniform ChunkRenderData {
+	vec3 chunkPos;
+	int offset;
+	NeighborData neighbors[8];
+} chunkData;
 
 layout(set = 0, binding = 8) readonly buffer Particles {
     ParticleData particles[];
@@ -34,19 +43,16 @@ layout(location = 2) out mat3 vTBN;
 layout(location = 6) out vec3 vTangentViewDir;
 
 void main() {
-    vec4 worldPos = vec4(inPosition * 0.025 + particles[gl_InstanceIndex].position, 1.0);
-	worldPos = worldPos * pc.transform;
+    vec4 worldPos = vec4(inPosition * 0.025 + particles[chunkData.offset + gl_InstanceIndex].position + chunkData.chunkPos, 1.0);
 	
     gl_Position = cameraUBO.viewProj * worldPos;
     vWorldPos = worldPos.xyz;
 	
     vTexCoord = inTexCoord;
 	vTexCoord.y = 1.0 - vTexCoord.y;
-	
-	mat3 normalMatrix = transpose(inverse(mat3(pc.transform)));
 
-    vec3 N = normalize(normalMatrix * inNormal);
-    vec3 T = normalize(normalMatrix * inTangent.xyz);
+    vec3 N = normalize(inNormal);
+    vec3 T = normalize(inTangent.xyz);
 
     T = normalize(T - dot(T, N) * N);
 

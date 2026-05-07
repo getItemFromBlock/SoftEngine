@@ -120,7 +120,7 @@ void RenderQueue::SubmitSoftBody(Mesh* mesh, Material* material, VkBuffer partic
     Submit(cmd);
 }
 
-void RenderQueue::SubmitSoftBodyChunk(Mesh *mesh, Material *material, VkBuffer particleBuffer, VkDeviceSize particleBufferSize, const RenderCommand::ChunkRenderData &data, uint32_t instanceCount, const Mat4 &transform, bool isDebug)
+void RenderQueue::SubmitSoftBodyChunk(Mesh *mesh, Material *material, VkBuffer particleBuffer, VkDeviceSize particleBufferSize, const RenderCommand::ChunkRenderData &data, uint32_t instanceCount, bool isDebug)
 {
     if (!mesh || !mesh->IsLoaded() || !mesh->HasBeenSent()) return;
     if (!material) return;
@@ -130,7 +130,6 @@ void RenderQueue::SubmitSoftBodyChunk(Mesh *mesh, Material *material, VkBuffer p
     cmd.mesh = mesh;
     cmd.material = material;
     cmd.shader = material->GetShader().getPtr();
-    cmd.modelMatrix = transform;
     cmd.particleBuffer = particleBuffer;
     cmd.particleBufferSize = particleBufferSize;
     cmd.particleCount = instanceCount;
@@ -305,7 +304,6 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
                 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
             m_chunkDataBuffers[i].buffer->MapAll();
         }
-        m_materialBuffersInitialized = true;
     }
 
     m_gBufferPools[frameIndex]->Reset();
@@ -493,11 +491,8 @@ void RenderQueue::ExecuteGBuffer(VulkanRenderer* renderer, Material* gBufferMate
             vulkanMaterial->SetStorageBuffer(
                 drawSet, 0, 8, cmd.particleBuffer, 0, cmd.particleBufferSize, renderer);
 
-            uint32_t instanceCount = (cmd.type == RenderCommand::Type::SoftBodyDebug)
-                ? cmd.particleCount
-                : 1;
             renderer->DrawInstanced(cmd.mesh->GetIndexBuffer(),
-                cmd.mesh->GetVertexBuffer(), instanceCount);
+                cmd.mesh->GetVertexBuffer(), cmd.particleCount);
 
             lastMesh = nullptr; // soft body doesn't go through BindVertexBuffers, invalidate
             break;
