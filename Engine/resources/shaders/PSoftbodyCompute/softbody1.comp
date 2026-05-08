@@ -74,7 +74,7 @@ void main()
 		counter += chunkData[pc.bufferOffset].chunks[i].particleCount;
 	}
 	
-    if (chunkID == MAX_CHUNK_BUFFER_SIZE)
+    if (chunkID == MAX_CHUNK_BUFFER_SIZE || (particles[particleID].connectionsCount + particles[particleID].connectionsLCount) == 0)
         return;
 	
     vec3 vel = particles[particleID].velocity;

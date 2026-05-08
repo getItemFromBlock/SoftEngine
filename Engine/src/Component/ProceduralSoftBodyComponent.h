@@ -22,16 +22,18 @@ namespace ProceduralSoftBody
     {
         struct General
         {
-            Vec2i particleAmount = Vec2i(11, 11);
+            Vec2i particleAmount = Vec2i(9, 9);
             Vec2i surfacePoints = Vec2i(8, 8);
             float damping = 1.0f;
             float strength = 300.0f;
             uint32_t connectionStrength = 1;
+            float dtScale = 1.0f;
+            bool paused = true;
         } general;
 
         struct SphereData
         {
-            Vec3f position;
+            Vec3f position = Vec3f(0, 1.0f, 0);
             float radius = 1.0f;
             bool animate = true;
         } sphereData;

@@ -1,6 +1,6 @@
  ------------- Shader ------------- 
 [vert] : sb_instancing.vert
-[frag] : ../Deferred/gBuffer.frag
+[frag] : sb_instancing.frag
 [attachmentCount] : 4
 [attachment 0] : 109
 [attachment 1] : 97

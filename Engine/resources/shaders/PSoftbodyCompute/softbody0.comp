@@ -85,16 +85,19 @@ void main()
 	
 	uint chunkID = MAX_CHUNK_BUFFER_SIZE;
 	uint particleID = 0;
+	uint particleBufStart = 0;
 	uint counter = 0;
 	for	(uint i = 0; i < MAX_CHUNK_BUFFER_SIZE; i++)
 	{
-		if (chunkData[pc.bufferOffset].chunks[i].particleCount + counter > id)
+		uint pCount = chunkData[pc.bufferOffset].chunks[i].particleCount;
+		if (pCount + counter > id)
 		{
 			chunkID = i;
-			particleID = chunkData[pc.bufferOffset].chunks[i].offset + id - counter;
+			particleBufStart = chunkData[pc.bufferOffset].chunks[i].offset;
+			particleID = particleBufStart - counter + id;
 			break;
 		}
-		counter += chunkData[pc.bufferOffset].chunks[i].particleCount;
+		counter += pCount;
 	}
 	
     if (chunkID == MAX_CHUNK_BUFFER_SIZE)
@@ -119,7 +122,7 @@ void main()
     for (uint i = 0; i < cCount; i++)
 	{
 		ConnectionData c = connections[cOff + i];
-		vec3 dif = particles[c.particleID].position - pos;
+		vec3 dif = particles[c.particleID + particleBufStart].position - pos;
 		float l = length(dif);
 		if (l > 0.001)
 			vel += normalize(dif) * ((l - c.initialLength) * chunkData[pc.bufferOffset].deltaTime * chunkData[pc.bufferOffset].strength);
@@ -128,15 +131,19 @@ void main()
 	for (uint i = 0; i < lCount; i++)
 	{
 		ConnectionDataL c = connectionsL[cOff + i];
-		vec3 dif = chunkData[pc.bufferOffset].chunks[c.chunkID].chunkPos - chunkData[pc.bufferOffset].chunks[chunkID].chunkPos;
+		vec3 dif = chunkData[pc.bufferOffset].chunks[chunkID].neighbors[c.chunkID].pos - chunkData[pc.bufferOffset].chunks[chunkID].chunkPos;
 		vec3 ab;
-		if (chunkData[pc.bufferOffset].chunks[chunkID].neighbors[c.chunkID].offset < 0) // chunk is not present in memory, use to original pos instead
+		int nbOffset = chunkData[pc.bufferOffset].chunks[chunkID].neighbors[c.chunkID].offset;
+		if (nbOffset < 0) // chunk is not present in buffer, use original pos instead
 		{
-			ab = c.originalPos - dif - pos;
+			ab = c.originalPos - pos - dif;
+			
+			vel = vec3(0);
+			break;
 		}
 		else
 		{
-			ab = particles[chunkData[pc.bufferOffset].chunks[chunkID].neighbors[c.chunkID].offset + c.particleID].position - dif - pos;
+			ab = particles[c.particleID + nbOffset].position - pos - dif;
 		}
 		float l = length(ab);
 		if (l > 0.001)
@@ -149,5 +156,6 @@ void main()
 	if (l > 10.)
 		vel = normalize(vel) * 10.;
 
+    //particles[particleID].velocity = vel;
     particles[particleID].velocity = vel;
 }

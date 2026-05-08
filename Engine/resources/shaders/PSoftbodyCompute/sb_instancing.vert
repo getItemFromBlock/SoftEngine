@@ -41,6 +41,7 @@ layout(location = 0) out vec3 vWorldPos;
 layout(location = 1) out vec2 vTexCoord;
 layout(location = 2) out mat3 vTBN;
 layout(location = 6) out vec3 vTangentViewDir;
+layout(location = 7) out vec3 vColor;
 
 void main() {
     vec4 worldPos = vec4(inPosition * 0.025 + particles[chunkData.offset + gl_InstanceIndex].position + chunkData.chunkPos, 1.0);
@@ -50,6 +51,8 @@ void main() {
 	
     vTexCoord = inTexCoord;
 	vTexCoord.y = 1.0 - vTexCoord.y;
+	vColor = (particles[chunkData.offset + gl_InstanceIndex].connectionsCount + particles[chunkData.offset + gl_InstanceIndex].connectionsLCount > 0) ?
+		(particles[chunkData.offset + gl_InstanceIndex].connectionsLCount > 0 ? vec3(0, 1, 0) : vec3(1)) : vec3(1,0,0);
 
     vec3 N = normalize(inNormal);
     vec3 T = normalize(inTangent.xyz);
