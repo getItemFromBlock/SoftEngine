@@ -33,7 +33,7 @@ void Inspector::OnRender()
             auto pos = object->GetTransform()->GetWorldPosition();
             renderer->AddLine(pos, pos + object->GetTransform()->GetRight(), {Vec3f::Right(), 1});
             renderer->AddLine(pos, pos + object->GetTransform()->GetUp(), {Vec3f::Up(), 1});
-            renderer->AddLine(pos, pos + object->GetTransform()->GetForward(), {Vec3f::Forward() * -1, 1});
+            renderer->AddLine(pos, pos - object->GetTransform()->GetForward(), {-Vec3f::Forward(), 1});
         }
     }
     if (ImGui::Begin("Inspector"))

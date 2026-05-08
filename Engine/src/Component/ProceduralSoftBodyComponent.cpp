@@ -347,6 +347,8 @@ void ProceduralSoftBodyComponent::OnRender(VulkanRenderer* renderer)
         {
             for (int j = -1; j < 2; j++)
             {
+                if (i == 0 && j == 0)
+                    continue;
                 const auto &neighbor = m_chunks.find(source.iPos + Vec2i(i, j));
                 if (neighbor != m_chunks.end())
                 {
@@ -380,7 +382,7 @@ void ProceduralSoftBodyComponent::OnRender(VulkanRenderer* renderer)
         }
     }
 
-    Mat4 worldMat = Mat4::CreateTranslationMatrix(m_particleSettings.sphereData.position + position);
+    Mat4 worldMat = Mat4::CreateTranslationMatrix(m_particleSettings.sphereData.position + position) * Mat4::CreateScaleMatrix(Vec3f(m_particleSettings.sphereData.radius));
     queue->SubmitMeshRenderer(worldMat, m_sphereMesh.getPtr(), m_sphereMaterial);
 }
 
@@ -661,9 +663,10 @@ void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParti
                         PConnectionData1 c;
                         c.particleID = otherChunkData.positionsMap.at(otherP);
                         c.chunkID = (otherChunk.x+1)*3+(otherChunk.y+1);
+                        ASSERT(c.chunkID != 4);
                         if (c.chunkID > 4) c.chunkID--;
                         c.originalPos = otherChunkData.positions[c.particleID];
-                        c.initialLength = (particle.originalPos - c.originalPos + Vec3f(otherChunk.x, 0, otherChunk.y) * CHUNK_SIZE).Length();
+                        c.initialLength = (particle.originalPos - c.originalPos - Vec3f(otherChunk.x, 0, otherChunk.y) * CHUNK_SIZE).Length();
                         connections1.push_back(c);
 
                         continue;

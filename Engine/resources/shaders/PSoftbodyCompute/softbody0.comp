@@ -130,20 +130,17 @@ void main()
 	
 	for (uint i = 0; i < lCount; i++)
 	{
-		ConnectionDataL c = connectionsL[cOff + i];
+		ConnectionDataL c = connectionsL[lOff + i];
 		vec3 dif = chunkData[pc.bufferOffset].chunks[chunkID].neighbors[c.chunkID].pos - chunkData[pc.bufferOffset].chunks[chunkID].chunkPos;
 		vec3 ab;
 		int nbOffset = chunkData[pc.bufferOffset].chunks[chunkID].neighbors[c.chunkID].offset;
 		if (nbOffset < 0) // chunk is not present in buffer, use original pos instead
 		{
-			ab = c.originalPos - pos - dif;
-			
-			vel = vec3(0);
-			break;
+			ab = c.originalPos - pos + dif;
 		}
 		else
 		{
-			ab = particles[c.particleID + nbOffset].position - pos - dif;
+			ab = particles[c.particleID + nbOffset].position - pos + dif;
 		}
 		float l = length(ab);
 		if (l > 0.001)

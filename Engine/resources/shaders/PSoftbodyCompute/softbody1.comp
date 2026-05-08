@@ -89,7 +89,7 @@ void main()
 	if (f <= chunkData[pc.bufferOffset].sphereRadius)
 	{
 		vec3 dif = -normalize(ab) * (chunkData[pc.bufferOffset].sphereRadius - f);
-		vel += dif * chunkData[pc.bufferOffset].strength * 0.01;
+		//vel += dif * chunkData[pc.bufferOffset].strength * 0.001;
 		pos += dif;
     }
 	pos += vel * chunkData[pc.bufferOffset].deltaTime;

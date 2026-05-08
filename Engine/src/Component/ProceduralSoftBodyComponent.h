@@ -33,7 +33,7 @@ namespace ProceduralSoftBody
 
         struct SphereData
         {
-            Vec3f position = Vec3f(0, 1.0f, 0);
+            Vec3f position = Vec3f(0, 2.0f, 0);
             float radius = 1.0f;
             bool animate = true;
         } sphereData;
