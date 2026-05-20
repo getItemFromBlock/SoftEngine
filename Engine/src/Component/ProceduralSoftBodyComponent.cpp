@@ -16,7 +16,7 @@
 #define MAX_CONNECTIONL_COUNT 0x100000
 #define MAX_CHUNK_BUFFER_SIZE 0x10
 #define MAX_CHUNK_BUFFER_COUNT 0x40
-#define CHUNK_SIZE 2.0f
+#define CHUNK_SIZE 4.0f
 
 using namespace ProceduralSoftBody;
 
@@ -433,34 +433,35 @@ void ProceduralSoftBodyComponent::CreateSkinnedMesh(CPUChunkData &data)
     data.mesh = new Mesh("internal");
 
     const Vec2i amount = m_particleSettings.general.particleAmount;
-    const Vec2i numPoints = m_particleSettings.general.surfacePoints - Vec2i(1,1);
-    const float posDelta = 1.0f / std::max(numPoints.x, numPoints.y);
+    const float posDelta = 1.0f / std::max(amount.x, amount.y);
     std::vector<WeightedVertex> vertices;
     std::vector<uint32_t> indices;
 
-    for (int32_t i = 0; i <= numPoints.x; i++)
+    for (int32_t i = 0; i <= amount.x; i++)
     {
-        float posX = ((float)(i) / (numPoints.x - 1) + 0.5f / amount.x) * CHUNK_SIZE;
+        float posX = (i + 0.5f) / amount.x * CHUNK_SIZE;
 
-        for (int32_t j = 0; j <= numPoints.y; j++)
+        for (int32_t j = 0; j <= amount.y; j++)
         {
-            const float posZ = ((float)(j) / (numPoints.y - 1) + 0.5f / amount.y) * CHUNK_SIZE;
+            const float posZ = (j + 0.5f) / amount.y * CHUNK_SIZE;
             const float height = GetHeightAt(posX + data.iPos.x * CHUNK_SIZE, posZ + data.iPos.y * CHUNK_SIZE);
             const Vec3f pos = Vec3f(posX, height, posZ);
 
             WeightedVertex v = {};
             v.position = pos;
-            v.texCoord = Vec2f((float)(i) / numPoints.x, (float)(j) / numPoints.y);
+            v.texCoord = Vec2f((float)(i) / amount.x, (float)(j) / amount.y);
             v.normal = GetNormalAt(pos + Vec3f(data.iPos.x, 0, data.iPos.y) * CHUNK_SIZE, posDelta);
-            v.tangent = Vec4f(Vec3f::Back().Cross(v.normal), -1.0f);
+
+            // Temporarily stores particle index in the indices for later use
+            v.indices = Vec4i(i, j, 0, 0);
             vertices.push_back(v);
         }
     }
 
-    const int stride = numPoints.x + 1;
-    for (int32_t j = 0; j < numPoints.x - 1; j++)
+    const int stride = amount.x + 1;
+    for (int32_t j = 0; j < amount.x; j++)
     {
-        for (int32_t k = 0; k < numPoints.y - 1; k++)
+        for (int32_t k = 0; k < amount.y; k++)
         {
             indices.push_back(j * stride + k);
             indices.push_back(j * stride + k + 1);
@@ -480,12 +481,13 @@ void ProceduralSoftBodyComponent::CreateSkinnedMesh(CPUChunkData &data)
 
 void ProceduralSoftBodyComponent::MapMeshToParticles(CPUChunkData &data, std::vector<WeightedVertex> &vertices)
 {
-    const PreChunkData *maps[4];
+    const Vec2i amount = m_particleSettings.general.particleAmount;
+    const PreChunkData *maps[9];
 
     uint32_t counter = 0;
-    for (int i = 0; i < 2; i++)
+    for (int i = -1; i < 2; i++)
     {
-        for (int j = 0; j < 2; j++)
+        for (int j = -1; j < 2; j++)
         {
             Vec2i iPos = data.iPos + Vec2i(i, j);
             if (!m_preChunkData.contains(iPos))
@@ -496,100 +498,58 @@ void ProceduralSoftBodyComponent::MapMeshToParticles(CPUChunkData &data, std::ve
 
     for (uint32_t i = 0; i < vertices.size(); i++)
     {
-        struct ParticleDist
-        {
-            Vec3f pos;
-            uint32_t id;
-            int neighbor;
-            float dist;
-        };
-
         Vec3f pos = vertices[i].position;
+        Vec2i iPos = Vec2i(vertices[i].indices.x, vertices[i].indices.y);
+        int chunk = ((iPos.x + amount.x) / amount.x) * 3 + ((iPos.y + amount.y) / amount.y);
 
-        std::array<ParticleDist, 3> closests = std::array<ParticleDist, 3>();
-        uint32_t count = 0;
+        int sx = (iPos.x + amount.x) % amount.x;
+        int sz = (iPos.y + amount.y) % amount.y;
 
-        const bool cr = pos.x < 0.5f;
-        const bool cu = pos.z < 0.5f;
+        Vec3i pPos = Vec3i(sx, maps[chunk]->heightMap[sx * amount.y + sz], sz);
+        vertices[i].normal = pos;
+        vertices[i].position = Vec3f(vertices[i].position.y - (pPos.y * CHUNK_SIZE / std::max(amount.x, amount.y)), maps[chunk]->positionsMap.at(pPos), chunk == 4 ? -1 : (chunk < 4 ? chunk : chunk - 1));
 
-        for (int x = 0; x < 2; x++)
+        for (uint32_t j = 0; j < 4; j++)
         {
-            if (cr && x > 0)
-                break;
-            for (int y = 0; y < 2; y++)
+            int dx = j < 2;
+            int dz = j >= 2;
+            if ((j & 0x1) == 0)
             {
-                if (cu && y > 0)
-                    break;
-
-                const ProceduralSoftBody::PreChunkData &chunkData = *(maps[x*2+y]);
-                for (uint32_t l = 0; l < chunkData.heightMap.size(); l++)
-                {
-                    const uint32_t particleID = chunkData.heightMap[l];
-                    Vec3f pos2 = chunkData.positions[particleID];
-                    float d = pos2.Distance(pos);
-                    if (count < closests.size())
-                    {
-                        ParticleDist p;
-                        p.id = particleID;
-                        p.dist = d;
-                        p.pos = pos2;
-                        p.neighbor = (x+1) * 3 + (y+1);
-                        if (p.neighbor == 4)
-                            p.neighbor = -1;
-                        closests[count] = p;
-                        count++;
-                        continue;
-                    }
-                    for (uint32_t m = 0; m < count; m++)
-                    {
-                        if (d < closests[m].dist)
-                        {
-                            for (uint32_t n = 1; n < count - m; n++)
-                            {
-                                closests[count - n] = closests[count - n - 1];
-                            }
-                            closests[m].id = particleID;
-                            closests[m].neighbor = (x + 1) * 3 + (y + 1);
-                            if (closests[m].neighbor == 4)
-                                closests[m].neighbor = -1;
-                            closests[m].dist = d;
-                            closests[m].pos = pos2;
-                            break;
-                        }
-                    }
-                }
+                dx = -dx;
+                dz = -dz;
             }
-        }
 
-        Vec3f weights = Vec3f();
-        Vec3f normal = (closests[1].pos - closests[0].pos).Cross(closests[2].pos - closests[0].pos);
-        float area = normal.Length();
-        area = std::copysign(area, normal.x * normal.y * normal.z);
-        if (std::abs(area) > 0.001f)
-        {
-            normal = normal.GetNormalize();
-            Vec3f pos2 = pos - normal * normal.Dot(pos - closests[0].pos);
-
-            for (uint32_t l = 0; l < 3; l++)
+            int nx = 0;
+            int nz = 0;
+            dx += iPos.x;
+            dz += iPos.y;
+            if (dx < 0)
             {
-                Vec3f normal1 = (closests[(l + 1) % 3].pos - pos2).Cross(closests[(l + 2) % 3].pos - pos2);
-                float area1 = normal1.Length();
-                area1 = std::copysign(area1, normal1.x * normal1.y * normal1.z);
-                float w = std::max(area1 / area, 0.0f);
-                weights[l] = w;
+                nx = -1;
+                dx += amount.x;
             }
+            else if (dx >= amount.x)
+            {
+                nx = 1;
+                dx -= amount.x;
+            }
+            if (dz < 0)
+            {
+                nz = -1;
+                dz += amount.y;
+            }
+            else if (dz >= amount.y)
+            {
+                nz = 1;
+                dz -= amount.y;
+            }
+
+            int id = (nx + 1) * 3 + (nz + 1);
+            int heightVal = maps[id]->heightMap[dx * amount.y + dz];
+            vertices[i].neightbor[j] = id == 4 ? -1 : (id < 4 ? id : id - 1);
+            vertices[i].indices[j] = maps[id]->positionsMap.at(Vec3i(dx, heightVal, dz));
+            vertices[i].tangent[j] = GetHeightAt(((float)(dx) / amount.x + data.iPos.x + nx) * CHUNK_SIZE, ((float)(dz) / amount.y + data.iPos.y + nz) * CHUNK_SIZE) - (heightVal * CHUNK_SIZE / std::max(amount.x, amount.y));
         }
-        else
-        {
-            weights = Vec4f(1.0f, 0, 0, 0);
-        }
-        float l = weights[0] + weights[1] + weights[2];
-        if (l <= 0.0001f)
-            vertices[i].weights = Vec4f(1.0f, 0.0f, 0.0f, 0.0f);
-        else
-            vertices[i].weights = Vec4f(weights / l, 0.0f);
-        vertices[i].indices = Vec4i(closests[0].id, closests[1].id, closests[2].id, -1);
-        vertices[i].neightbor = Vec4i(closests[0].neighbor, closests[1].neighbor, closests[2].neighbor, -1);
     }
 }
 
@@ -761,7 +721,7 @@ void ProceduralSoftBodyComponent::PreGenChunk(const Vec2i &chunkID)
                 const Vec3f pos = Vec3f(posX, posY, posZ);
                 if (posY + heightDelta >= height)
                 {
-                    chunkData.heightMap.push_back((uint32_t)chunkData.positions.size());
+                    chunkData.heightMap.push_back(j);
                 }
                 chunkData.positionsMap[Vec3i(i, j, k)] = (uint32_t)chunkData.positions.size();
                 chunkData.positions.push_back(pos);
@@ -793,7 +753,7 @@ Vec2i ProceduralSoftBodyComponent::GetChunkPos(Vec3f pos)
 
 float ProceduralSoftBodyComponent::GetHeightAt(float posX, float posZ)
 {
-    return 0.6f + sinf(posX * 0.4687435f + 0.76543f * posZ) * 0.2f + cosf(posX * 0.61354313f - 0.2684354f * posZ) * 0.15f + sinf(-posX * 1.23384643f + 1.4687351f * posZ) * 0.1f;
+    return 1.2f + sinf(posX * 0.4687435f + 0.76543f * posZ) * 0.2f + cosf(posX * 0.61354313f - 0.2684354f * posZ) * 0.15f + sinf(-posX * 1.23384643f + 1.4687351f * posZ) * 0.1f;
 }
 
 Vec3f ProceduralSoftBodyComponent::GetNormalAt(const Vec3f &pos, float dt)

@@ -28,8 +28,13 @@ struct WeightedVertex
     Vec3f normal;
     Vec4f tangent;
     Vec4i indices;
-    Vec4f weights;
-    Vec4i neightbor;
+    union
+    {
+        Vec4f weights;
+        Vec4i neightbor;
+    };
+
+    WeightedVertex() {}
 };
 
 struct SubMesh

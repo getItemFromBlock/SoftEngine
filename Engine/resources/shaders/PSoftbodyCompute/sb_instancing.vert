@@ -44,7 +44,7 @@ layout(location = 6) out vec3 vTangentViewDir;
 layout(location = 7) out vec3 vColor;
 
 void main() {
-    vec4 worldPos = vec4(inPosition * 0.025 + particles[chunkData.offset + gl_InstanceIndex].position + chunkData.chunkPos, 1.0);
+    vec4 worldPos = vec4(inPosition * 0.075 + particles[chunkData.offset + gl_InstanceIndex].position + chunkData.chunkPos, 1.0);
 	
     gl_Position = cameraUBO.viewProj * worldPos;
     vWorldPos = worldPos.xyz;

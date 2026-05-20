@@ -23,8 +23,7 @@ namespace ProceduralSoftBody
         struct General
         {
             Vec2i particleAmount = Vec2i(9, 9);
-            Vec2i surfacePoints = Vec2i(8, 8);
-            float damping = 1.0f;
+            float damping = 2.0f;
             float strength = 300.0f;
             uint32_t connectionStrength = 1;
             float dtScale = 1.0f;
@@ -145,8 +144,8 @@ namespace ProceduralSoftBody
 
     struct PreChunkData
     {
-        std::vector<uint32_t>   heightMap;
-        std::vector<Vec3f>      positions;
+        std::vector<int>    heightMap;
+        std::vector<Vec3f>  positions;
         std::unordered_map<Vec3i, uint32_t, Vec3iHash> positionsMap;
     };
 }

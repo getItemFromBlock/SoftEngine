@@ -93,6 +93,14 @@ void main()
 		pos += dif;
     }
 	pos += vel * chunkData[pc.bufferOffset].deltaTime;
+	
+	// hard collide with floor plane
+	if (pos.y < 0)
+	{
+		pos.y = 0;
+		vel.y = 0;
+	}
 
     particles[particleID].position = pos;
+    particles[particleID].velocity = vel;
 }

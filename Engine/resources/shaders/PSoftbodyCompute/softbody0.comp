@@ -135,13 +135,9 @@ void main()
 		vec3 ab;
 		int nbOffset = chunkData[pc.bufferOffset].chunks[chunkID].neighbors[c.chunkID].offset;
 		if (nbOffset < 0) // chunk is not present in buffer, use original pos instead
-		{
 			ab = c.originalPos - pos + dif;
-		}
 		else
-		{
 			ab = particles[c.particleID + nbOffset].position - pos + dif;
-		}
 		float l = length(ab);
 		if (l > 0.001)
 			vel += normalize(ab) * ((l - c.initialLength) * chunkData[pc.bufferOffset].deltaTime * chunkData[pc.bufferOffset].strength);
