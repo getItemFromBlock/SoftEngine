@@ -3,6 +3,7 @@
 
 #include "Component/MeshComponent.h"
 #include "Component/GPUSoftBodyComponent.h"
+#include "Component/ProceduralSoftBodyComponent.h"
 #include "Component/TestComponent.h"
 #include "Component/TransformComponent.h"
 #include "Component/LightComponent.h"

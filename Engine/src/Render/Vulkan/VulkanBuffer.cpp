@@ -82,10 +82,12 @@ void VulkanBuffer::CopyData(const void* data, VkDeviceSize size, VkDeviceSize of
     vkUnmapMemory(m_device->GetDevice(), m_bufferMemory);
 }
 
-void VulkanBuffer::CopyFrom(VkCommandBuffer commandBuffer, VulkanBuffer* srcBuffer, VkDeviceSize size)
+void VulkanBuffer::CopyFrom(VkCommandBuffer commandBuffer, VulkanBuffer* srcBuffer, VkDeviceSize size, VkDeviceSize offset)
 {
-    VkBufferCopy copyRegion{};
+    VkBufferCopy copyRegion = {};
     copyRegion.size = size;
+    copyRegion.srcOffset = offset;
+    copyRegion.dstOffset = offset;
     vkCmdCopyBuffer(commandBuffer, srcBuffer->GetBuffer(), m_buffer, 1, &copyRegion);
 }
 

@@ -13,13 +13,7 @@
 #include "Scene/SceneSerializer.h"
 #include "Utils/Color.h"
 #include "Utils/Random.h"
-
-// Aligns an integer to the next nearest memory aligned value. Alignement MUST be a power of two!
-uint64_t align(uint64_t value, uint64_t alignement)
-{
-    ASSERT(((alignement-1) & alignement) == 0);
-    return (value + alignement - 1) & ~(alignement - 1);
-}
+#include "Utils/Memory.h"
 
 void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
 {
@@ -73,20 +67,19 @@ void GPUSoftBodyComponent::CreateFromModel(SafePtr<Model> inputModel)
 {
     m_initializerModel = inputModel;
     m_loadedFromModel = true;
-    InitializeParticleDataFromModel(m_particleSettings.general.density, m_particleSettings.general.connectionStrength);
+    InitializeParticleDataFromModel(m_particleSettings.general.density, (float)m_particleSettings.general.connectionStrength);
     InitializeMaterialsFromModel(inputModel);
     CreateParticleBuffers();
 }
 
 void GPUSoftBodyComponent::Recreate()
 {
-    InitializeParticleDataFromModel(m_particleSettings.general.density, m_particleSettings.general.connectionStrength);
+    InitializeParticleDataFromModel(m_particleSettings.general.density, (float)m_particleSettings.general.connectionStrength);
     CreateParticleBuffers();
 }
 
 void GPUSoftBodyComponent::OnCreate()
 {
-    m_seed = Random::Global().Range(0, 100000);
     auto resourceManager = Engine::Get()->GetResourceManager();
     auto renderer = Engine::Get()->GetRenderer();
 
@@ -401,9 +394,9 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
 
     VkDeviceSize PBufSize = sizeof(SBParticleData) * m_particles.size();
     VkDeviceSize CBufSize = sizeof(ConnectionData) * m_connections.size();
-    PBufSizeAligned = align(PBufSize, 0x40);
+    PBufSizeAligned = Memory::align(PBufSize, 0x40);
     PBufSizeAligned = std::max(0x40llu, PBufSize);
-    CBufSizeAligned = align(CBufSize, 0x40);
+    CBufSizeAligned = Memory::align(CBufSize, 0x40);
     CBufSizeAligned = std::max(0x40llu, CBufSize);
 
     auto particleBuffer = std::make_unique<VulkanBuffer>();

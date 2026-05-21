@@ -44,7 +44,7 @@ class VulkanUniformBuffer
 {
 public:
     VulkanUniformBuffer() = default;
-    virtual ~VulkanUniformBuffer();
+    ~VulkanUniformBuffer();
 
     bool Initialize(VulkanDevice* device, VkDeviceSize size, 
         uint32_t frameCount, VkBufferUsageFlags usageFlags = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);

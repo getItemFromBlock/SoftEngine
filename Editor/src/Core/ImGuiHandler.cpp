@@ -187,9 +187,6 @@ void ImGuiHandler::Initialize(Window* window, VulkanRenderer* renderer)
     {
         std::cerr << "Failed to initialize ImGui Vulkan backend!" << std::endl;
     }
-
-    VkPhysicalDeviceProperties deviceProps;
-    vkGetPhysicalDeviceProperties(m_device->GetPhysicalDevice(), &deviceProps);
 }
 
 void ImGuiHandler::Cleanup()

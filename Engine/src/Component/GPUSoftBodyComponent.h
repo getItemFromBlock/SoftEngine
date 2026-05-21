@@ -64,13 +64,6 @@ struct ConnectionData
     float initialLength;
 };
 
-struct SoftBodyInstanceData
-{
-    Vec3f localPosition;
-    float localScale;
-    Quat  localRotation;
-};
-
 class GPUSoftBodyComponent : public IComponent
 {
 public:
@@ -100,8 +93,6 @@ public:
     nlohmann::json Serialize() const override;
     void Deserialize(const nlohmann::json& json) override;
 private:
-    friend class SceneSerializer;
-    
     void CreateParticleBuffers();
     void CreateSkinnedMesh(std::vector<WeightedVertex> &vertices, std::vector<uint32_t> &indices);
     void MapMeshToParticles(std::vector<WeightedVertex> &vertices);
@@ -147,6 +138,5 @@ private:
 
     std::atomic<bool> m_needRecreateFromModel = false;
 
-    Seed m_seed;
     BodySettings m_particleSettings;
 };

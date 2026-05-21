@@ -1,0 +1,106 @@
+#version 450
+
+#define MAX_CHUNK_BUFFER_SIZE 0x10
+
+layout(local_size_x = 64) in;
+
+struct ParticleData {
+    vec3 position;
+	uint connectionsOffset;
+    vec3 velocity;
+	uint connectionsCount;
+	vec3 originalPos;
+	uint connectionsLOffset;
+	uint connectionsLCount;
+	uint _paddingA, _paddingB, _paddingC;
+};
+
+struct NeighborData
+{
+	vec3 pos;
+	int offset;
+};
+
+struct ChunkData
+{
+	vec3 chunkPos;
+	uint offset;
+	uint particleCount;
+	uint connectionOffset;
+	uint connectionLOffset;
+	uint _padding;
+	NeighborData neighbors[8];
+};
+
+struct ChunkHeader {
+	vec3    spherePos;
+	float   sphereRadius;
+	vec3   gravity;
+	float   deltaTime;
+	float   damping;
+	float   strength;
+	uint   _paddingA, _paddingB;
+    ChunkData chunks[MAX_CHUNK_BUFFER_SIZE];
+};
+
+layout(set = 0, binding = 0) buffer Particles {
+    ParticleData particles[];
+};
+
+layout(set = 0, binding = 3) buffer ChunkHeaders {
+	ChunkHeader chunkData[];
+};
+
+layout(push_constant) uniform Push {
+    uint bufferOffset;
+} pc;
+
+
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+	
+	uint chunkID = MAX_CHUNK_BUFFER_SIZE;
+	uint particleID = 0;
+	uint counter = 0;
+	for	(uint i = 0; i < MAX_CHUNK_BUFFER_SIZE; i++)
+	{
+		if (chunkData[pc.bufferOffset].chunks[i].particleCount + counter > id)
+		{
+			chunkID = i;
+			particleID = chunkData[pc.bufferOffset].chunks[i].offset + id - counter;
+			break;
+		}
+		counter += chunkData[pc.bufferOffset].chunks[i].particleCount;
+	}
+	
+    if (chunkID == MAX_CHUNK_BUFFER_SIZE || (particles[particleID].connectionsCount + particles[particleID].connectionsLCount) == 0)
+        return;
+	
+    vec3 vel = particles[particleID].velocity;
+	vec3 pos = particles[particleID].position;
+	
+	// Collide with sphere
+	
+	vec3 spPos = chunkData[pc.bufferOffset].spherePos - chunkData[pc.bufferOffset].chunks[chunkID].chunkPos;
+	vec3 ab = spPos - pos;
+	
+	float f = length(ab);
+	if (f <= chunkData[pc.bufferOffset].sphereRadius)
+	{
+		vec3 dif = -normalize(ab) * (chunkData[pc.bufferOffset].sphereRadius - f);
+		//vel += dif * chunkData[pc.bufferOffset].strength * 0.001;
+		pos += dif;
+    }
+	pos += vel * chunkData[pc.bufferOffset].deltaTime;
+	
+	// hard collide with floor plane
+	if (pos.y < 0)
+	{
+		pos.y = 0;
+		vel.y = 0;
+	}
+
+    particles[particleID].position = pos;
+    particles[particleID].velocity = vel;
+}

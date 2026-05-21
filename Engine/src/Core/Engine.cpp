@@ -21,6 +21,7 @@
 #include "Component/LightComponent.h"
 #include "Component/ParticleSystemComponent.h"
 #include "Component/GPUSoftBodyComponent.h"
+#include "Component/ProceduralSoftBodyComponent.h"
 
 
 #include "Utils/Color.h"
@@ -85,6 +86,7 @@ bool Engine::Initialize(EngineDesc desc)
     m_componentRegister->RegisterComponent<LightComponent>();
     m_componentRegister->RegisterComponent<ParticleSystemComponent>();
     m_componentRegister->RegisterComponent<GPUSoftBodyComponent>();
+    m_componentRegister->RegisterComponent<ProceduralSoftBodyComponent>();
     
     m_sceneHolder = std::make_unique<SceneHolder>();
     m_sceneHolder->Initialize();

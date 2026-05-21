@@ -14,11 +14,12 @@ public:
     void Cleanup();
 
     void CopyData(const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
-    void CopyFrom(VkCommandBuffer commandBuffer, VulkanBuffer* srcBuffer, VkDeviceSize size);
+    void CopyFrom(VkCommandBuffer commandBuffer, VulkanBuffer* srcBuffer, VkDeviceSize size, VkDeviceSize offset = 0);
 
     VkDeviceMemory GetBufferMemory() const { return m_bufferMemory; }
     VkBuffer GetBuffer() const { return m_buffer; }
     VkDeviceSize GetSize() const { return m_size; }
+    VulkanDevice *GetDevice() const { return m_device; }
 
 private:
     uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);

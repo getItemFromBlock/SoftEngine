@@ -114,7 +114,7 @@ bool Shader::Load(ResourceManager* resourceManager)
         
         if (m_vertexShader)
         {
-            PrintError("Vertex Shader already loaded: %s", resolvedPath.c_str());
+            PrintError("Vertex Shader already loaded: %s", resolvedPath.string().c_str());
             return false;
         }
         
@@ -122,7 +122,7 @@ bool Shader::Load(ResourceManager* resourceManager)
         {
             m_vertexShader = resourceManager->Load<VertexShader>(resolvedPath, multithread);
             if (!m_vertexShader) {
-                PrintError("Failed to load Vertex Shader: %s", resolvedPath.c_str());
+                PrintError("Failed to load Vertex Shader: %s", resolvedPath.string().c_str());
                 return false;
             }
         }
@@ -133,7 +133,7 @@ bool Shader::Load(ResourceManager* resourceManager)
         
         if (m_fragmentShader)
         {
-            PrintError("Fragment shader already loaded: %s", resolvedPath.c_str());
+            PrintError("Fragment shader already loaded: %s", resolvedPath.string().c_str());
             return false;
         }
         
@@ -141,7 +141,7 @@ bool Shader::Load(ResourceManager* resourceManager)
         {
             m_fragmentShader = resourceManager->Load<FragmentShader>(resolvedPath, multithread);
             if (!m_fragmentShader) {
-                PrintError("Failed to load Fragment Shader: %s", resolvedPath.c_str());
+                PrintError("Failed to load Fragment Shader: %s", resolvedPath.string().c_str());
                 return false;
             }
         }
@@ -152,7 +152,7 @@ bool Shader::Load(ResourceManager* resourceManager)
         
         if (m_computeShader)
         {
-            PrintError("Compute shader already loaded: %s", resolvedPath.c_str());
+            PrintError("Compute shader already loaded: %s", resolvedPath.string().c_str());
             return false;
         }
         
@@ -160,7 +160,7 @@ bool Shader::Load(ResourceManager* resourceManager)
         {
             m_computeShader = resourceManager->Load<ComputeShader>(resolvedPath, multithread);
             if (!m_computeShader) {
-                PrintError("Failed to load Compute Shader: %s", resolvedPath.c_str());
+                PrintError("Failed to load Compute Shader: %s", resolvedPath.string().c_str());
                 return false;
             }
         }
