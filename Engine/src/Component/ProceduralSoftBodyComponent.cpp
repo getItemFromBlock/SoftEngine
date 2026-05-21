@@ -15,17 +15,17 @@
 #define MAX_PARTICLE_COUNT 0x100000
 #define MAX_CONNECTION_COUNT 0x1000000
 #define MAX_CONNECTIONL_COUNT 0x100000
+#define MAX_SURFACE_CHUNK_COUNT 0x400
 #define MAX_CHUNK_BUFFER_SIZE 0x10
 #define MAX_CHUNK_BUFFER_COUNT 0x40
 #define CHUNK_SIZE 4.0f
 static const Vec2i particleAmount = Vec2i(9, 9);
+static const uint32_t connectionStrength = 2;
 
 using namespace ProceduralSoftBody;
 
 void ProceduralSoftBodyComponent::Describe(ClassDescriptor& d)
 {
-    d.AddProperty("Connections Amount", PropertyType::Int, &m_particleSettings.general.connectionStrength)
-        .SetRangeInt(2, 256);
     d.AddFloat("Damping", m_particleSettings.general.damping).SetRangeFloat(0, 65536);
     d.AddFloat("Connection Strength", m_particleSettings.general.strength).SetRangeFloat(0, 65536);
     d.AddVec3f("Sphere pos", m_particleSettings.sphereData.position);
@@ -35,6 +35,7 @@ void ProceduralSoftBodyComponent::Describe(ClassDescriptor& d)
     d.AddFloat("Deltatime", m_particleSettings.general.dtScale).SetRangeFloat(0, 65536);
 
     d.AddBool("Debug", m_drawDebug);
+    d.AddBool("Should Collide", m_shouldDetectStuff);
 }
 
 void ProceduralSoftBodyComponent::OnCreate()
@@ -42,9 +43,11 @@ void ProceduralSoftBodyComponent::OnCreate()
     m_globalChunkCount[0] = 0;
     m_globalChunkCount[1] = 0;
     m_globalChunkCount[2] = 0;
+    m_globalChunkCount[3] = 0;
     m_globalChunkOffset[0] = 0;
     m_globalChunkOffset[1] = 0;
     m_globalChunkOffset[2] = 0;
+    m_globalChunkOffset[3] = 0;
 
     auto resourceManager = Engine::Get()->GetResourceManager();
     auto renderer = Engine::Get()->GetRenderer();
@@ -55,6 +58,7 @@ void ProceduralSoftBodyComponent::OnCreate()
 
     auto computeShader0 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/softbody0.shader");
     auto computeShader1 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/softbody1.shader");
+    //auto computeshader2 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/collision0.shader");
     auto instancingShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/sb_instancing.shader");
     auto skinnedShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/sb_skinning.shader");
 
@@ -105,30 +109,41 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
     if (!m_simulationCompute0 || !m_simulationCompute1 || !m_particleBuffer.GetSize())
         return;
 
+    HandleCopyRequests();
+}
+
+void ProceduralSoftBodyComponent::HandleCopyRequests()
+{
     auto renderer = Engine::Get()->GetRenderer();
     VkCommandBuffer cmd = renderer->GetCommandBuffer();
 
     if (!copyRequests.empty())
     {
         const size_t stride = copyRequests.size();
-        VkBufferCopy *regions = reinterpret_cast<VkBufferCopy*>(malloc(sizeof(VkBufferCopy) * stride * 3));
+        VkBufferCopy *regions = reinterpret_cast<VkBufferCopy *>(malloc(sizeof(VkBufferCopy) * stride * 4));
         for (uint32_t i = 0; i < copyRequests.size(); i++)
         {
-            regions[i].size = copyRequests[i].sizeP;
-            regions[i + stride].size = copyRequests[i].sizeC;
+            regions[i + 0 * stride].size = copyRequests[i].sizeP;
+            regions[i + 1 * stride].size = copyRequests[i].sizeC;
             regions[i + 2 * stride].size = copyRequests[i].sizeL;
-            regions[i].srcOffset = copyRequests[i].offsetP;
-            regions[i + stride].srcOffset = copyRequests[i].offsetC;
+            regions[i + 3 * stride].size = copyRequests[i].sizeS;
+
+            regions[i + 0 * stride].srcOffset = copyRequests[i].offsetP;
+            regions[i + 1 * stride].srcOffset = copyRequests[i].offsetC;
             regions[i + 2 * stride].srcOffset = copyRequests[i].offsetL;
-            regions[i].dstOffset = copyRequests[i].offsetP;
-            regions[i + stride].dstOffset = copyRequests[i].offsetC;
+            regions[i + 3 * stride].srcOffset = copyRequests[i].offsetS;
+
+            regions[i + 0 * stride].dstOffset = copyRequests[i].offsetP;
+            regions[i + 1 * stride].dstOffset = copyRequests[i].offsetC;
             regions[i + 2 * stride].dstOffset = copyRequests[i].offsetL;
+            regions[i + 3 * stride].dstOffset = copyRequests[i].offsetS;
         }
         vkCmdCopyBuffer(cmd, m_particleBuffer.GetStagingBuffer(), m_particleBuffer.GetBuffer(), (uint32_t)copyRequests.size(), regions);
-        vkCmdCopyBuffer(cmd, m_connectionBuffer.GetStagingBuffer(), m_connectionBuffer.GetBuffer(), (uint32_t)copyRequests.size(), regions + copyRequests.size());
-        vkCmdCopyBuffer(cmd, m_connectionBufferL.GetStagingBuffer(), m_connectionBufferL.GetBuffer(), (uint32_t)copyRequests.size(), regions + copyRequests.size()*2);
+        vkCmdCopyBuffer(cmd, m_connectionBuffer.GetStagingBuffer(), m_connectionBuffer.GetBuffer(), (uint32_t)copyRequests.size(), regions + stride);
+        vkCmdCopyBuffer(cmd, m_connectionBufferL.GetStagingBuffer(), m_connectionBufferL.GetBuffer(), (uint32_t)copyRequests.size(), regions + stride * 2);
+        vkCmdCopyBuffer(cmd, m_surfacePointsBuffer.GetStagingBuffer(), m_surfacePointsBuffer.GetBuffer(), (uint32_t)copyRequests.size(), regions + stride * 3);
 
-        VkBufferMemoryBarrier barriers[3] = {};
+        VkBufferMemoryBarrier barriers[4] = {};
         barriers[0].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
         barriers[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
@@ -147,10 +162,16 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
         barriers[2].buffer = m_connectionBufferL.GetBuffer();
         barriers[2].size = VK_WHOLE_SIZE;
 
+        barriers[3].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barriers[3].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barriers[3].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barriers[3].buffer = m_surfacePointsBuffer.GetBuffer();
+        barriers[3].size = VK_WHOLE_SIZE;
+
         vkCmdPipelineBarrier(cmd,
             VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            0, 0, nullptr, 3, barriers, 0, nullptr);
+            0, 0, nullptr, 4, barriers, 0, nullptr);
 
         free(regions);
         copyRequests.clear();
@@ -178,53 +199,7 @@ void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
     auto renderer = Engine::Get()->GetRenderer();
     VkCommandBuffer cmd = renderer->GetCommandBuffer();
 
-    if (!copyRequests.empty())
-    {
-        const size_t stride = copyRequests.size();
-        VkBufferCopy *regions = reinterpret_cast<VkBufferCopy*>(malloc(sizeof(VkBufferCopy) * stride * 3));
-        for (uint32_t i = 0; i < copyRequests.size(); i++)
-        {
-            regions[i].size = copyRequests[i].sizeP;
-            regions[i + stride].size = copyRequests[i].sizeC;
-            regions[i + 2 * stride].size = copyRequests[i].sizeL;
-            regions[i].srcOffset = copyRequests[i].offsetP;
-            regions[i + stride].srcOffset = copyRequests[i].offsetC;
-            regions[i + 2 * stride].srcOffset = copyRequests[i].offsetL;
-            regions[i].dstOffset = copyRequests[i].offsetP;
-            regions[i + stride].dstOffset = copyRequests[i].offsetC;
-            regions[i + 2 * stride].dstOffset = copyRequests[i].offsetL;
-        }
-        vkCmdCopyBuffer(cmd, m_particleBuffer.GetStagingBuffer(), m_particleBuffer.GetBuffer(), (uint32_t)copyRequests.size(), regions);
-        vkCmdCopyBuffer(cmd, m_connectionBuffer.GetStagingBuffer(), m_connectionBuffer.GetBuffer(), (uint32_t)copyRequests.size(), regions + copyRequests.size());
-        vkCmdCopyBuffer(cmd, m_connectionBufferL.GetStagingBuffer(), m_connectionBufferL.GetBuffer(), (uint32_t)copyRequests.size(), regions + copyRequests.size()*2);
-
-        VkBufferMemoryBarrier barriers[3] = {};
-        barriers[0].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-        barriers[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        barriers[0].buffer = m_particleBuffer.GetBuffer();
-        barriers[0].size = VK_WHOLE_SIZE;
-
-        barriers[1].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-        barriers[1].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        barriers[1].buffer = m_connectionBuffer.GetBuffer();
-        barriers[1].size = VK_WHOLE_SIZE;
-
-        barriers[2].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-        barriers[2].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barriers[2].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        barriers[2].buffer = m_connectionBufferL.GetBuffer();
-        barriers[2].size = VK_WHOLE_SIZE;
-
-        vkCmdPipelineBarrier(cmd,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            0, 0, nullptr, 3, barriers, 0, nullptr);
-
-        free(regions);
-        copyRequests.clear();
-    }
+    HandleCopyRequests();
 
     VulkanMaterial* mat0 = m_simulationCompute0->GetMaterial();
     VulkanMaterial* mat1 = m_simulationCompute1->GetMaterial();
@@ -460,6 +435,7 @@ void ProceduralSoftBodyComponent::OnDestroy()
         m_particleBuffer.Cleanup();
         m_connectionBuffer.Cleanup();
         m_connectionBufferL.Cleanup();
+        m_surfacePointsBuffer.Cleanup();
         m_chunkDataBuffer.Cleanup();
     }
 }
@@ -469,11 +445,11 @@ nlohmann::json ProceduralSoftBodyComponent::Serialize() const
     const PBodySettings& settings = const_cast<ProceduralSoftBodyComponent*>(this)->GetSettings();
     return {
         {"drawDebug", m_drawDebug},
+        {"shouldDetectStuff", m_shouldDetectStuff},
         {"settings", {
             {"general", {
                 {"damping", settings.general.damping},
                 {"strength", settings.general.strength},
-                {"connectionStrength", settings.general.connectionStrength},
                 {"dtScale", settings.general.dtScale},
                 {"paused", settings.general.paused}
             }},
@@ -495,7 +471,6 @@ void ProceduralSoftBodyComponent::Deserialize(const nlohmann::json& json)
         const nlohmann::json& general = settingsData["general"];
         settings.general.damping = general.value("damping", settings.general.damping);
         settings.general.strength = general.value("strength", settings.general.strength);
-        settings.general.connectionStrength = general.value("connectionStrength", settings.general.connectionStrength);
         settings.general.dtScale = general.value("dtScale", settings.general.dtScale);
         settings.general.paused = general.value("paused", settings.general.paused);
     }
@@ -508,6 +483,7 @@ void ProceduralSoftBodyComponent::Deserialize(const nlohmann::json& json)
     }
 
     m_drawDebug = json.value("drawDebug", m_drawDebug);
+    m_shouldDetectStuff = json.value("shouldDetectStuff", m_shouldDetectStuff);
 }
 
 void ProceduralSoftBodyComponent::CreateParticleBuffers()
@@ -521,9 +497,11 @@ void ProceduralSoftBodyComponent::CreateParticleBuffers()
     VkDeviceSize alignedSizeP = Memory::align(MAX_PARTICLE_COUNT * sizeof(PSBParticleData), m_atomicBufferAlignement);
     VkDeviceSize alignedSizeC = Memory::align(MAX_CONNECTION_COUNT * sizeof(PConnectionData0), m_atomicBufferAlignement);
     VkDeviceSize alignedSizeL = Memory::align(MAX_CONNECTIONL_COUNT * sizeof(PConnectionData1), m_atomicBufferAlignement);
+    VkDeviceSize alignedSizeS = Memory::align(sizeof(uint32_t) * particleAmount.x * particleAmount.y * MAX_SURFACE_CHUNK_COUNT, m_atomicBufferAlignement);
     m_particleBuffer.Initialize(device, alignedSizeP);
     m_connectionBuffer.Initialize(device, alignedSizeC);
     m_connectionBufferL.Initialize(device, alignedSizeL);
+    m_surfacePointsBuffer.Initialize(device, alignedSizeS);
 
     //m_chunkSize = (uint32_t)Memory::align(sizeof(GPUCommonData) + sizeof(GPUChunkData) * MAX_CHUNK_BUFFER_SIZE, m_atomicBufferAlignement);
     m_chunkSize = (uint32_t)(sizeof(GPUCommonData) + sizeof(GPUChunkData) * MAX_CHUNK_BUFFER_SIZE);
@@ -658,7 +636,7 @@ void ProceduralSoftBodyComponent::MapMeshToParticles(CPUChunkData &data, std::ve
 void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParticleData> &particles, std::vector<PConnectionData0> &connections0,
                                                             std::vector<PConnectionData1> &connections1, const Vec2i &chunkID)
 {
-    const int32_t maxL = m_particleSettings.general.connectionStrength;
+    const int32_t maxL = connectionStrength;
 
     if (!m_preChunkData.contains(chunkID))
         PreGenChunk(chunkID);
@@ -760,31 +738,39 @@ void ProceduralSoftBodyComponent::CreateChunkAt(Vec2i pos)
     const uint32_t totalSizeP = (uint32_t)(sizeof(PSBParticleData) * particles.size());
     const uint32_t totalSizeC = (uint32_t)(sizeof(PConnectionData0) * connections0.size());
     const uint32_t totalSizeL = (uint32_t)(sizeof(PConnectionData1) * connections1.size());
+    const uint32_t totalSizeS = (uint32_t)(sizeof(uint32_t) * particleAmount.x * particleAmount.y);
 
     const BufferChunk newChunkP = AllocChunk(totalSizeP, 0);
     const BufferChunk newChunkC = AllocChunk(totalSizeC, 1);
     const BufferChunk newChunkL = AllocChunk(totalSizeL, 2);
+    const BufferChunk newChunkS = AllocChunk(totalSizeS, 3);
 
     CPUChunkData data;
     data.pId = newChunkP.id;
     data.cId = newChunkC.id;
     data.lId = newChunkL.id;
+    data.sId = newChunkS.id;
     data.iPos = pos;
     data.globalOffsetP = newChunkP.offset / sizeof(PSBParticleData);
     data.globalOffsetC = newChunkC.offset / sizeof(PConnectionData0);
     data.globalOffsetL = newChunkL.offset / sizeof(PConnectionData1);
+    data.globalOffsetS = newChunkS.offset / sizeof(uint32_t);
     data.localPosition = Vec3f(pos.x * CHUNK_SIZE, 0.0f, pos.y * CHUNK_SIZE);
     data.particleCount = (uint32_t)particles.size();
     // Sanity checks
     ASSERT(data.globalOffsetP * sizeof(PSBParticleData) == newChunkP.offset);
     ASSERT(data.globalOffsetC * sizeof(PConnectionData0) == newChunkC.offset);
     ASSERT(data.globalOffsetL * sizeof(PConnectionData1) == newChunkL.offset);
+    ASSERT(data.globalOffsetS * sizeof(uint32_t) == newChunkS.offset);
 
     CreateSkinnedMesh(data);
 
+    const ProceduralSoftBody::PreChunkData &chunkData = m_preChunkData[pos];
+    ASSERT(totalSizeS / sizeof(uint32_t) == chunkData.heightMap.size());
     m_particleBuffer.UpdateData(particles.data(), newChunkP.offset, totalSizeP);
     m_connectionBuffer.UpdateData(connections0.data(), newChunkC.offset, totalSizeC);
     m_connectionBufferL.UpdateData(connections1.data(), newChunkL.offset, totalSizeL);
+    m_surfacePointsBuffer.UpdateData(chunkData.heightMap.data(), newChunkS.offset, totalSizeS);
     
     CopyRequest cr = {};
     cr.offsetP = newChunkP.offset;
@@ -793,6 +779,8 @@ void ProceduralSoftBodyComponent::CreateChunkAt(Vec2i pos)
     cr.sizeC = newChunkC.size;
     cr.offsetL = newChunkL.offset;
     cr.sizeL = newChunkL.size;
+    cr.offsetS = newChunkS.offset;
+    cr.sizeS = newChunkS.size;
     copyRequests.push_back(cr);
 
     m_chunks[pos] = data;
@@ -869,7 +857,7 @@ Vec3f ProceduralSoftBodyComponent::GetNormalAt(const Vec3f &pos, float dt)
 
 BufferChunk ProceduralSoftBodyComponent::AllocChunk(uint32_t size, uint32_t page)
 {
-    ASSERT(page < 3);
+    ASSERT(page < 4);
     size = (uint32_t)Memory::align(size, m_atomicBufferAlignement);
     for (auto &chunk : m_memChunks[page])
     {
@@ -894,7 +882,26 @@ BufferChunk ProceduralSoftBodyComponent::AllocChunk(uint32_t size, uint32_t page
     }
 
     BufferChunk newChunk;
-    if (m_globalChunkOffset[page] + size < (page == 0 ? m_particleBuffer.GetSize() : (page == 1 ? m_connectionBuffer.GetSize() : m_connectionBufferL.GetSize())))
+    VkDeviceSize bufferSize;
+    switch (page)
+    {
+    case 0:
+        bufferSize = m_particleBuffer.GetSize();
+        break;
+    case 1:
+        bufferSize = m_connectionBuffer.GetSize();
+        break;
+    case 2:
+        bufferSize = m_connectionBufferL.GetSize();
+        break;
+    case 3:
+        bufferSize = m_surfacePointsBuffer.GetSize();
+        break;
+    default:
+        PrintError("Tryingto alloc to invalid memory page: %d", page);
+        break;
+    }
+    if (m_globalChunkOffset[page] + size < bufferSize)
     {
         newChunk.offset = m_globalChunkOffset[page];
         newChunk.size = size;
@@ -945,5 +952,5 @@ void ProceduralSoftBodyComponent::FreeChunk(uint32_t id, uint32_t page)
         }
     }
 
-    PrintError("Invalid free");
+    PrintError("Invalid free (hmleh)");
 }

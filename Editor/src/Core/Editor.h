@@ -24,7 +24,7 @@ public:
 private:
     inline static std::unique_ptr<Editor> s_instance = nullptr;
     
-    Engine* m_engine;
+    Engine* m_engine = nullptr;
     std::atomic_bool loadedA = false;
     std::atomic_bool loadedB = false;
     bool initialised = false;

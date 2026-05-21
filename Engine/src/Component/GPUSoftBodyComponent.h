@@ -136,6 +136,9 @@ private:
     bool m_needsRecreation = false;
     bool m_drawDebug = false;
 
+    uint32_t uniqueSeed = 0;
+    static uint32_t seedCounter;
+
     std::atomic<bool> m_needRecreateFromModel = false;
 
     BodySettings m_particleSettings;

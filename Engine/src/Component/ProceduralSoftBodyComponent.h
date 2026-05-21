@@ -22,9 +22,8 @@ namespace ProceduralSoftBody
     {
         struct General
         {
-            float damping = 2.0f;
-            float strength = 300.0f;
-            uint32_t connectionStrength = 1;
+            float damping = 4.0f;
+            float strength = 50.0f;
             float dtScale = 1.0f;
             bool paused = false;
         } general;
@@ -76,7 +75,7 @@ namespace ProceduralSoftBody
         uint32_t    particleCount;
         uint32_t    connectionOffset;
         uint32_t    connectionLOffset;
-        uint32_t       _padding;
+        uint32_t    surfacePointsOffset;
         GPUNeighborData neighbors[8];
     };
 
@@ -99,9 +98,11 @@ namespace ProceduralSoftBody
         uint32_t pId;
         uint32_t cId;
         uint32_t lId;
+        uint32_t sId;
         uint32_t globalOffsetP;
         uint32_t globalOffsetC;
         uint32_t globalOffsetL;
+        uint32_t globalOffsetS;
         uint32_t particleCount;
         uint32_t neighbors[8];
     };
@@ -122,6 +123,8 @@ namespace ProceduralSoftBody
         VkDeviceSize sizeC;
         VkDeviceSize offsetL;
         VkDeviceSize sizeL;
+        VkDeviceSize offsetS;
+        VkDeviceSize sizeS;
     };
 
     struct Vec2iHash
@@ -174,6 +177,7 @@ private:
                                 std::vector<ProceduralSoftBody::PConnectionData0> &connections0,
                                 std::vector<ProceduralSoftBody::PConnectionData1> &connections1, const Vec2i &chunkID);
     void PreGenChunk(const Vec2i &chunkID);
+    void HandleCopyRequests();
 
     Vec2i GetChunkPos(Vec3f pos);
     float GetHeightAt(float posX, float posZ);
@@ -187,10 +191,12 @@ private:
 private:
     std::unique_ptr<ComputeDispatch> m_simulationCompute0;
     std::unique_ptr<ComputeDispatch> m_simulationCompute1;
+    std::unique_ptr<ComputeDispatch> m_collisionCompute0;
 
     VulkanMappedBuffer m_particleBuffer;
     VulkanMappedBuffer m_connectionBuffer;
     VulkanMappedBuffer m_connectionBufferL;
+    VulkanMappedBuffer m_surfacePointsBuffer;
     VulkanMappedBuffer m_chunkDataBuffer;
 
     VkDeviceSize    m_atomicBufferAlignement;
@@ -198,9 +204,9 @@ private:
     uint32_t        m_chunkSize;
 
     // Memory allocator stuff
-    std::list<ProceduralSoftBody::BufferChunk> m_memChunks[3];
-    uint32_t m_globalChunkCount[3];
-    uint32_t m_globalChunkOffset[3];
+    std::list<ProceduralSoftBody::BufferChunk> m_memChunks[4];
+    uint32_t m_globalChunkCount[4];
+    uint32_t m_globalChunkOffset[4];
     std::vector<ProceduralSoftBody::CopyRequest> copyRequests;
 
     std::unordered_map<Vec2i, ProceduralSoftBody::CPUChunkData, ProceduralSoftBody::Vec2iHash> m_chunks;
@@ -213,6 +219,9 @@ private:
     SafePtr<Material> m_billboardMaterial;
 
     bool m_drawDebug = false;
+    bool m_shouldDetectStuff = false;
+
+    bool m_hasDetectedStuff = false;
 
     ProceduralSoftBody::PBodySettings m_particleSettings;
 };

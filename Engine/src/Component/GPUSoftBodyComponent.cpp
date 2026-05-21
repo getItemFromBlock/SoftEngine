@@ -15,6 +15,8 @@
 #include "Utils/Random.h"
 #include "Utils/Memory.h"
 
+uint32_t GPUSoftBodyComponent::seedCounter = 0;
+
 void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
 {
     auto &res = d.AddVec3i("Block Size", m_particleSettings.general.particleAmount).SetRangeInt(3, 1024);
@@ -88,7 +90,11 @@ void GPUSoftBodyComponent::OnCreate()
     auto instancingShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/sb_instancing.shader");
     auto skinnedShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/sb_skinning.shader");
 
-    m_billboardMaterial = resourceManager->CreateMaterial("SoftbodyInstancing", instancingShader);
+    if (!uniqueSeed)
+        uniqueSeed = ++seedCounter;
+
+    std::string billboardName = std::format("SoftbodyInstancing@{} ", uniqueSeed);
+    m_billboardMaterial = resourceManager->CreateMaterial(billboardName, instancingShader);
     m_billboardMaterial->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
     m_billboardMaterial->SetAttribute("normalSampler", resourceManager->GetDefaultNormal());
     m_billboardMaterial->SetAttribute("roughnessSampler", resourceManager->GetBlankTexture());
@@ -102,7 +108,8 @@ void GPUSoftBodyComponent::OnCreate()
     m_billboardMaterial->SetAttribute("material.aoFactor", 1.f);
     m_billboardMaterial->SetAttribute("material.heightScale", 0.0f);
     
-    m_defaultMaterial = resourceManager->CreateMaterial("SoftbodySkinned default", skinnedShader);
+    std::string skinnedName = std::format("SoftbodySkinned@{} ", uniqueSeed);
+    m_defaultMaterial = resourceManager->CreateMaterial(skinnedName, skinnedShader);
     m_defaultMaterial->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
     m_defaultMaterial->SetAttribute("normalSampler", resourceManager->GetDefaultNormal());
     m_defaultMaterial->SetAttribute("roughnessSampler", resourceManager->GetBlankTexture());
@@ -116,7 +123,8 @@ void GPUSoftBodyComponent::OnCreate()
     m_defaultMaterial->SetAttribute("material.aoFactor", 1.f);
     m_defaultMaterial->SetAttribute("material.heightScale", 0.0f);
 
-    m_mesh = std::make_shared<Mesh>("internal");
+    std::string meshName = std::format("internal@{} ", uniqueSeed);
+    m_mesh = std::make_shared<Mesh>(meshName);
     m_billboardMesh = resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cube.obj/Cube.mesh");
 
     computeShader0->EOnSentToGPU.Bind([this, computeShader0, renderer]()
@@ -298,11 +306,11 @@ void GPUSoftBodyComponent::OnDestroy()
     renderer->AddAfterRenderCallback([buffer, compute0, compute1, mesh, renderer]()
     {
         renderer->WaitForGPU();
-
+        
         if (*buffer)
         {
-            (*buffer)->Cleanup(); 
-            buffer->reset();
+            //(*buffer)->Cleanup(); 
+            //buffer->reset();
         }
         mesh->Unload();
         compute0->reset();
@@ -386,8 +394,8 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
 
     renderer->WaitForGPU();
 
-    if (m_particleBuffer)
-        m_particleBuffer->Cleanup();
+    //if (m_particleBuffer)
+    //    m_particleBuffer->Cleanup();
     
     if (m_particles.empty())
         InitializeParticleData(m_particles, m_connections);
@@ -850,10 +858,13 @@ void GPUSoftBodyComponent::InitializeMaterialsFromModel(SafePtr<Model> inputMode
         return;
     }
 
+    if (!uniqueSeed)
+        uniqueSeed = ++seedCounter;
+
     const auto& materials = inputModel->GetMaterials();
     for (SafePtr<Material> mat : materials)
     {
-        std::string name = std::format("{}_SkinnedMaterial {} ", inputModel->GetName(), m_materials.size());
+        std::string name = std::format("{}_SkinnedMaterial_{}@{} ", inputModel->GetName(), m_materials.size(), uniqueSeed);
         SafePtr<Material> newMat = resourceManager->CreateMaterial(name, skinnedShader);
         newMat->SetAttribute("albedoSampler",       mat->GetTexture("albedoSampler"));
         newMat->SetAttribute("normalSampler",       mat->GetTexture("normalSampler"));
