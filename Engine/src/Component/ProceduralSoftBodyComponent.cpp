@@ -104,6 +104,63 @@ void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
     if (!m_simulationCompute0 || !m_simulationCompute1 || !m_particleBuffer.GetSize())
         return;
 
+    auto renderer = Engine::Get()->GetRenderer();
+    VkCommandBuffer cmd = renderer->GetCommandBuffer();
+
+    if (!copyRequests.empty())
+    {
+        const size_t stride = copyRequests.size();
+        VkBufferCopy *regions = reinterpret_cast<VkBufferCopy*>(malloc(sizeof(VkBufferCopy) * stride * 3));
+        for (uint32_t i = 0; i < copyRequests.size(); i++)
+        {
+            regions[i].size = copyRequests[i].sizeP;
+            regions[i + stride].size = copyRequests[i].sizeC;
+            regions[i + 2 * stride].size = copyRequests[i].sizeL;
+            regions[i].srcOffset = copyRequests[i].offsetP;
+            regions[i + stride].srcOffset = copyRequests[i].offsetC;
+            regions[i + 2 * stride].srcOffset = copyRequests[i].offsetL;
+            regions[i].dstOffset = copyRequests[i].offsetP;
+            regions[i + stride].dstOffset = copyRequests[i].offsetC;
+            regions[i + 2 * stride].dstOffset = copyRequests[i].offsetL;
+        }
+        vkCmdCopyBuffer(cmd, m_particleBuffer.GetStagingBuffer(), m_particleBuffer.GetBuffer(), (uint32_t)copyRequests.size(), regions);
+        vkCmdCopyBuffer(cmd, m_connectionBuffer.GetStagingBuffer(), m_connectionBuffer.GetBuffer(), (uint32_t)copyRequests.size(), regions + copyRequests.size());
+        vkCmdCopyBuffer(cmd, m_connectionBufferL.GetStagingBuffer(), m_connectionBufferL.GetBuffer(), (uint32_t)copyRequests.size(), regions + copyRequests.size()*2);
+
+        VkBufferMemoryBarrier barriers[3] = {};
+        barriers[0].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barriers[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barriers[0].buffer = m_particleBuffer.GetBuffer();
+        barriers[0].size = VK_WHOLE_SIZE;
+
+        barriers[1].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barriers[1].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barriers[1].buffer = m_connectionBuffer.GetBuffer();
+        barriers[1].size = VK_WHOLE_SIZE;
+
+        barriers[2].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barriers[2].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barriers[2].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barriers[2].buffer = m_connectionBufferL.GetBuffer();
+        barriers[2].size = VK_WHOLE_SIZE;
+
+        vkCmdPipelineBarrier(cmd,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            0, 0, nullptr, 3, barriers, 0, nullptr);
+
+        free(regions);
+        copyRequests.clear();
+    }
+}
+
+void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
+{
+    if (!m_simulationCompute0 || !m_simulationCompute1 || !m_particleBuffer.GetSize())
+        return;
+
     Vec3f cameraPos = Engine::Get()->GetSceneHolder()->GetCurrentScene()->GetCameraData().position;
 
     /*

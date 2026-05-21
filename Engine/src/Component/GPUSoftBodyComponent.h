@@ -89,14 +89,8 @@ public:
     
     std::vector<SafePtr<Material>> GetMaterial() const { return m_materials; }
     SafePtr<Mesh> GetMesh() const { return m_mesh; }
-private:
-    friend class SceneSerializer;
 
-    void ReleaseGPUResources(std::unique_ptr<VulkanBuffer> particleBuffer,
-        std::shared_ptr<Mesh> mesh = {},
-        std::unique_ptr<ComputeDispatch> simulationCompute0 = {},
-        std::unique_ptr<ComputeDispatch> simulationCompute1 = {});
-    
+private:
     void CreateParticleBuffers();
     void CreateSkinnedMesh(std::vector<WeightedVertex> &vertices, std::vector<uint32_t> &indices);
     void MapMeshToParticles(std::vector<WeightedVertex> &vertices);
