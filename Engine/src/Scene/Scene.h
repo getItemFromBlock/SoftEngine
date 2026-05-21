@@ -16,6 +16,7 @@ class TransformComponent;
 class RHIRenderer;
 class IComponent;
 class GameObject;
+class SceneSerializer;
 
 struct CameraData
 {    
@@ -40,14 +41,18 @@ public:
 
     void PreFrame(VulkanRenderer* renderer);
     void OnRender(VulkanRenderer* renderer);
+    void OnStart();
+    void OnUpdateEditor(float deltaTime);
+    void OnUpdateRuntime(float deltaTime);
     void OnUpdate(float deltaTime);
 
     #pragma region GameObject
     const GameObjectList& GetGameObjects() const { return m_gameObjects; }
-    SafePtr<GameObject> CreateGameObject(GameObject* parent = nullptr);
+    SafePtr<GameObject> CreateGameObject(GameObject* parent = nullptr, Core::UUID uuid = Core::UUID());
     SafePtr<GameObject> GetGameObject(Core::UUID UUID) const;
     SafePtr<GameObject> GetRootObject() const;
     void DestroyGameObject(GameObject* gameObject);
+    void Clear();
     void SetParent(GameObject* object, GameObject* parent);
     void RemoveChild(GameObject* object, GameObject* child);
     #pragma endregion
@@ -78,8 +83,9 @@ public:
     Camera* GetEditorCamera() const { return m_editorCamera.get(); }
     
     LightManager* GetLightManager() const { return m_lightManager.get(); }
+    
+    void UpdateEditorCamera(float deltaTime) const;
 private:
-    void UpdateCamera(float deltaTime) const;
 private:
     friend GameObject;
 

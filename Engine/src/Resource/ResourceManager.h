@@ -27,6 +27,7 @@ public:
     ResourceManager() = default;
 
     void Initialize(VulkanRenderer* renderer);
+    void InitializeResources();
 
     Core::UUID GetUUID(const std::filesystem::path& resourcePath) const;
 
@@ -41,6 +42,7 @@ public:
     std::vector<std::shared_ptr<T>> GetAll() const;
     
     bool Contains(const Core::UUID& uuid) const;
+    bool Contains(const std::filesystem::path& resourcePath) const;
 
     template<typename T>
     SafePtr<T> AddResource(const std::shared_ptr<T>& resource);
@@ -53,6 +55,8 @@ public:
 
     template<typename T>
     SafePtr<T> Load(const std::filesystem::path& resourcePath, bool multiThread = true);
+    
+    SafePtr<IResource> Load(const std::filesystem::path& resourcePath, bool multiThread = true);
 
     static std::shared_ptr<IResource> CreateResourceFromPath(const std::filesystem::path& path);
 
@@ -98,6 +102,8 @@ private:
     }
 
     static void CreateCacheDir();
+    
+    void AddResourceFromFolder(std::filesystem::path folderPath);
 
 private:
     VulkanRenderer* m_renderer;
@@ -172,6 +178,7 @@ SafePtr<T> ResourceManager::AddResource(const std::shared_ptr<T>& resource)
     AddResource(resource->GetUUID(), resource, hash);
     return resource;
 }
+
 template<typename T>
 SafePtr<T> ResourceManager::Load(const std::filesystem::path& resourcePath, bool multiThread)
 {

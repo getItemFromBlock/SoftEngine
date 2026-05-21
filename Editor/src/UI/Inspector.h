@@ -16,6 +16,9 @@ public:
     void SetSelectedObject(const Core::UUID& uuid);
 
     static void ShowDescriptor(const ClassDescriptor& descriptor);
+
+    template <typename T>
+    static std::optional<SafePtr<T>> DisplayResourcePopup();
 private:
     static void ShowProperty(const Property& property);
     static void UpdateProperty(const Property& property, void* newValue);
@@ -42,6 +45,7 @@ private:
     static void RenderShaderProperty(const Property& property, const std::string& id);
     static void RenderPostProcessShaderProperty(const Property& property, const std::string& id);
     static void RenderListProperty(const Property& property, const std::string& id);
+    static void RenderModelProperty(const Property& property, const std::string& id);
     #pragma endregion 
     
     static void* GetListElement(const Property& property, size_t index);
@@ -49,15 +53,12 @@ private:
     static void RemoveListElement(const Property& property, size_t index);
     static void AddListElement(const Property& property);
 
-    template <typename T>
-    static std::optional<SafePtr<T>> DisplayResourcePopup();
-
     template<typename T>
-    const ClassDescriptor& GetDescriptor(const Core::UUID& uuid, SafePtr<T> descriptorContainer)
+    static ClassDescriptor GetDescriptor(SafePtr<T> descriptorContainer)
     {
         ClassDescriptor descriptor;
         descriptorContainer->Describe(descriptor);
-        return m_descriptors[uuid] = descriptor;
+        return descriptor;
     }
     
     void DisplayAddComponentPopup() const;

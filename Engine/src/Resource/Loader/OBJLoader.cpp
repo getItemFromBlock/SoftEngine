@@ -1,6 +1,7 @@
 #include "OBJLoader.h"
 
 #include <fstream>
+#include <unordered_map>
 
 #include "MTLLoader.h"
 
@@ -268,23 +269,43 @@ void OBJLoader::ComputeVertices(Mesh& mesh)
         float sign = (dot < 0.0f) ? -1.0f : 1.0f;
 
         // Position
-        mesh.finalVertices.push_back(mesh.positions[idx.x].x);
-        mesh.finalVertices.push_back(mesh.positions[idx.x].y);
-        mesh.finalVertices.push_back(mesh.positions[idx.x].z);
+        mesh.intermediateVertices.push_back(mesh.positions[idx.x].x);
+        mesh.intermediateVertices.push_back(mesh.positions[idx.x].y);
+        mesh.intermediateVertices.push_back(mesh.positions[idx.x].z);
 
         // UV
-        mesh.finalVertices.push_back(mesh.textureUVs[idx.y].x);
-        mesh.finalVertices.push_back(mesh.textureUVs[idx.y].y);
+        mesh.intermediateVertices.push_back(mesh.textureUVs[idx.y].x);
+        mesh.intermediateVertices.push_back(mesh.textureUVs[idx.y].y);
 
         // Normal
-        mesh.finalVertices.push_back(N.x);
-        mesh.finalVertices.push_back(N.y);
-        mesh.finalVertices.push_back(N.z);
+        mesh.intermediateVertices.push_back(N.x);
+        mesh.intermediateVertices.push_back(N.y);
+        mesh.intermediateVertices.push_back(N.z);
 
         // Tangent xyz + handedness w
-        mesh.finalVertices.push_back(T.x);
-        mesh.finalVertices.push_back(T.y);
-        mesh.finalVertices.push_back(T.z);
-        mesh.finalVertices.push_back(sign);
+        mesh.intermediateVertices.push_back(T.x);
+        mesh.intermediateVertices.push_back(T.y);
+        mesh.intermediateVertices.push_back(T.z);
+        mesh.intermediateVertices.push_back(sign);
+    }
+
+    std::unordered_map<Vertex, uint32_t, VertexHash, VertexEqual> hashed_vertices;
+    const Vertex    *ptr = reinterpret_cast<Vertex*>(mesh.intermediateVertices.data());
+
+    for (size_t i = 0; i < mesh.indices.size(); i++)
+    {
+        Vertex v = *(ptr++);
+        const auto &res = hashed_vertices.find(v);
+        if (res != hashed_vertices.end())
+        {
+            mesh.finalIndices.push_back(res->second);
+        }
+        else
+        {
+            const uint32_t id = static_cast<uint32_t>(mesh.finalVertices.size());
+            mesh.finalVertices.push_back(v);
+            mesh.finalIndices.push_back(id);
+            hashed_vertices[v] = id;
+        }
     }
 }

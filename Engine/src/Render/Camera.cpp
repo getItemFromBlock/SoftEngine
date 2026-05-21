@@ -21,7 +21,7 @@ Camera::Camera()
 
 Camera::~Camera()
 {
-    
+    EOnDestroy.Invoke();
 }
 
 Mat4 Camera::GetViewMatrix() const
@@ -62,11 +62,54 @@ void Camera::Describe(ClassDescriptor& descriptor)
     {
         SetSkybox(*static_cast<SafePtr<CubeMap>*>(data));
     };
-    descriptor.AddPostProcessShader("Post process", m_postProcessShader).setter =
-        [this](void* data)
+
+    // PostProcess
+    {
+        Property property;
+        property.data = &m_postProcessShaders;
+        property.type = PropertyType::PostProcessShader;
+        property.name = "Postprocess";
+        property.isList = true;
+        property.addElement = [this]()
         {
-            SetPostProcessShader(*static_cast<SafePtr<PostProcessShader>*>(data));
+            auto renderer = Engine::Get()->GetRenderer();
+            renderer->AddAfterRenderCallback([this]()
+            {
+                auto resourceManager = Engine::Get()->GetResourceManager();
+                auto defaultpp = resourceManager->Load<PostProcessShader>(
+                    RESOURCE_PATH"/shaders/PostProcess/inverted.pshader");
+                AddPostProcessShader(defaultpp);
+            });
         };
+        property.removeElement = [this](int index)
+        {
+            auto renderer = Engine::Get()->GetRenderer();
+            renderer->AddAfterRenderCallback([this, index]()
+            {
+                RemovePostProcessShader(index);
+            });
+        };
+        property.setElement = [this](int index, void* data)
+        {
+            auto renderer = Engine::Get()->GetRenderer();
+            auto pp = *static_cast<SafePtr<PostProcessShader>*>(data);
+            renderer->AddAfterRenderCallback([this, index, pp]()
+            {
+                SetPostProcessShaderAt(index, pp);
+            });
+        };
+        descriptor.AddProperty(property);
+    }
+
+    // PostProcess Material
+    {
+        for (const SafePtr<Material>& material : m_postProcessMaterials)
+        {
+            if (material.valid())
+                material->Describe(descriptor);
+        }
+    }
+
     descriptor.AddEnum("View mode", reinterpret_cast<int32_t*>(&p_viewMode), ViewMode::to_cstr()).setter = [this
         ](void* data)
         {
@@ -113,6 +156,16 @@ void Camera::SetRenderTargetSize(uint32_t width, uint32_t height)
     if (width == 0 || height == 0)
         return;
     p_requestedSize = Vec2i(static_cast<int32_t>(width), static_cast<int32_t>(height));
+
+    auto renderer = Engine::Get()->GetRenderer();
+    if (!renderer)
+        return;
+    if (p_requestedSize == p_renderTargetSize || p_requestedSize.x <= 0 || p_requestedSize.y <= 0)
+        return;
+    renderer->AddAfterRenderCallback([this, renderer]()
+    {
+        HandleResize(renderer);
+    });
 }
 
 Vec2i Camera::GetRenderTargetSize() const
@@ -174,32 +227,82 @@ SafePtr<CubeMap> Camera::GetSkybox() const
     return m_skybox;
 }
 
-void Camera::SetPostProcessShader(const SafePtr<PostProcessShader>& shader)
+void Camera::AddPostProcessShader(const SafePtr<PostProcessShader>& shader)
 {
-    m_postProcessShader = shader;
-    if (!m_postProcessMaterial && shader)
-    {
-        auto resourceManager = Engine::Get()->GetResourceManager();
-        m_postProcessMaterial = resourceManager->CreateMaterial("Post Process Material");
+    if (!shader)
+        return;
 
-        m_quad = resourceManager->Load<Mesh>(RESOURCE_PATH"models/Plane.obj/Plane.mesh");
-        std::shared_ptr<RenderTargetTexture> renderTarget = std::make_shared<RenderTargetTexture>(
-            "Editor Render Target Post Process");
-        auto renderer = Engine::Get()->GetRenderer();
-        renderTarget->CreateRenderTarget(renderer, p_renderTargetSize.x, p_renderTargetSize.y);
+    EnsurePostProcessResources();
 
-        m_postProcessRenderTarget = resourceManager->AddResource(renderTarget);
-    }
-    if (shader)
+    auto resourceManager = Engine::Get()->GetResourceManager();
+    std::string name = "Post Process Material " + std::to_string(m_postProcessMaterials.size());
+    SafePtr<Material> mat = resourceManager->CreateMaterial(name, shader);
+
+    m_postProcessShaders.push_back(shader);
+    m_postProcessMaterials.push_back(mat);
+}
+
+void Camera::RemovePostProcessShader(const SafePtr<PostProcessShader>& shader)
+{
+    for (size_t i = 0; i < m_postProcessShaders.size(); ++i)
     {
-        m_postProcessMaterial->SetShader(shader);
-        m_postProcessMaterial->SetAttribute("albedoSampler", m_renderTarget);
+        if (m_postProcessShaders[i].getPtr() == shader.getPtr())
+        {
+            RemovePostProcessShader(static_cast<int>(i));
+            return;
+        }
     }
+}
+
+void Camera::RemovePostProcessShader(int index)
+{
+    if (VulkanRenderer* renderer = Engine::Get()->GetRenderer())
+        renderer->WaitForGPU();
+
+    auto resourceManager = Engine::Get()->GetResourceManager();
+    resourceManager->RemoveResource(m_postProcessMaterials[index]->GetUUID());
+    m_postProcessShaders.erase(m_postProcessShaders.begin() + index);
+    m_postProcessMaterials.erase(m_postProcessMaterials.begin() + index);
+
+    if (m_postProcessShaders.empty())
+        CleanupPostprocessRenderTarget();
+}
+
+void Camera::SetPostProcessShaderAt(int32_t index, const SafePtr<PostProcessShader>& shader)
+{
+    if (index < 0 || index >= static_cast<int32_t>(m_postProcessShaders.size()))
+        return;
+
+    if (!shader)
+    {
+        RemovePostProcessShader(index);
+        return;
+    }
+
+    m_postProcessShaders[index] = shader;
+    m_postProcessMaterials[index]->SetShader(shader);
+}
+
+void Camera::ClearPostProcessShaders()
+{
+    auto resourceManager = Engine::Get()->GetResourceManager();
+    for (auto& mat : m_postProcessMaterials)
+        resourceManager->RemoveResource(mat->GetUUID());
+
+    m_postProcessShaders.clear();
+    m_postProcessMaterials.clear();
+
+    CleanupPostprocessRenderTarget();
+}
+
+const std::vector<SafePtr<PostProcessShader>>& Camera::GetPostProcessShaders() const
+{
+    return m_postProcessShaders;
 }
 
 bool Camera::IsPostProcessActive() const
 {
-    return m_postProcessShader.valid();
+    return !m_postProcessShaders.empty();
 }
 
 void Camera::InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, uint32_t height)
@@ -229,10 +332,18 @@ void Camera::InitializeRenderTarget(VulkanRenderer* renderer, uint32_t width, ui
         m_albedoTexture = rm->AddResource(std::make_shared<Texture>("Albedo GBuffer Texture"));
         m_metallicRoughnessTexture = rm->AddResource(std::make_shared<Texture>("MetallicRoughness GBuffer Texture"));
 
-        m_compositionMaterial->SetAttribute("gPosition", MakeGBufferTexture(m_positionTexture, m_gBuffer->GetPosition(), m_gBuffer->GetSampler(), width, height));
-        m_compositionMaterial->SetAttribute("gNormal", MakeGBufferTexture(m_normalTexture, m_gBuffer->GetNormal(), m_gBuffer->GetSampler(), width, height));
-        m_compositionMaterial->SetAttribute("gAlbedo", MakeGBufferTexture(m_albedoTexture, m_gBuffer->GetAlbedo(), m_gBuffer->GetSampler(), width, height));
-        m_compositionMaterial->SetAttribute("gMetallicRoughnessAO", MakeGBufferTexture(m_metallicRoughnessTexture, m_gBuffer->GetMetallicRoughness(), m_gBuffer->GetSampler(), width, height));
+        m_compositionMaterial->SetAttribute("gPosition",
+                                            MakeGBufferTexture(m_positionTexture, m_gBuffer->GetPosition(),
+                                                               m_gBuffer->GetSampler(), width, height));
+        m_compositionMaterial->SetAttribute(
+            "gNormal", MakeGBufferTexture(m_normalTexture, m_gBuffer->GetNormal(), m_gBuffer->GetSampler(), width,
+                                          height));
+        m_compositionMaterial->SetAttribute("gAlbedo", MakeGBufferTexture(
+                                                m_albedoTexture, m_gBuffer->GetAlbedo(), m_gBuffer->GetSampler(), width,
+                                                height));
+        m_compositionMaterial->SetAttribute("gMetallicRoughnessAO", MakeGBufferTexture(
+                                                m_metallicRoughnessTexture, m_gBuffer->GetMetallicRoughness(),
+                                                m_gBuffer->GetSampler(), width, height));
 
         SafePtr<Shader> gBufferShader = rm->Load<Shader>(RESOURCE_PATH"shaders/Deferred/gBuffer.shader");
         m_gBufferMaterial->SetShader(gBufferShader);
@@ -257,20 +368,20 @@ void Camera::CleanupRenderTarget()
 
 void Camera::CleanupPostprocessRenderTarget()
 {
-    if (!m_postProcessRenderTarget && !m_postProcessMaterial)
-        return;
-    if (m_postProcessRenderTarget)
-        Engine::Get()->GetResourceManager()->RemoveResource(m_postProcessRenderTarget->GetUUID());
-    if (m_postProcessMaterial)
-        Engine::Get()->GetResourceManager()->RemoveResource(m_postProcessMaterial->GetUUID());
-    m_postProcessRenderTarget.reset();
-    m_postProcessMaterial.reset();
+    auto resourceManager = Engine::Get()->GetResourceManager();
+
+    for (int slot = 0; slot < 2; ++slot)
+    {
+        if (m_postProcessRenderTargets[slot])
+        {
+            resourceManager->RemoveResource(m_postProcessRenderTargets[slot]->GetUUID());
+            m_postProcessRenderTargets[slot].reset();
+        }
+    }
 }
 
 void Camera::HandleResize(VulkanRenderer* renderer)
 {
-    GetTransform()->SetDirty();
-    return; // To fix (Infinite Wait Idle until swapchain invalid ??)
     if (p_requestedSize == p_renderTargetSize || p_requestedSize.x <= 0 || p_requestedSize.y <= 0)
         return;
     if (!m_gBufferMaterial || !m_gBufferMaterial->HasBeenSent())
@@ -282,36 +393,53 @@ void Camera::HandleResize(VulkanRenderer* renderer)
     const uint32_t h = static_cast<uint32_t>(p_requestedSize.y);
 
     m_gBuffer->Resize(w, h);
-    m_compositionMaterial->SetAttribute("gPosition",         MakeGBufferTexture(m_positionTexture,            m_gBuffer->GetPosition(),         m_gBuffer->GetSampler(), w, h));
-    m_compositionMaterial->SetAttribute("gNormal",           MakeGBufferTexture(m_normalTexture,              m_gBuffer->GetNormal(),           m_gBuffer->GetSampler(), w, h));
-    m_compositionMaterial->SetAttribute("gAlbedo",           MakeGBufferTexture(m_albedoTexture,              m_gBuffer->GetAlbedo(),           m_gBuffer->GetSampler(), w, h));
-    m_compositionMaterial->SetAttribute("gMetallicRoughnessAO", MakeGBufferTexture(m_metallicRoughnessTexture, m_gBuffer->GetMetallicRoughness(), m_gBuffer->GetSampler(), w, h));
+    m_compositionMaterial->SetAttribute("gPosition",
+                                        MakeGBufferTexture(m_positionTexture, m_gBuffer->GetPosition(),
+                                                           m_gBuffer->GetSampler(), w, h));
+    m_compositionMaterial->SetAttribute(
+        "gNormal", MakeGBufferTexture(m_normalTexture, m_gBuffer->GetNormal(), m_gBuffer->GetSampler(), w, h));
+    m_compositionMaterial->SetAttribute(
+        "gAlbedo", MakeGBufferTexture(m_albedoTexture, m_gBuffer->GetAlbedo(), m_gBuffer->GetSampler(), w, h));
+    m_compositionMaterial->SetAttribute("gMetallicRoughnessAO",
+                                        MakeGBufferTexture(m_metallicRoughnessTexture,
+                                                           m_gBuffer->GetMetallicRoughness(), m_gBuffer->GetSampler(),
+                                                           w, h));
 
     m_renderTarget->Resize(renderer, w, h);
-    if (m_postProcessRenderTarget)
+
+    for (const auto& m_postProcessRenderTarget : m_postProcessRenderTargets)
     {
-        m_postProcessRenderTarget->Resize(renderer, w, h);
-        m_postProcessMaterial->SetAttribute("albedoSampler", m_renderTarget);
+        if (m_postProcessRenderTarget)
+            m_postProcessRenderTarget->Resize(renderer, w, h);
     }
-    
+
+    // Re-bind albedoSampler on pass 0 in case the main RT moved.
+    if (!m_postProcessMaterials.empty())
+        m_postProcessMaterials[0]->SetAttribute("albedoSampler", m_renderTarget);
+
     PrintWarning("Camera::HandleResize - Resized render targets to %dx%d", w, h);
 
     p_renderTargetSize = p_requestedSize;
     p_requestedSize = Vec2i::Zero();
-
+    EOnRenderTargetResized.Invoke(p_renderTargetSize);
     GetTransform()->SetDirty();
 }
 
 SafePtr<Texture> Camera::MakeGBufferTexture(SafePtr<Texture> texture, const GBufferAttachment& attachment,
                                             VkSampler sampler, uint32_t width, uint32_t height)
 {
+    texture->Unload();
     texture->CreateFromBuffer(attachment, sampler, width, height);
     return texture;
 }
 
 SafePtr<RenderTargetTexture> Camera::GetRenderTarget() const
 {
-    return IsPostProcessActive() ? m_postProcessRenderTarget : m_renderTarget;
+    if (!IsPostProcessActive())
+        return m_renderTarget;
+
+    int lastSlot = static_cast<int>(m_postProcessShaders.size() - 1) % 2;
+    return m_postProcessRenderTargets[lastSlot];
 }
 
 void Camera::Begin()
@@ -335,7 +463,7 @@ void Camera::End()
 
 void Camera::BeginForwardPass() const
 {
-    BeginRenderTarget(m_renderTarget.getPtr());
+    BeginRenderTarget(m_renderTarget.getPtr(), false);
 }
 
 void Camera::EndForwardPass()
@@ -343,7 +471,7 @@ void Camera::EndForwardPass()
     EndRenderTarget(m_renderTarget.getPtr());
 }
 
-void Camera::BeginRenderTarget(const RenderTargetTexture* rtt) const
+void Camera::BeginRenderTarget(const RenderTargetTexture* rtt, bool clearAttachment) const
 {
     if (!rtt)
         return;
@@ -351,7 +479,7 @@ void Camera::BeginRenderTarget(const RenderTargetTexture* rtt) const
     VulkanRenderer* renderer = Engine::Get()->GetRenderer();
     VkCommandBuffer commandBuffer = renderer->GetCommandPool()->GetCommandBuffer(renderer->GetFrameIndex());
 
-    if (rtt->GetDepthBuffer()->NeedsTransition())
+    if (rtt->GetDepthBuffer() && rtt->GetDepthBuffer()->NeedsTransition())
     {
         VulkanUtils::TransitionImageLayout(renderer->GetCommandPool(), renderer->GetDevice()->GetGraphicsQueue(),
                                            VK_IMAGE_LAYOUT_UNDEFINED,
@@ -359,31 +487,49 @@ void Camera::BeginRenderTarget(const RenderTargetTexture* rtt) const
                                            renderer->GetDevice(), rtt->GetDepthBuffer()->GetImage());
         rtt->GetDepthBuffer()->ValidateTransition();
     }
+    
+    VkImageMemoryBarrier colorBarrier{};
+    colorBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    colorBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    colorBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    colorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    colorBarrier.image = rtt->GetBuffer()->GetImage();
+    colorBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    colorBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    colorBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-    VkImageMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = rtt->GetBuffer()->GetImage();
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 1;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
-    barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    if (clearAttachment)
+    {
+        vkCmdPipelineBarrier(
+            commandBuffer,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            0, 0, nullptr, 0, nullptr,
+            1, &colorBarrier);
+    }
+    else
+    {
+        VkImageMemoryBarrier depthBarrier{};
+        depthBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        depthBarrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        depthBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        depthBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        depthBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        depthBarrier.image = rtt->GetDepthBuffer()->GetImage();
+        depthBarrier.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+        depthBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        depthBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+            | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-    vkCmdPipelineBarrier(
-        commandBuffer,
-        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier
-    );
+        VkImageMemoryBarrier barriers[] = {colorBarrier, depthBarrier};
+        vkCmdPipelineBarrier(
+            commandBuffer,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+            0, 0, nullptr, 0, nullptr,
+            2, barriers);
+    }
 
     std::vector<VkClearValue> clearValues(2);
     clearValues[0].color = {{p_clearColor.x, p_clearColor.y, p_clearColor.z, p_clearColor.w}};
@@ -392,9 +538,11 @@ void Camera::BeginRenderTarget(const RenderTargetTexture* rtt) const
     VkExtent2D extent = {static_cast<uint32_t>(p_renderTargetSize.x), static_cast<uint32_t>(p_renderTargetSize.y)};
     renderer->GetRenderPass()->Begin(commandBuffer,
                                      rtt->GetBuffer()->GetImageView(),
-                                     rtt->GetDepthBuffer()->GetImageView(),
+                                     rtt->GetDepthBuffer() ? rtt->GetDepthBuffer()->GetImageView() : nullptr,
                                      extent,
-                                     clearValues);
+                                     clearAttachment ? clearValues : std::vector<VkClearValue>{},
+                                     clearAttachment);
+
     VkViewport viewport{};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
@@ -439,40 +587,54 @@ void Camera::EndRenderTarget(RenderTargetTexture* rtt)
         commandBuffer,
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier
-    );
+        0, 0, nullptr, 0, nullptr,
+        1, &barrier);
 }
 
 void Camera::RenderPostProcess(VulkanRenderer* renderer)
 {
-    if (!m_postProcessMaterial)
+    if (m_postProcessShaders.empty())
         return;
 
-    if (!m_postProcessMaterial.valid() || !m_quad.valid())
+    if (!m_quad.valid())
         return;
-    if (!m_postProcessMaterial->HasBeenSent() || !m_quad->HasBeenSent())
-        return;
-    if (!renderer->BindShader(m_postProcessMaterial->GetShader().getPtr()))
+    if (!m_quad->HasBeenSent())
         return;
 
-    BeginRenderTarget(m_postProcessRenderTarget.getPtr());
+    const size_t passCount = m_postProcessShaders.size();
 
-    if (!renderer->BindMaterial(m_postProcessMaterial.getPtr()))
+    for (size_t i = 0; i < passCount; ++i)
     {
-        EndRenderTarget(m_postProcessRenderTarget.getPtr()); // can't early-return without closing
-        return;
+        SafePtr<Material>& mat = m_postProcessMaterials[i];
+
+        if (!mat.valid() || !mat->HasBeenSent())
+            continue;
+        if (!renderer->BindShader(mat->GetShader().getPtr()))
+            continue;
+
+        // Determine which render target is the source and which is the dest.
+        SafePtr<RenderTargetTexture> src = (i == 0) ? m_renderTarget : m_postProcessRenderTargets[(i - 1) % 2];
+        SafePtr<RenderTargetTexture> dest = m_postProcessRenderTargets[i % 2];
+        
+        mat->SetAttribute("albedoSampler", src);
+        mat->SetAttribute("params.resolution", Vec2f(p_renderTargetSize), true);
+
+        BeginRenderTarget(dest.getPtr());
+
+        if (!renderer->BindMaterial(mat.getPtr()))
+        {
+            EndRenderTarget(dest.getPtr());
+            continue;
+        }
+
+        mat->SendAllValues(renderer);
+        renderer->BindVertexBuffers(m_quad->GetVertexBuffer(), m_quad->GetIndexBuffer());
+        uint32_t startIndex = m_quad->GetSubMeshes()[0].startIndex;
+        uint32_t indexCount = m_quad->GetSubMeshes()[0].count;
+        renderer->DrawVertexSubMesh(m_quad->GetIndexBuffer(), startIndex, indexCount);
+
+        EndRenderTarget(dest.getPtr());
     }
-
-    m_postProcessMaterial->SendAllValues(renderer);
-    renderer->BindVertexBuffers(m_quad->GetVertexBuffer(), m_quad->GetIndexBuffer());
-    uint32_t startIndex = m_quad->GetSubMeshes()[0].startIndex;
-    uint32_t indexCount = m_quad->GetSubMeshes()[0].count;
-    renderer->DrawVertexSubMesh(m_quad->GetIndexBuffer(), startIndex, indexCount);
-
-    EndRenderTarget(m_postProcessRenderTarget.getPtr());
 }
 
 void Camera::BlitToSwapchain(VulkanRenderer* renderer)
@@ -559,35 +721,8 @@ void Camera::BeginGBufferPass(RenderTargetTexture* rtt)
         static_cast<uint32_t>(p_renderTargetSize.x),
         static_cast<uint32_t>(p_renderTargetSize.y)
     };
-
-    std::array<VkImage, 4> gBufferImages = {
-        m_gBuffer->GetPosition().image,
-        m_gBuffer->GetNormal().image,
-        m_gBuffer->GetAlbedo().image,
-        m_gBuffer->GetMetallicRoughness().image
-    };
-
-    std::vector<VkImageMemoryBarrier> barriers;
-    for (VkImage img : gBufferImages)
-    {
-        VkImageMemoryBarrier b{};
-        b.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        b.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        b.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        b.image = img;
-        b.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        b.srcAccessMask = 0;
-        b.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        barriers.push_back(b);
-    }
-
-    vkCmdPipelineBarrier(commandBuffer,
-                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                         0, 0, nullptr, 0, nullptr,
-                         static_cast<uint32_t>(barriers.size()), barriers.data());
+    
+    VulkanUtils::TransitionGBufferToColorAttachment(commandBuffer, *m_gBuffer);
 
     if (rtt->GetDepthBuffer()->NeedsTransition())
     {
@@ -625,35 +760,8 @@ void Camera::EndGBufferPass()
     VkCommandBuffer commandBuffer = renderer->GetCommandPool()->GetCommandBuffer(renderer->GetFrameIndex());
 
     renderer->GetRenderPass()->EndGBuffer(commandBuffer, m_gBuffer.get());
-
-    std::array<VkImage, 4> gBufferImages = {
-        m_gBuffer->GetPosition().image,
-        m_gBuffer->GetNormal().image,
-        m_gBuffer->GetAlbedo().image,
-        m_gBuffer->GetMetallicRoughness().image
-    };
-
-    std::vector<VkImageMemoryBarrier> barriers;
-    for (VkImage img : gBufferImages)
-    {
-        VkImageMemoryBarrier b{};
-        b.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        b.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        b.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        b.image = img;
-        b.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        b.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        b.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        barriers.push_back(b);
-    }
-
-    vkCmdPipelineBarrier(commandBuffer,
-                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                         0, 0, nullptr, 0, nullptr,
-                         static_cast<uint32_t>(barriers.size()), barriers.data());
+    
+    VulkanUtils::TransitionGBufferToShaderRead(commandBuffer, *m_gBuffer);
 }
 
 void Camera::BeginCompositionPass(RenderTargetTexture* rtt)
@@ -679,7 +787,7 @@ void Camera::BeginCompositionPass(RenderTargetTexture* rtt)
     barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
     vkCmdPipelineBarrier(commandBuffer,
-                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                          0, 0, nullptr, 0, nullptr, 1, &barrier);
 
@@ -753,6 +861,26 @@ void Camera::DrawComposition(VulkanRenderer* renderer) const
 
     VkCommandBuffer commandBuffer = renderer->GetCommandPool()->GetCommandBuffer(renderer->GetFrameIndex());
     vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+}
+
+void Camera::EnsurePostProcessResources()
+{
+    auto resourceManager = Engine::Get()->GetResourceManager();
+    auto renderer = Engine::Get()->GetRenderer();
+
+    if (!m_quad)
+        m_quad = resourceManager->Load<Mesh>(RESOURCE_PATH"models/Plane.obj/Plane.mesh");
+
+    for (int slot = 0; slot < 2; ++slot)
+    {
+        if (!m_postProcessRenderTargets[slot])
+        {
+            std::string name = "Post Process RT " + std::to_string(slot);
+            auto rt = std::make_shared<RenderTargetTexture>(name);
+            rt->CreateRenderTarget(renderer, p_renderTargetSize.x, p_renderTargetSize.y, VK_FILTER_LINEAR, false);
+            m_postProcessRenderTargets[slot] = resourceManager->AddResource(rt);
+        }
+    }
 }
 
 void Camera::RenderSkybox(VulkanRenderer* renderer) const

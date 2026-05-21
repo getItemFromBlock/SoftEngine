@@ -65,7 +65,9 @@ vec2 parallaxOcclusionMapping(vec2 uv, vec3 viewDirTS)
 void main() {
     vec3 viewDirTS = normalize(vTangentViewDir);
     vec2 uv = parallaxOcclusionMapping(vTexCoord, viewDirTS);
-    vec3 albedo = texture(albedoSampler, uv).rgb * material.color.rgb;
+    vec4 albedo = texture(albedoSampler, uv) * material.color;
+	if (albedo.a < 0.5)
+		discard;
 
     vec3 tangentNormal = normalize(texture(normalSampler,     uv).rgb * 2.0 - 1.0);
     vec3 worldNormal   = normalize(vTBN * tangentNormal);
@@ -75,6 +77,6 @@ void main() {
 
     outPosition            = vec4(vWorldPos, 1.0);
     outNormal              = vec4(worldNormal, 0.0);
-    outAlbedo              = vec4(albedo, 1.0);
+    outAlbedo              = vec4(albedo.rgb, 1.0);
     outMetallicRoughnessAO = vec4(metalness, roughness, bakedAO, 1.0);
 }

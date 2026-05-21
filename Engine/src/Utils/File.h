@@ -15,7 +15,7 @@ public:
     static bool ReadAllBytes(const std::filesystem::path& path, std::vector<uint8_t>& out);
     static bool ReadAllLines(const std::filesystem::path& path, std::vector<std::string>& out);
     static bool ReadAllText(const std::filesystem::path& path, std::string& out);
-    static bool Exist(const std::filesystem::path& path);
+    static bool Exists(const std::filesystem::path& path);
     
     static std::filesystem::file_time_type GetLastWriteTime(const std::filesystem::path& path);
     std::filesystem::file_time_type GetLastWriteTime() const;

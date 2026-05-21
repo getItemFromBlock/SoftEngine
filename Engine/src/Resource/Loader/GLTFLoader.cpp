@@ -2,6 +2,7 @@
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <cstring>
+#include <unordered_map>
 
 #include "Debug/Log.h"
 #include "Utils/File.h"
@@ -139,21 +140,41 @@ static void ComputeVertices(GLTFLoader::Mesh& mesh)
         cross.z = N.x * T.y - N.y * T.x;
         const float sign = (cross.x * Bref.x + cross.y * Bref.y + cross.z * Bref.z < 0.f) ? -1.f : 1.f;
 
-        mesh.finalVertices.push_back(mesh.positions[idx.x].x);
-        mesh.finalVertices.push_back(mesh.positions[idx.x].y);
-        mesh.finalVertices.push_back(mesh.positions[idx.x].z);
+        mesh.intermediateVertices.push_back(mesh.positions[idx.x].x);
+        mesh.intermediateVertices.push_back(mesh.positions[idx.x].y);
+        mesh.intermediateVertices.push_back(mesh.positions[idx.x].z);
 
-        mesh.finalVertices.push_back(mesh.textureUVs[idx.y].x);
-        mesh.finalVertices.push_back(mesh.textureUVs[idx.y].y);
+        mesh.intermediateVertices.push_back(mesh.textureUVs[idx.y].x);
+        mesh.intermediateVertices.push_back(mesh.textureUVs[idx.y].y);
 
-        mesh.finalVertices.push_back(N.x);
-        mesh.finalVertices.push_back(N.y);
-        mesh.finalVertices.push_back(N.z);
+        mesh.intermediateVertices.push_back(N.x);
+        mesh.intermediateVertices.push_back(N.y);
+        mesh.intermediateVertices.push_back(N.z);
 
-        mesh.finalVertices.push_back(T.x);
-        mesh.finalVertices.push_back(T.y);
-        mesh.finalVertices.push_back(T.z);
-        mesh.finalVertices.push_back(sign);
+        mesh.intermediateVertices.push_back(T.x);
+        mesh.intermediateVertices.push_back(T.y);
+        mesh.intermediateVertices.push_back(T.z);
+        mesh.intermediateVertices.push_back(sign);
+    }
+
+    std::unordered_map<GLTFLoader::Vertex, uint32_t, GLTFLoader::VertexHash, GLTFLoader::VertexEqual> hashed_vertices;
+    const GLTFLoader::Vertex    *ptr = reinterpret_cast<GLTFLoader::Vertex*>(mesh.intermediateVertices.data());
+
+    for (size_t i = 0; i < mesh.indices.size(); i++)
+    {
+        GLTFLoader::Vertex v = *(ptr++);
+        const auto &res = hashed_vertices.find(v);
+        if (res != hashed_vertices.end())
+        {
+            mesh.finalIndices.push_back(res->second);
+        }
+        else
+        {
+            const uint32_t id = static_cast<uint32_t>(mesh.finalVertices.size());
+            mesh.finalVertices.push_back(v);
+            mesh.finalIndices.push_back(id);
+            hashed_vertices[v] = id;
+        }
     }
 }
 
@@ -254,12 +275,19 @@ bool GLTFLoader::Load(const std::filesystem::path& fullPath, Model& model)
     // Meshes
     if (file.contains("meshes"))
     {
+        size_t index = 0;
         for (const auto& meshJson : file["meshes"])
         {
             Mesh mesh;
 
             if (meshJson.contains("name"))
+            {
                 mesh.name = meshJson["name"].get<std::string>();
+            }
+            else
+            {
+                mesh.name = fullPath.filename().stem().generic_string() + "_Mesh_" + std::to_string(index++);
+            }
 
             if (!meshJson.contains("primitives"))
             {

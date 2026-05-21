@@ -12,7 +12,14 @@
 
 bool Material::Load(ResourceManager* resourceManager)
 {
-    return true;
+    auto parentModel = p_path.parent_path();
+    
+    if (parentModel.extension() == ".obj" || parentModel.extension() == ".gltf")
+    {
+        resourceManager->Load<Model>(parentModel);
+        return true;
+    }
+    return false;
 }
 
 bool Material::SendToGPU(VulkanRenderer* renderer)
@@ -24,6 +31,8 @@ void Material::Unload()
 {
     if (m_handle)
     {
+        VulkanRenderer* renderer = Engine::Get()->GetRenderer();
+        renderer->WaitForGPU();
         m_handle->Cleanup();
         m_handle.reset();
     }
@@ -31,6 +40,7 @@ void Material::Unload()
 
 void Material::Describe(ClassDescriptor& descriptor)
 {
+    descriptor.PushID(std::to_string(GetUUID()));
     for (auto& [name, attrib] : m_attributes.floatAttributes)
     {
         descriptor.AddFloat(name.c_str(), attrib.value);
@@ -69,17 +79,35 @@ void Material::Describe(ClassDescriptor& descriptor)
             SetAttribute(prop.name, *cubeMap);
         };
     }
+    descriptor.PopID();
+}
+
+bool Material::Exists() const
+{
+    if (!IResource::Exists())
+    {
+        auto parentModel = p_path.parent_path();
+    
+        if (parentModel.extension() == ".obj" || parentModel.extension() == ".gltf")
+            return File::Exists(parentModel);
+    }
+    return false;
 }
 
 void Material::SetShader(const SafePtr<Shader>& shader)
 {
-    if (m_shader && m_shader->GetUUID() != shader->GetUUID())
-        m_shader->EOnSentToGPU.Unbind(m_shaderChangeEvent);
-
+    p_state = ResourceState::SendingToGPU;
+    m_shaderComputed = false;
     m_shader = shader;
-    m_shaderChangeEvent = m_shader->EOnSentToGPU.Bind([this]()
+    m_shader->EOnSentToGPU.Bind([this]()
     {
-        OnShaderChanged();
+        auto renderer = Engine::Get()->GetRenderer();
+        renderer->AddAfterRenderCallback([this, renderer]()
+        {
+            OnShaderChanged();
+            m_shaderComputed = true;
+            p_state = ResourceState::SentToGPU;
+        }, GetUUID());
     });
 }
 
@@ -87,7 +115,7 @@ void Material::SetAttribute(const std::string& name, float attribute, bool optio
 {
     if (m_attributes.floatAttributes.contains(name))
         m_attributes.floatAttributes[name].value = attribute;
-    else if (m_shader && !m_shader->HasBeenSent())
+    else if (m_shader && !m_shader->HasBeenSent() || m_shader && !m_shaderComputed)
         m_temporaryAttributes.floatAttributes[name] = attribute;
     else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
@@ -97,7 +125,7 @@ void Material::SetAttribute(const std::string& name, int attribute, bool optiona
 {
     if (m_attributes.intAttributes.contains(name))
         m_attributes.intAttributes[name].value = attribute;
-    else if (m_shader && !m_shader->HasBeenSent())
+    else if (m_shader && !m_shader->HasBeenSent() || m_shader && !m_shaderComputed)
         m_temporaryAttributes.intAttributes[name] = attribute;
     else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
@@ -107,7 +135,7 @@ void Material::SetAttribute(const std::string& name, const Vec2f& attribute, boo
 {
     if (m_attributes.vec2Attributes.contains(name))
         m_attributes.vec2Attributes[name].value = attribute;
-    else if (m_shader && !m_shader->HasBeenSent())
+    else if (m_shader && !m_shader->HasBeenSent() || m_shader && !m_shaderComputed)
         m_temporaryAttributes.vec2Attributes[name] = attribute;
     else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
@@ -117,7 +145,7 @@ void Material::SetAttribute(const std::string& name, const Vec3f& attribute, boo
 {
     if (m_attributes.vec3Attributes.contains(name))
         m_attributes.vec3Attributes[name].value = attribute;
-    else if (m_shader && !m_shader->HasBeenSent())
+    else if (m_shader && !m_shader->HasBeenSent() || m_shader && !m_shaderComputed)
         m_temporaryAttributes.vec3Attributes[name] = attribute;
     else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
@@ -127,7 +155,7 @@ void Material::SetAttribute(const std::string& name, const Vec4f& attribute, boo
 {
     if (m_attributes.vec4Attributes.contains(name))
         m_attributes.vec4Attributes[name].value = attribute;
-    else if (m_shader && !m_shader->HasBeenSent())
+    else if (m_shader && !m_shader->HasBeenSent() || m_shader && !m_shaderComputed)
         m_temporaryAttributes.vec4Attributes[name] = attribute;
     else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
@@ -137,7 +165,7 @@ void Material::SetAttribute(const std::string& name, const Mat4& attribute, bool
 {
     if (m_attributes.matrixAttributes.contains(name))
         m_attributes.matrixAttributes[name].value = attribute;
-    else if (m_shader && !m_shader->HasBeenSent())
+    else if (m_shader && !m_shader->HasBeenSent() || m_shader && !m_shaderComputed)
         m_temporaryAttributes.matrixAttributes[name] = attribute;
     else if (!optional)
         PrintWarning("Material::SetAttribute - Attribute %s not found", name.c_str());
@@ -160,7 +188,7 @@ void Material::SetAttribute(const std::string& name, const SafePtr<Texture>& tex
             });
         });
     }
-    else if (m_shader && !m_shader->HasBeenSent())
+    else if (m_shader && !m_shader->HasBeenSent() || m_shader && !m_shaderComputed)
     {
         m_temporaryAttributes.samplerAttributes[name] = texture;
     }
@@ -186,7 +214,7 @@ void Material::SetAttribute(const std::string& name, const SafePtr<CubeMap>& cub
             });
         });
     }
-    else if (m_shader && !m_shader->HasBeenSent())
+    else if (m_shader && !m_shader->HasBeenSent() || m_shader && !m_shaderComputed)
     {
         m_temporaryAttributes.sampler3DAttributes[name] = cubeMap;
     }
@@ -497,11 +525,7 @@ void Material::OnShaderChanged()
     Uniforms uniforms = m_shader->GetUniforms();
     auto renderer = Engine::Get()->GetRenderer();
 
-    if (m_handle)
-    {
-        m_handle->Cleanup();
-        m_handle.reset();
-    }
+    Unload();
     m_handle = renderer->CreateMaterial(m_shader.getPtr());
 
     for (Uniform& uniform : uniforms | std::views::values)

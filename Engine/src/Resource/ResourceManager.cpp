@@ -24,7 +24,12 @@ void ResourceManager::Initialize(VulkanRenderer* renderer)
 {
     m_renderer = renderer;
     CreateCacheDir();
+}
+
+void ResourceManager::InitializeResources()
+{
     ReadCache();
+    AddResourceFromFolder("Engine/resources/");
 }
 
 Core::UUID ResourceManager::GetUUID(const std::filesystem::path& resourcePath) const
@@ -41,6 +46,11 @@ Core::UUID ResourceManager::GetUUID(const std::filesystem::path& resourcePath) c
 bool ResourceManager::Contains(const Core::UUID& uuid) const
 {
     return m_resources.contains(uuid);
+}
+
+bool ResourceManager::Contains(const std::filesystem::path& resourcePath) const
+{
+    return GetUUID(resourcePath) != UUID_INVALID;
 }
 
 void ResourceManager::AddResource(const Core::UUID& uuid, const std::shared_ptr<IResource>& resource, Hash hash)
@@ -65,18 +75,98 @@ std::filesystem::path ResourceManager::SanitizePath(const std::filesystem::path&
     return resourcePath.lexically_normal();
 }
 
+SafePtr<IResource> ResourceManager::Load(const std::filesystem::path& resourcePath, bool multiThread)
+{
+    if (resourcePath.extension().empty())
+    {
+        PrintError("Invalid extension for resource: %s", resourcePath.generic_string().c_str());
+        return {};
+    }
+
+    std::filesystem::path path = SanitizePath(resourcePath);
+
+    Core::UUID uuid = GetUUID(path);
+
+    std::shared_ptr<IResource> resource = nullptr;
+    if (uuid == UUID_INVALID)
+    {
+        resource = CreateResourceFromPath(path);
+        AddResource(resource);
+        uuid = resource->GetUUID();
+    }
+    else
+    {
+        resource = GetResource<IResource>(uuid);
+        if (!resource)
+        {
+            resource = CreateResourceFromPath(path);
+            resource->p_uuid = uuid;
+            AddResource(resource);
+        }
+        else if (resource->IsLoading() || resource->IsLoaded())
+        {
+            return resource;
+        }
+    }
+
+    if (multiThread)
+    {
+        ThreadPool::Enqueue([this, uuid]()
+        {
+            auto resource = GetResource<IResource>(uuid);
+            if (!resource)
+            {
+                PrintError("Resource is invalid");
+                return;
+            }
+            if (resource->IsLoading() || resource->IsLoaded())
+            {
+                return;
+            }
+            resource->p_state = ResourceState::Loading;
+            if (resource->Load(this))
+            {
+                PrintLog("Resource loaded %s", resource->GetPath().generic_string().c_str());
+                resource->SetLoaded();
+                AddResourceToSend(uuid);
+            }
+        });
+    }
+    else
+    {
+        resource->p_state = ResourceState::Loading;
+        if (resource->Load(this))
+        {
+            PrintLog("Resource loaded %s", resource->GetPath().generic_string().c_str());
+            resource->SetLoaded();
+            if (resource->SendToGPU(m_renderer))
+            {
+                resource->SetSentToGPU();
+            }
+            else
+            {
+                AddResourceToSend(uuid);
+            }
+        }
+    }
+    return resource;
+}
+
 std::shared_ptr<IResource> ResourceManager::CreateResourceFromPath(const std::filesystem::path& path)
 {
     std::string extension = path.extension().generic_string();
     if (extension.empty())
         return nullptr;
-    extension = extension.substr(1); // Remove the . for optimization
+    extension = extension.substr(1); // Remove the '.'
 
     std::ranges::transform(extension, extension.begin(), ::tolower);
     auto it = extensionToResourceType.find(extension);
 
     if (it == extensionToResourceType.end())
+    {
+        // PrintError("Extension %s not handled", extension.c_str());
         return nullptr;
+    }
 
     switch (it->second)
     {
@@ -328,7 +418,7 @@ void ResourceManager::ReadCache()
     while (stream >> uuid >> std::quoted(pathString))
     {
         std::shared_ptr<IResource> resource = CreateResourceFromPath(pathString);
-        if (!resource || !resource->Exists())
+        if (!resource || !resource->Exists() || Contains(pathString))
             continue;
         resource->p_uuid = uuid;
         AddResource(uuid, resource, GetHash(pathString));
@@ -363,4 +453,21 @@ void ResourceManager::CreateCacheDir()
 {
     std::filesystem::create_directories(GetCacheDir());
     std::filesystem::create_directories(GetCompiledCacheDir());
+}
+
+void ResourceManager::AddResourceFromFolder(std::filesystem::path folderPath)
+{
+    for (const auto& entry : std::filesystem::directory_iterator(folderPath))
+    {
+        if (std::filesystem::is_directory(entry.path()))
+        {
+            AddResourceFromFolder(entry.path());
+        }
+        else
+        {
+            auto resource = CreateResourceFromPath(entry.path());
+            if (resource && !Contains(resource->GetPath()))
+                Load(resource->GetPath());
+        }
+    }
 }

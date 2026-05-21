@@ -1,5 +1,24 @@
 #include "ClassDescriptor.h"
 
+#include "Core/UUID.h"
+
+Property& ClassDescriptor::PushID(std::string id)
+{
+    Property property;
+    property.name = id;
+    property.type = PropertyType::PushID;
+    properties.push_back(property);
+    return properties.back();
+}
+
+Property& ClassDescriptor::PopID()
+{
+    Property property;
+    property.type = PropertyType::PopID;
+    properties.push_back(property);
+    return properties.back();
+}
+
 Property& ClassDescriptor::AddProperty(const char* name, PropertyType type, void* data)
 {
     Property property;
@@ -7,8 +26,8 @@ Property& ClassDescriptor::AddProperty(const char* name, PropertyType type, void
     property.type = type;
     property.data = data;
     // This makes it so that the float ranges is [1; -1] so minValue > maxValue with both int and float
-    property.range.intRange.minInt = 0x3f800000;
-    property.range.intRange.maxInt = 0xbf800000;
+    property.range.intRange.minInt;
+    property.range.intRange.maxInt;
     properties.push_back(property);
     return properties.back();
 }
@@ -104,6 +123,11 @@ Property& ClassDescriptor::AddCubeMap(const char* name, SafePtr<CubeMap>& value)
 Property& ClassDescriptor::AddMesh(const char* name, SafePtr<Mesh>& value)
 {
     return AddProperty(name, PropertyType::Mesh, &value);
+}
+
+Property& ClassDescriptor::AddModel(const char* name, SafePtr<Model>& value)
+{
+    return AddProperty(name, PropertyType::Model, &value);
 }
 
 Property& ClassDescriptor::AddShader(const char* name, SafePtr<Shader>& value)

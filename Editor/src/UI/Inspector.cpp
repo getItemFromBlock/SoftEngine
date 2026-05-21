@@ -16,7 +16,7 @@
 #include "Resource/Mesh.h"
 #include "Resource/PostProcessShader.h"
 
-Inspector::Inspector(Engine* engine, ImGuiHandler* handler) : EditorWindow(handler)
+Inspector::Inspector(Engine* engine, ImGuiHandler* handler) : EditorWindow("Inspector", handler)
 {
     m_sceneHolder = engine->GetSceneHolder();
 }
@@ -31,9 +31,9 @@ void Inspector::OnRender()
         {
             auto renderer = Engine::Get()->GetRenderer();
             auto pos = object->GetTransform()->GetWorldPosition();
-            renderer->AddLine(pos, pos + object->GetTransform()->GetRight(), {Vec3f::Right(), 1});
-            renderer->AddLine(pos, pos + object->GetTransform()->GetUp(), {Vec3f::Up(), 1});
-            renderer->AddLine(pos, pos - object->GetTransform()->GetForward(), {-Vec3f::Forward(), 1});
+            renderer->DrawLine(pos, pos + object->GetTransform()->GetRight(), {Vec3f::Right(), 1});
+            renderer->DrawLine(pos, pos + object->GetTransform()->GetUp(), {Vec3f::Up(), 1});
+            renderer->DrawLine(pos, pos - object->GetTransform()->GetForward(), {-Vec3f::Forward(), 1});
         }
     }
     if (ImGui::Begin("Inspector"))
@@ -48,14 +48,16 @@ void Inspector::OnRender()
 
         if (SafePtr<GameObject> object = scene->GetGameObject(m_selectedObject))
         {
-            ImGui::Text("Name: %s", object->GetName().c_str());
+            std::string name = object->GetName();
+            if (ImGui::InputText("Name", &name))
+                object->SetName(name);
 
             auto components = object->GetComponents();
             size_t i = 0;
             Core::UUID deletedID = UUID_INVALID;
             for (SafePtr<IComponent>& component : components)
             {
-                const ClassDescriptor& descriptor = GetDescriptor(component->GetUUID(), component);
+                const ClassDescriptor& descriptor = GetDescriptor(component);
                 ImGui::PushID(component->GetUUID());
 
                 bool enable = component->IsEnable();
@@ -66,9 +68,19 @@ void Inspector::OnRender()
                 ImGui::SameLine();
 
                 bool visible = true;
-                const bool open = ImGui::CollapsingHeader(component->GetTypeName(), &visible,
-                                                          ImGuiTreeNodeFlags_AllowOverlap |
-                                                          ImGuiTreeNodeFlags_DefaultOpen);
+                bool open = true;
+                if (component->GetTypeName() != "TransformComponent")
+                {
+                    open = ImGui::CollapsingHeader(component->GetTypeName(), &visible,
+                                                   ImGuiTreeNodeFlags_AllowOverlap |
+                                                   ImGuiTreeNodeFlags_DefaultOpen);
+                }
+                else
+                {
+                    open = ImGui::CollapsingHeader(component->GetTypeName(),
+                        ImGuiTreeNodeFlags_AllowOverlap |
+                        ImGuiTreeNodeFlags_DefaultOpen);
+                }
 
                 if (!visible)
                 {
@@ -85,7 +97,7 @@ void Inspector::OnRender()
             {
                 object->RemoveComponent(deletedID);
             }
-        
+
             ImGui::NewLine();
             ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2);
             ImGui::NewLine();
@@ -103,19 +115,157 @@ void Inspector::OnRender()
 void Inspector::SetSelectedObject(const Core::UUID& uuid)
 {
     m_selectedObject = uuid;
+}
 
-    if (SafePtr<GameObject> object = m_sceneHolder->GetCurrentScene()->GetGameObject(uuid))
+template <typename T>
+bool DisplayWithType(const std::string& name, T* value)
+{
+    ImGui::TextUnformatted("Unknown");
+    return false;
+}
+
+template <>
+bool DisplayWithType(const std::string& name, float* value)
+{
+    return ImGui::DragFloat(name.c_str(), value);
+}
+
+template <>
+bool DisplayWithType(const std::string& name, Vec4f* value)
+{
+    return ImGui::ColorEdit4(name.c_str(), &value->x);
+}
+
+template <typename T>
+bool DisplayParticleValue(const std::string& name, ParticleProperty<T>& property)
+{
+    ImGui::PushID(name.c_str());
+    ImGui::TextUnformatted(name.c_str());
+    ImGui::SameLine();
+    bool result = false;
+    switch (property.type)
     {
-        std::vector<SafePtr<IComponent>> components = object->GetComponents();
-
-        for (SafePtr<IComponent>& component : components)
+    case ParticleProperty<T>::Type::Constant:
         {
-            ClassDescriptor descriptor;
-            component->Describe(descriptor);
-            m_descriptors[component->GetUUID()] = descriptor;
+            result |= DisplayWithType("##" + name, &property.value.min);
         }
+        break;
+    case ParticleProperty<T>::Type::Random:
+        {
+            float itemWidth = ImGui::GetContentRegionAvail().x * 0.5f - ImGui::GetFrameHeight() * 1.5f;
+            ImGui::SetNextItemWidth(itemWidth);
+            result |= DisplayWithType("##1" + name, &property.value.min);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(itemWidth);
+            result |= DisplayWithType("##2" + name, &property.value.max);
+        }
+        break;
+    default:
+        break;
+    }
+    ImGui::SameLine();
+    bool random = property.type == ParticleProperty<T>::Type::Random;
+    if (ImGui::Checkbox("##Random", &random))
+    {
+        result = true;
+        property.type = random ? ParticleProperty<T>::Type::Random : ParticleProperty<T>::Type::Constant;
+    }
+    ImGui::PopID();
+    return result;
+}
+
+void Inspector::ShowDescriptor(const ClassDescriptor& descriptor)
+{
+    if (descriptor.properties.size() == 1 && descriptor.properties[0].type == PropertyType::ParticleSystem)
+    {
+        ShowParticleSystem(descriptor.properties[0]);
+        return;
+    }
+    if (ImGui::BeginTable("PropertiesTable", 2, ImGuiTableFlags_SizingStretchSame))
+    {
+        ImGui::TableSetupColumn("Property");
+        ImGui::TableSetupColumn("Value");
+
+        for (const auto& property : descriptor.properties)
+        {
+            if (property.isList)
+            {
+                ImGui::TableNextRow();
+
+                ImGui::TableSetColumnIndex(0);
+                ImGui::TextUnformatted(property.name.c_str());
+                ImGui::SameLine();
+                if (ImGui::Button("+"))
+                {
+                    if (property.addElement)
+                        property.addElement();
+                    else
+                        AddListElement(property);
+                }
+                ImGui::TableSetColumnIndex(1);
+                size_t listSize = GetListSize(property);
+                ImGui::Text("Size %d", listSize);
+
+                if (listSize > 0)
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+
+                    // Draw full-width separator using draw list
+                    ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+                    ImDrawList* drawList = ImGui::GetWindowDrawList();
+                    float tableWidth = ImGui::GetContentRegionAvail().x + ImGui::GetStyle().ItemSpacing.x;
+                    ImVec2 tableStart = ImVec2(ImGui::GetCursorScreenPos().x - ImGui::GetStyle().ItemSpacing.x,
+                                               cursorPos.y);
+
+                    // Get table bounds properly
+                    ImGuiTable* table = ImGui::GetCurrentTable();
+                    if (table)
+                    {
+                        float x1 = table->OuterRect.Min.x;
+                        float x2 = table->OuterRect.Max.x;
+                        float y = cursorPos.y;
+
+                        drawList->AddLine(ImVec2(x1, y), ImVec2(x2, y), ImGui::GetColorU32(ImGuiCol_Separator));
+                        ImGui::Dummy(ImVec2(0, 1)); // Add vertical spacing
+                    }
+
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::PushID(property.name.c_str());
+                    RenderListProperty(property, "##" + property.name);
+                    ImGui::PopID();
+                }
+            }
+            else
+            {
+                if (property.type == PropertyType::PushID)
+                {
+                    ImGui::PushID(property.name.c_str());
+                }
+                else if (property.type == PropertyType::PopID)
+                {
+                    ImGui::PopID();
+                }
+                else
+                {
+                    ImGui::TableNextRow();
+
+                    // Label column
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::TextUnformatted(property.name.c_str());
+
+                    // Value column
+                    ImGui::TableSetColumnIndex(1);
+                    ShowProperty(property);
+                }
+            }
+        }
+
+        ImGui::EndTable();
     }
 }
+
 
 template <>
 std::optional<SafePtr<Material>> Inspector::DisplayResourcePopup<Material>()
@@ -164,6 +314,34 @@ std::optional<SafePtr<Mesh>> Inspector::DisplayResourcePopup<Mesh>()
             if (ImGui::MenuItem(mesh->GetName().c_str()))
             {
                 result = resourceManager->Load<Mesh>(mesh->GetPath());
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndPopup();
+    }
+    return result;
+}
+
+template <>
+std::optional<SafePtr<Model>> Inspector::DisplayResourcePopup<Model>()
+{
+    std::optional<SafePtr<Model>> result;
+    if (ImGui::BeginPopup("Resource Popup"))
+    {
+        auto resourceManager = Engine::Get()->GetResourceManager();
+        auto meshes = resourceManager->GetAll<Model>();
+        if (ImGui::MenuItem("None"))
+        {
+            result = nullptr;
+            ImGui::CloseCurrentPopup();
+        }
+        for (auto& mesh : meshes)
+        {
+            ImGui::PushID(mesh->GetUUID());
+            if (ImGui::MenuItem(mesh->GetName().c_str()))
+            {
+                result = resourceManager->Load<Model>(mesh->GetPath());
                 ImGui::CloseCurrentPopup();
             }
             ImGui::PopID();
@@ -288,144 +466,9 @@ std::optional<SafePtr<PostProcessShader>> Inspector::DisplayResourcePopup<PostPr
     return result;
 }
 
-template <typename T>
-bool DisplayWithType(const std::string& name, T* value)
-{
-    ImGui::TextUnformatted("Unknown");
-    return false;
-}
-
-template <>
-bool DisplayWithType(const std::string& name, float* value)
-{
-    return ImGui::DragFloat(name.c_str(), value);
-}
-
-template <>
-bool DisplayWithType(const std::string& name, Vec4f* value)
-{
-    return ImGui::ColorEdit4(name.c_str(), &value->x);
-}
-
-template <typename T>
-bool DisplayParticleValue(const std::string& name, ParticleProperty<T>& property)
-{
-    ImGui::PushID(name.c_str());
-    ImGui::TextUnformatted(name.c_str());
-    ImGui::SameLine();
-    bool result = false;
-    switch (property.type)
-    {
-    case ParticleProperty<T>::Type::Constant:
-        {
-            result |= DisplayWithType("##" + name, &property.value.min);
-        }
-        break;
-    case ParticleProperty<T>::Type::Random:
-        {
-            float itemWidth = ImGui::GetContentRegionAvail().x * 0.5f - ImGui::GetFrameHeight() * 1.5f;
-            ImGui::SetNextItemWidth(itemWidth);
-            result |= DisplayWithType("##1" + name, &property.value.min);
-            ImGui::SameLine();
-            ImGui::SetNextItemWidth(itemWidth);
-            result |= DisplayWithType("##2" + name, &property.value.max);
-        }
-        break;
-    default:
-        break;
-    }
-    ImGui::SameLine();
-    bool random = property.type == ParticleProperty<T>::Type::Random;
-    if (ImGui::Checkbox("##Random", &random))
-    {
-        result = true;
-        property.type = random ? ParticleProperty<T>::Type::Random : ParticleProperty<T>::Type::Constant;
-    }
-    ImGui::PopID();
-    return result;
-}
-
-void Inspector::ShowDescriptor(const ClassDescriptor& descriptor)
-{
-    if (descriptor.properties.size() == 1 && descriptor.properties[0].type == PropertyType::ParticleSystem)
-    {
-        ShowParticleSystem(descriptor.properties[0]);
-        return;
-    }
-    if (ImGui::BeginTable("PropertiesTable", 2, ImGuiTableFlags_SizingStretchSame))
-    {
-        ImGui::TableSetupColumn("Property");
-        ImGui::TableSetupColumn("Value");
-
-        for (const auto& property : descriptor.properties)
-        {
-            if (property.isList)
-            {
-                ImGui::TableNextRow();
-
-                ImGui::TableSetColumnIndex(0);
-                ImGui::TextUnformatted(property.name.c_str());
-                ImGui::SameLine();
-                if (ImGui::Button("+"))
-                {
-                    AddListElement(property);
-                }
-                ImGui::TableSetColumnIndex(1);
-                size_t listSize = GetListSize(property);
-                ImGui::Text("Size %d", listSize);
-
-                if (listSize > 0)
-                {
-                    ImGui::TableNextRow();
-                    ImGui::TableSetColumnIndex(0);
-    
-                    // Draw full-width separator using draw list
-                    ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-                    ImDrawList* drawList = ImGui::GetWindowDrawList();
-                    float tableWidth = ImGui::GetContentRegionAvail().x + ImGui::GetStyle().ItemSpacing.x;
-                    ImVec2 tableStart = ImVec2(ImGui::GetCursorScreenPos().x - ImGui::GetStyle().ItemSpacing.x, cursorPos.y);
-    
-                    // Get table bounds properly
-                    ImGuiTable* table = ImGui::GetCurrentTable();
-                    if (table)
-                    {
-                        float x1 = table->OuterRect.Min.x;
-                        float x2 = table->OuterRect.Max.x;
-                        float y = cursorPos.y;
-        
-                        drawList->AddLine(ImVec2(x1, y), ImVec2(x2, y), ImGui::GetColorU32(ImGuiCol_Separator));
-                        ImGui::Dummy(ImVec2(0, 1)); // Add vertical spacing
-                    }
-    
-                    ImGui::TableNextRow();
-                    ImGui::TableSetColumnIndex(0);
-                    ImGui::PushID(property.name.c_str());
-                    RenderListProperty(property, "##" + property.name);
-                    ImGui::PopID();
-                }
-            }
-            else
-            {
-                ImGui::TableNextRow();
-
-                // Label column
-                ImGui::TableSetColumnIndex(0);
-                ImGui::TextUnformatted(property.name.c_str());
-
-                // Value column
-                ImGui::TableSetColumnIndex(1);
-                ShowProperty(property);
-            }
-        }
-
-        ImGui::EndTable();
-    }
-}
-
 void Inspector::ShowProperty(const Property& property)
 {
     std::string id = ("##" + property.name);
-    ImGui::PushID(id.c_str());
 
     ImGui::SetNextItemWidth(-FLT_MIN);
     switch (property.type)
@@ -535,13 +578,18 @@ void Inspector::ShowProperty(const Property& property)
             RenderPostProcessShaderProperty(property, id);
             break;
         }
+
+    case PropertyType::Model:
+        {
+            RenderModelProperty(property, id);
+            break;
+        }
     default:
         {
             PrintWarning("Property type not handle on Inspector");
             break;
         }
     }
-    ImGui::PopID();
 }
 
 void Inspector::UpdateProperty(const Property& property, void* newValue)
@@ -549,6 +597,10 @@ void Inspector::UpdateProperty(const Property& property, void* newValue)
     if (property.setter)
     {
         property.setter(newValue);
+    }
+    else if (property.index != -1 && property.setElement)
+    {
+        property.setElement(property.index, newValue);
     }
     else if (property.data && !property.readOnly)
     {
@@ -585,7 +637,7 @@ void Inspector::UpdateProperty(const Property& property, void* newValue)
 
 void Inspector::RenderButtonProperty(const Property& property, const std::string& id)
 {
-    ImVec2 button_sz(19, 19);
+    ImVec2 button_sz(17, 17);
     if (ImGui::Button(id.c_str(), button_sz))
     {
         UpdateProperty(property, nullptr);
@@ -635,7 +687,8 @@ void Inspector::RenderIVec2Property(const Property& property, const std::string&
     bool changed = false;
 
     if (property.hasRange)
-        changed = ImGui::DragInt2(id.c_str(), &value.x, 1, property.range.intRange.minInt, property.range.intRange.maxInt);
+        changed = ImGui::DragInt2(id.c_str(), &value.x, 1, property.range.intRange.minInt,
+                                  property.range.intRange.maxInt);
     else
         changed = ImGui::InputInt2(id.c_str(), &value.x, flags);
 
@@ -657,7 +710,8 @@ void Inspector::RenderIVec3Property(const Property& property, const std::string&
     bool changed = false;
 
     if (property.hasRange)
-        changed = ImGui::DragInt3(id.c_str(), &value.x, 1, property.range.intRange.minInt, property.range.intRange.maxInt);
+        changed = ImGui::DragInt3(id.c_str(), &value.x, 1, property.range.intRange.minInt,
+                                  property.range.intRange.maxInt);
     else
         changed = ImGui::InputInt3(id.c_str(), &value.x, flags);
 
@@ -680,7 +734,8 @@ void Inspector::RenderIVec4Property(const Property& property, const std::string&
     bool changed = false;
 
     if (property.hasRange)
-        changed = ImGui::DragInt4(id.c_str(), &value.x, 1, property.range.intRange.minInt, property.range.intRange.maxInt);
+        changed = ImGui::DragInt4(id.c_str(), &value.x, 1, property.range.intRange.minInt,
+                                  property.range.intRange.maxInt);
     else
         changed = ImGui::InputInt4(id.c_str(), &value.x, flags);
 
@@ -704,7 +759,8 @@ void Inspector::RenderFloatProperty(const Property& property, const std::string&
     bool changed = false;
 
     if (property.hasRange)
-        changed = ImGui::SliderFloat(id.c_str(), &value, property.range.floatRange.minFloat, property.range.floatRange.maxFloat);
+        changed = ImGui::SliderFloat(id.c_str(), &value, property.range.floatRange.minFloat,
+                                     property.range.floatRange.maxFloat);
     else
         changed = ImGui::DragFloat(id.c_str(), &value, 0.01f);
 
@@ -725,7 +781,8 @@ void Inspector::RenderFVec2Property(const Property& property, const std::string&
     bool changed = false;
 
     if (property.hasRange)
-        changed = ImGui::SliderFloat2(id.c_str(), &value.x, property.range.floatRange.minFloat, property.range.floatRange.maxFloat);
+        changed = ImGui::SliderFloat2(id.c_str(), &value.x, property.range.floatRange.minFloat,
+                                      property.range.floatRange.maxFloat);
     else
         changed = ImGui::DragFloat2(id.c_str(), &value.x, 0.01f);
 
@@ -747,7 +804,8 @@ void Inspector::RenderFVec3Property(const Property& property, const std::string&
     bool changed = false;
 
     if (property.hasRange)
-        changed = ImGui::SliderFloat3(id.c_str(), &value.x, property.range.floatRange.minFloat, property.range.floatRange.maxFloat);
+        changed = ImGui::SliderFloat3(id.c_str(), &value.x, property.range.floatRange.minFloat,
+                                      property.range.floatRange.maxFloat);
     else
         changed = ImGui::DragFloat3(id.c_str(), &value.x, 0.01f);
 
@@ -770,7 +828,8 @@ void Inspector::RenderFVec4Property(const Property& property, const std::string&
     bool changed = false;
 
     if (property.hasRange)
-        changed = ImGui::SliderFloat4(id.c_str(), &value.x, property.range.floatRange.minFloat, property.range.floatRange.maxFloat);
+        changed = ImGui::SliderFloat4(id.c_str(), &value.x, property.range.floatRange.minFloat,
+                                      property.range.floatRange.maxFloat);
     else
         changed = ImGui::DragFloat4(id.c_str(), &value.x, 0.01f);
 
@@ -834,9 +893,9 @@ void Inspector::RenderColor4Property(const Property& property, const std::string
     }
 }
 
-void Inspector::RenderEnumProperty(const Property & property, const std::string & id)
+void Inspector::RenderEnumProperty(const Property& property, const std::string& id)
 {
-    int32_t *index = static_cast<int32_t *>(property.data);
+    int32_t* index = static_cast<int32_t*>(property.data);
     if (ImGui::Combo(property.name.c_str(), index, static_cast<const char*>(property.dataDescriptor)))
     {
         UpdateProperty(property, index);
@@ -857,6 +916,7 @@ void Inspector::RenderTextureProperty(const Property& property, const std::strin
     {
         textureID = Editor::Get()->GetImGuiHandler()->GetTextureID(texture.getPtr());
     }
+    ImGui::PushID(textureID.GetTexID());
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2.f, 2.f));
     if (!property.readOnly && ImGui::ImageButton(id.c_str(), textureID, ImVec2(64, 64)))
     {
@@ -866,7 +926,7 @@ void Inspector::RenderTextureProperty(const Property& property, const std::strin
     {
         ImGui::Image(textureID, ImVec2(64, 64));
     }
-    
+
     auto result = DisplayResourcePopup<Texture>();
     if (result.has_value())
     {
@@ -874,6 +934,7 @@ void Inspector::RenderTextureProperty(const Property& property, const std::strin
         UpdateProperty(property, &newValue);
     }
     ImGui::PopStyleVar();
+    ImGui::PopID();
 }
 
 void Inspector::RenderCubeMapProperty(const Property& property, const std::string& id)
@@ -956,6 +1017,22 @@ void Inspector::RenderPostProcessShaderProperty(const Property& property, const 
     }
 }
 
+void Inspector::RenderModelProperty(const Property& property, const std::string& id)
+{
+    SafePtr<Model> model = *static_cast<SafePtr<Model>*>(property.data);
+    std::string name = model ? model->GetName() : "None";
+    if (ImGui::Button(name.c_str()))
+    {
+        ImGui::OpenPopup("Resource Popup");
+    }
+    auto result = DisplayResourcePopup<Model>();
+    if (result.has_value())
+    {
+        SafePtr<Model> newValue = result.value();
+        UpdateProperty(property, &newValue);
+    }
+}
+
 void Inspector::RenderListProperty(const Property& property, const std::string& id)
 {
     size_t listSize = GetListSize(property);
@@ -977,6 +1054,7 @@ void Inspector::RenderListProperty(const Property& property, const std::string& 
         Property elementProp = property;
         elementProp.isList = false;
         elementProp.data = GetListElement(property, i);
+        elementProp.index = i;
 
         ShowProperty(elementProp);
 
@@ -986,7 +1064,10 @@ void Inspector::RenderListProperty(const Property& property, const std::string& 
 
     if (removeIndex != -1)
     {
-        RemoveListElement(property, removeIndex);
+        if (property.removeElement)
+            property.removeElement(removeIndex);
+        else
+            RemoveListElement(property, removeIndex);
     }
 }
 
@@ -1055,6 +1136,11 @@ void* Inspector::GetListElement(const Property& property, size_t index)
             auto* list = static_cast<std::vector<SafePtr<Material>>*>(property.data);
             return &(*list)[index];
         }
+    case PropertyType::PostProcessShader:
+        {
+            auto* list = static_cast<std::vector<SafePtr<PostProcessShader>>*>(property.data);
+            return &(*list)[index];
+        }
     default:
         return nullptr;
     }
@@ -1089,6 +1175,8 @@ size_t Inspector::GetListSize(const Property& property)
         return static_cast<std::vector<SafePtr<Mesh>>*>(property.data)->size();
     case PropertyType::Material:
         return static_cast<std::vector<SafePtr<Material>>*>(property.data)->size();
+    case PropertyType::PostProcessShader:
+        return static_cast<std::vector<SafePtr<PostProcessShader>>*>(property.data)->size();
     default:
         return 0;
     }
@@ -1226,6 +1314,9 @@ void Inspector::AddListElement(const Property& property)
     case PropertyType::Material:
         static_cast<std::vector<SafePtr<Material>>*>(property.data)->emplace_back();
         break;
+    case PropertyType::PostProcessShader:
+        static_cast<std::vector<SafePtr<PostProcessShader>>*>(property.data)->emplace_back();
+        break;
     default:
         PrintError("Type not handled for AddListElement");
     }
@@ -1236,7 +1327,8 @@ void Inspector::AddListElement(const Property& property)
 
 void Inspector::DisplayAddComponentPopup() const
 {
-    auto componentList = Engine::Get()->GetComponentRegister()->GetComponentTypes();
+    const std::unordered_map<ComponentID, ComponentTypeInfo>& componentList = Engine::Get()->GetComponentRegister()->
+        GetComponentTypes();
     if (ImGui::BeginPopup("Add Component"))
     {
         Scene* scene = m_sceneHolder->GetCurrentScene();
@@ -1244,6 +1336,8 @@ void Inspector::DisplayAddComponentPopup() const
         ASSERT(object);
         for (auto& [id, info] : componentList)
         {
+            if (info.GetTypeName() == TransformComponent::GetStaticTypeName())
+                continue;
             if (ImGui::MenuItem(info.GetTypeName()))
             {
                 scene->AddComponent(object.getPtr(), id);

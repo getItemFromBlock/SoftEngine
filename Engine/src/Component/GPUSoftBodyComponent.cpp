@@ -1,11 +1,14 @@
-﻿#include "GPUSoftBodyComponent.h"
+﻿#include <string>
+#include <format>
+
+#include "GPUSoftBodyComponent.h"
 #include "Core/Engine.h"
 
 #include "Render/Vulkan/VulkanIndexBuffer.h"
 #include "Render/Vulkan/VulkanRenderer.h"
 #include "Render/Vulkan/VulkanVertexBuffer.h"
 
-#include "Resource/Mesh.h"
+#include "Resource/Model.h"
 #include "Scene/GameObject.h"
 #include "Utils/Color.h"
 #include "Utils/Random.h"
@@ -26,6 +29,8 @@ void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
             m_needsRecreation = true;
         };
 
+    d.AddProperty("Density", PropertyType::Float, &m_particleSettings.general.density);
+
     auto &res3 = d.AddInt("Solid Layers", m_particleSettings.general.solidLayers).SetRangeInt(1, 1024);
     res3.onModified = [this](void)
         {
@@ -36,11 +41,16 @@ void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
 
     d.AddFloat("Connection Strength", m_particleSettings.general.strength).SetRangeFloat(0, 65536);
 
-    auto &res6 = d.AddEnum("Shape", reinterpret_cast<int32_t *>(&m_particleSettings.shape.type), m_particleSettings.shape.to_cstr());
-    res6.onModified = [this](void)
-        {
-            m_needsRecreation = true;
-        };
+    if (!m_needRecreateFromModel)
+    {
+        auto &res6 = d.AddProperty("Model", PropertyType::Model, &m_initializerModel);
+        res6.onModified = [this](void)
+            {
+                m_initializerModel->EOnLoaded.Bind([this](){
+                        m_needRecreateFromModel = true;
+                    });
+            };
+    }
 
     d.AddBool("Debug", m_drawDebug);
 
@@ -51,11 +61,18 @@ void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
         };
 }
 
-void GPUSoftBodyComponent::CreateFromMesh(SafePtr<Mesh> inputMesh)
+void GPUSoftBodyComponent::CreateFromModel(SafePtr<Model> inputModel)
 {
-    m_initializerMesh = inputMesh;
-    m_loadedFromMesh = true;
-    InitializeParticleDataFromMesh(5, 0.5);
+    m_initializerModel = inputModel;
+    m_loadedFromModel = true;
+    InitializeParticleDataFromModel(m_particleSettings.general.density, (float)m_particleSettings.general.connectionStrength);
+    InitializeMaterialsFromModel(inputModel);
+    CreateParticleBuffers();
+}
+
+void GPUSoftBodyComponent::Recreate()
+{
+    InitializeParticleDataFromModel(m_particleSettings.general.density, (float)m_particleSettings.general.connectionStrength);
     CreateParticleBuffers();
 }
 
@@ -69,23 +86,33 @@ void GPUSoftBodyComponent::OnCreate()
     auto instancingShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/sb_instancing.shader");
     auto skinnedShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/sb_skinning.shader");
 
-    m_billboardMaterial = resourceManager->CreateMaterial("SoftbodyInstancing");
-    m_billboardMaterial->SetShader(instancingShader);
+    m_billboardMaterial = resourceManager->CreateMaterial("SoftbodyInstancing", instancingShader);
     m_billboardMaterial->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
-    
-    m_material = resourceManager->CreateMaterial("SoftbodySkinned", skinnedShader);
-    m_material->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
-    m_material->SetAttribute("normalSampler", resourceManager->GetDefaultNormal());
-    m_material->SetAttribute("roughnessSampler", resourceManager->GetBlankTexture());
-    m_material->SetAttribute("metalnessSampler", resourceManager->GetBlankTexture());
-    m_material->SetAttribute("aoSampler", resourceManager->GetBlankTexture());
-    m_material->SetAttribute("heightSampler", resourceManager->GetBlackTexture());
+    m_billboardMaterial->SetAttribute("normalSampler", resourceManager->GetDefaultNormal());
+    m_billboardMaterial->SetAttribute("roughnessSampler", resourceManager->GetBlankTexture());
+    m_billboardMaterial->SetAttribute("metalnessSampler", resourceManager->GetBlankTexture());
+    m_billboardMaterial->SetAttribute("aoSampler", resourceManager->GetBlankTexture());
+    m_billboardMaterial->SetAttribute("heightSampler", resourceManager->GetBlackTexture());
 
-    m_material->SetAttribute("material.color", Vec4f(0.05f, 0.3f, 0.05f, 1.0f));
-    m_material->SetAttribute("material.roughnessFactor", 0.05f);
-    m_material->SetAttribute("material.metalnessFactor", 0.8f);
-    m_material->SetAttribute("material.aoFactor", 1.f);
-    m_material->SetAttribute("material.heightScale", 0.0f);
+    m_billboardMaterial->SetAttribute("material.color", Vec4f(0.05f, 0.3f, 0.05f, 1.0f));
+    m_billboardMaterial->SetAttribute("material.roughnessFactor", 0.05f);
+    m_billboardMaterial->SetAttribute("material.metalnessFactor", 0.8f);
+    m_billboardMaterial->SetAttribute("material.aoFactor", 1.f);
+    m_billboardMaterial->SetAttribute("material.heightScale", 0.0f);
+    
+    m_defaultMaterial = resourceManager->CreateMaterial("SoftbodySkinned default", skinnedShader);
+    m_defaultMaterial->SetAttribute("albedoSampler", resourceManager->GetBlankTexture());
+    m_defaultMaterial->SetAttribute("normalSampler", resourceManager->GetDefaultNormal());
+    m_defaultMaterial->SetAttribute("roughnessSampler", resourceManager->GetBlankTexture());
+    m_defaultMaterial->SetAttribute("metalnessSampler", resourceManager->GetBlankTexture());
+    m_defaultMaterial->SetAttribute("aoSampler", resourceManager->GetBlankTexture());
+    m_defaultMaterial->SetAttribute("heightSampler", resourceManager->GetBlackTexture());
+
+    m_defaultMaterial->SetAttribute("material.color", Vec4f(1.0f, 0.0f, 1.0f, 1.0f));
+    m_defaultMaterial->SetAttribute("material.roughnessFactor", 0.05f);
+    m_defaultMaterial->SetAttribute("material.metalnessFactor", 0.8f);
+    m_defaultMaterial->SetAttribute("material.aoFactor", 1.f);
+    m_defaultMaterial->SetAttribute("material.heightScale", 0.0f);
 
     m_mesh = std::make_shared<Mesh>("internal");
     m_billboardMesh = resourceManager->Load<Mesh>(RESOURCE_PATH"/models/Cube.obj/Cube.mesh");
@@ -103,16 +130,21 @@ void GPUSoftBodyComponent::OnCreate()
 
 void GPUSoftBodyComponent::OnUpdate(float deltaTime)
 {
+    if (m_needRecreateFromModel)
+    {
+        CreateFromModel(m_initializerModel);
+        m_needRecreateFromModel = false;
+    }
+}
+
+void GPUSoftBodyComponent::OnGameUpdate(float deltaTime)
+{
     if (!m_simulationCompute0 || !m_simulationCompute1)
         return;
     
     if (m_needsRecreation)
     {
-        if (m_loadedFromMesh)
-        {
-            InitializeParticleDataFromMesh(5, 0.5);
-        }
-        CreateParticleBuffers();
+        Recreate();
         m_needsRecreation = false;
         return;
     }
@@ -205,7 +237,7 @@ void GPUSoftBodyComponent::OnUpdate(float deltaTime)
         0, 0, nullptr, 1, &barrier1, 0, nullptr);
 
     CameraData cam = p_gameObject->GetScene()->GetCameraData();
-    m_material->SetAttribute("cameraUBO.viewProj", cam.VP);
+    m_defaultMaterial->SetAttribute("cameraUBO.viewProj", cam.VP);
     if (m_drawDebug)
     {
         m_billboardMaterial->SetAttribute("cameraUBO.viewProj", cam.VP);
@@ -216,7 +248,7 @@ void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
 {
     if (!m_mesh || !m_mesh->IsLoaded() || !m_mesh->HasBeenSent()) 
         return;
-    if (!m_particleBuffer || !m_material) 
+    if (!m_particleBuffer || !m_defaultMaterial) 
         return;
 
     auto* rqm = Engine::Get()->GetRenderer()->GetRenderQueueManager();
@@ -228,17 +260,19 @@ void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
     {
         // Skinned soft body mesh
         queue->SubmitSoftBody(
-            m_mesh.get(), m_material.getPtr(),
+            m_mesh.get(), m_materials,
             m_particleBuffer->GetBuffer(), PBufSizeAligned,
             m_totalParticleCount, m_particleSettings.general.particleAmount,
             transform, /*isDebug=*/false);
     }
 
     // Debug billboard instancing (one cube per particle)
-    if (m_drawDebug && m_billboardMaterial && m_billboardMesh)
+    else if (m_billboardMaterial && m_billboardMesh)
     {
+        std::vector<SafePtr<Material>> mat;
+        mat.push_back(m_billboardMaterial);
         queue->SubmitSoftBody(
-            m_billboardMesh.getPtr(), m_billboardMaterial.getPtr(),
+            m_billboardMesh.getPtr(), mat,
             m_particleBuffer->GetBuffer(), PBufSizeAligned,
             m_totalParticleCount, m_particleSettings.general.particleAmount,
             transform, /*isDebug=*/true);
@@ -333,32 +367,42 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
 
     std::vector<WeightedVertex> vertices;
     std::vector<uint32_t> indices;
-    if (m_initializerMesh)
+    if (m_initializerModel)
     {
-        static_assert(offsetof(Vertex, position) == offsetof(WeightedVertex, position));
-        static_assert(offsetof(Vertex, texCoord) == offsetof(WeightedVertex, texCoord));
-        static_assert(offsetof(Vertex, normal) == offsetof(WeightedVertex, normal));
-        static_assert(offsetof(Vertex, tangent) == offsetof(WeightedVertex, tangent));
-
-        const uint32_t stride = (m_initializerMesh->m_isWeighted ? sizeof(WeightedVertex) : sizeof(Vertex)) / sizeof(float);
-        const uint32_t vertCount = static_cast<uint32_t>(m_initializerMesh->m_vertices.size() / stride);
-        const uint32_t dataStride = sizeof(Vertex) / sizeof(float);
-
-        vertices.resize(vertCount);
-        const float *ptrSource = m_initializerMesh->m_vertices.data();
-        float *ptrDest = reinterpret_cast<float*>(vertices.data());
-
-        for (uint32_t i = 0; i < vertCount; i++)
+        for (const SafePtr<Mesh> mesh : m_initializerModel->GetMeshes())
         {
-            ASSERT(ptrSource < m_initializerMesh->m_vertices.data() + m_initializerMesh->m_vertices.size());
-            ASSERT(reinterpret_cast<WeightedVertex*>(ptrDest) < vertices.data() + vertices.size());
+            static_assert(offsetof(Vertex, position) == offsetof(WeightedVertex, position));
+            static_assert(offsetof(Vertex, texCoord) == offsetof(WeightedVertex, texCoord));
+            static_assert(offsetof(Vertex, normal) == offsetof(WeightedVertex, normal));
+            static_assert(offsetof(Vertex, tangent) == offsetof(WeightedVertex, tangent));
 
-            std::copy(ptrSource, ptrSource + dataStride, ptrDest);
-            ptrSource += stride;
-            ptrDest += sizeof(WeightedVertex) / sizeof(float);
+            const uint32_t stride = (mesh->m_isWeighted ? sizeof(WeightedVertex) : sizeof(Vertex)) / sizeof(float);
+            const uint32_t vertCount = static_cast<uint32_t>(mesh->m_vertices.size() / stride);
+            const uint32_t dataStride = sizeof(Vertex) / sizeof(float);
+
+            const uint32_t currentOffset = (uint32_t)vertices.size();
+            vertices.resize(vertCount + currentOffset);
+            const float *ptrSource = mesh->m_vertices.data();
+            float *ptrDest = reinterpret_cast<float*>(vertices.data() + currentOffset);
+
+            for (uint32_t i = 0; i < vertCount; i++)
+            {
+                ASSERT(ptrSource < mesh->m_vertices.data() + mesh->m_vertices.size());
+                ASSERT(reinterpret_cast<WeightedVertex*>(ptrDest) < vertices.data() + vertices.size());
+
+                std::copy(ptrSource, ptrSource + dataStride, ptrDest);
+                ptrSource += stride;
+                ptrDest += sizeof(WeightedVertex) / sizeof(float);
+            }
+
+            uint32_t prevIndSize = (uint32_t)indices.size();
+            indices.resize(mesh->m_indices.size() + prevIndSize);
+            uint32_t *ptrInd = indices.data() + prevIndSize;
+            for (uint32_t i = 0; i < mesh->m_indices.size(); i++)
+            {
+                ptrInd[i] = (mesh->m_indices[i] + currentOffset);
+            }
         }
-
-        indices = m_initializerMesh->m_indices;
     }
     else
         CreateSkinnedMesh(vertices, indices);
@@ -368,6 +412,22 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
     m_mesh->CreateFrom(reinterpret_cast<float*>(vertices.data()), static_cast<uint32_t>(vertices.size()), indices.data(), 
         static_cast<uint32_t>(indices.size()), true);
     
+    m_mesh->m_subMeshes.clear();
+
+    if (m_initializerModel)
+    {
+        uint32_t currIndex = 0;
+        for (const SafePtr<Mesh> mesh : m_initializerModel->GetMeshes())
+        {
+            for (const SubMesh subMesh : mesh->m_subMeshes)
+            {
+                SubMesh newOne{ currIndex, subMesh.count };
+                m_mesh->m_subMeshes.push_back(newOne);
+                currIndex = subMesh.count;
+            }
+        }
+    }
+
     m_particles.clear();
     m_connections.clear();
 }
@@ -643,7 +703,18 @@ void GPUSoftBodyComponent::ApplySettings()
     m_needsRecreation = true;
 }
 
-void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float maxDistToConnect)
+void Encapsulate(BoundingBox& target, const BoundingBox& other)
+{
+    target.min.x = std::min(target.min.x, other.min.x);
+    target.min.y = std::min(target.min.y, other.min.y);
+    target.min.z = std::min(target.min.z, other.min.z);
+
+    target.max.x = std::max(target.max.x, other.max.x);
+    target.max.y = std::max(target.max.y, other.max.y);
+    target.max.z = std::max(target.max.z, other.max.z);
+}
+
+void GPUSoftBodyComponent::InitializeParticleDataFromModel(float density, float maxDistToConnect)
 {
     m_particles.clear();
     m_connections.clear();
@@ -651,78 +722,137 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
     int itConnectionOffset = 0;
     UNUSED(itConnectionOffset);
 
-    BoundingBox BBox = m_initializerMesh.getPtr()->m_boundingBox;
+    BoundingBox globalBBox;
 
-    constexpr size_t vertexSize = sizeof(Vertex) / sizeof(float);
-
-    int pointCount = static_cast<int>(m_initializerMesh->m_vertices.size() / vertexSize);
-
-    Vertex* vertices = reinterpret_cast<Vertex*>(m_initializerMesh->m_vertices.data());
-
-    float invDensity = 1 / density;
-
-    // Place point inside mesh
-    for (float currY = BBox.min.y; currY <= BBox.max.y; currY += invDensity)
+    for (const SafePtr<Mesh> mesh : m_initializerModel->GetMeshes())
     {
-        for (float currZ = BBox.min.z; currZ <= BBox.max.z; currZ += invDensity)
-        {
-            for (float currX = BBox.min.x; currX <= BBox.max.x; currX += invDensity)
-            {
+        BoundingBox BBox = mesh->m_boundingBox;
 
-                Vec3f pos = { currX, currY, currZ };
+        int pointCount = static_cast<int>(mesh->m_indices.size());
 
-                bool shouldDiscard = false;
-                for (int i = 0; i < pointCount / 3; i++)
-                {
-                    Vec3f a = vertices[i * 3    ].position;
-                    Vec3f b = vertices[i * 3 + 1].position;
-                    Vec3f c = vertices[i * 3 + 2].position;
+        Vertex* vertices    = reinterpret_cast<Vertex*>(mesh->m_vertices.data());
+        uint32_t* indices   = reinterpret_cast<uint32_t*>(mesh->m_indices.data());
 
-                    Vec3f n = (b - a).Cross(c - a);
-
-                    Vec3f offset = pos - a;
-
-                    if (n.Dot(offset) > 0)
-                    {
-                        shouldDiscard = true;
-                        break;
-                    }
-                }
-                
-                if (shouldDiscard)
-                    continue;
-
-                SBParticleData data = { };
-
-                data.position = pos;
-                data.originalPos = pos;
-                data.velocity = { 0 , 0 , 0 };
-                data.connectionsCount = 0;
-                m_particles.push_back(data);
-            }
-        }
+        PlacePointMesh(BBox, vertices, indices, pointCount, density);
+        
+        Encapsulate(globalBBox, BBox);
     }
 
-    // Generate connection
+    GenerateConnection(globalBBox, maxDistToConnect);
+
+    m_totalParticleCount = uint32_t(m_particles.size());
+}
+
+void GPUSoftBodyComponent::InitializeMaterialsFromModel(SafePtr<Model> inputModel)
+{
+    m_materials.clear();
+    auto resourceManager = Engine::Get()->GetResourceManager();
+    auto skinnedShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/SoftbodyCompute/sb_skinning.shader");
+
+    if (inputModel->GetMaterials().size() == 0)
+    {
+        m_materials.push_back(m_defaultMaterial);
+        return;
+    }
+
+    for (SafePtr<Material> mat : inputModel->GetMaterials())
+    {
+        std::string name = std::format("{}_SkinnedMaterial {} ", inputModel->GetName(), m_materials.size());
+        SafePtr<Material> newMat = resourceManager->CreateMaterial(name, skinnedShader);
+        newMat->SetAttribute("albedoSampler",       mat->GetTexture("albedoSampler"));
+        newMat->SetAttribute("normalSampler",       mat->GetTexture("normalSampler"));
+        newMat->SetAttribute("roughnessSampler",    mat->GetTexture("roughnessSampler"));
+        newMat->SetAttribute("metalnessSampler",    mat->GetTexture("metalnessSampler"));
+        newMat->SetAttribute("aoSampler",           mat->GetTexture("aoSampler"));
+        newMat->SetAttribute("heightSampler",       mat->GetTexture("heightSampler"));
+
+        newMat->SetAttribute("material.color",          mat->GetVec4Attribute("material.color"));
+        newMat->SetAttribute("material.roughnessFactor", mat->GetFloatAttribute("material.roughnessFactor"));
+        newMat->SetAttribute("material.metalnessFactor", mat->GetFloatAttribute("material.metalnessFactor"));
+        newMat->SetAttribute("material.aoFactor",       mat->GetFloatAttribute("material.aoFactor"));
+        newMat->SetAttribute("material.heightScale",    mat->GetFloatAttribute("material.heightScale"));
+
+        m_materials.push_back(newMat);
+    }
+}
+
+struct Vec3iHash
+{
+    size_t operator()(const Vec3i& k) const
+    {
+        return ((std::hash<int>()(k.x)
+                ^ (std::hash<int>()(k.y) << 1)) >> 1)
+                ^ (std::hash<int>()(k.z) << 1);
+    }
+};
+
+struct SpatialGrid 
+{
+    float cellSize;
+    std::unordered_map<Vec3i, std::vector<int>, Vec3iHash> cells;
+
+    void Add(const Vec3f& pos, int particleIndex) 
+    {
+        int ix = (int)floor(pos.x / cellSize);
+        int iy = (int)floor(pos.y / cellSize);
+        int iz = (int)floor(pos.z / cellSize);
+        cells[{ix, iy, iz}].push_back(particleIndex);
+    }
+};
+
+void GPUSoftBodyComponent::GenerateConnection(const BoundingBox& BBox, const float& maxDistToConnect)
+{
+    float maxDistSqrt = maxDistToConnect * maxDistToConnect;
+    m_connections.clear();
+
+    SpatialGrid grid;
+    grid.cellSize = maxDistToConnect;
+    for (int i = 0; i < m_particles.size(); i++)
+    {
+        grid.Add(m_particles[i].position, i);
+    }
+
     for (int i = 0; i < m_particles.size(); i++)
     {
         m_particles[i].connectionsOffset = static_cast<uint32_t>(m_connections.size());
-        if (m_particles[i].position.y <= BBox.min.y + 0.2f) continue;
 
-        for (int j = 0; j < m_particles.size(); j++)
+        // Debug condion, not meant to remain on released project
+        if (m_particles[i].position.y <= BBox.min.y + 0.2f) 
         {
-            if (i == j) continue;
+            m_particles[i].connectionsCount = 0;
+            continue;
+        }
 
-            float dist = m_particles[j].position.Distance(m_particles[i].position);
+        Vec3f posI = m_particles[i].position;
+        int ix = (int)floor(posI.x / grid.cellSize);
+        int iy = (int)floor(posI.y / grid.cellSize);
+        int iz = (int)floor(posI.z / grid.cellSize);
 
-            if (dist <= maxDistToConnect)
+        for (int x = ix - 1; x <= ix + 1; ++x) 
+        {
+            for (int y = iy - 1; y <= iy + 1; ++y) 
             {
-                ConnectionData connectionData;
+                for (int z = iz - 1; z <= iz + 1; ++z) 
+                {
+                    if (grid.cells.count({ x, y, z }))
+                    {
+                        const auto& cell = grid.cells[{ x, y, z }];
 
-                connectionData.initialLength = dist;
-                connectionData.particleID = j;
+                        for (int j : cell) 
+                        {
+                            if (i == j) continue;
 
-                m_connections.push_back(connectionData);
+                            float distSq = Vec3f::LengthSquared(m_particles[j].position - posI);
+                            if (distSq <= maxDistSqrt) 
+                            {
+                                ConnectionData connectionData;
+                                connectionData.initialLength = sqrtf(distSq);
+                                connectionData.particleID = j;
+                                m_connections.push_back(connectionData);
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -730,4 +860,217 @@ void GPUSoftBodyComponent::InitializeParticleDataFromMesh(float density, float m
     }
 
     m_totalParticleCount = static_cast<uint32_t>(m_particles.size());
+}
+
+struct Ray
+{
+    Vec3f origin;
+    Vec3f direction;
+};
+
+struct Triangle
+{
+    Vec3f v[3];
+    Vec3f center;
+};
+
+struct BVHNode 
+{
+    BoundingBox bbox;
+    BVHNode* left = nullptr;
+    BVHNode* right = nullptr;
+    std::vector<Triangle> triangles;
+    bool isLeaf = false;
+};
+
+bool RayIntersectsBox(const Ray& ray, const BoundingBox& box) 
+{
+    float tmin = -FLT_MAX, tmax = FLT_MAX;
+
+    float dir[3] = { ray.direction.x, ray.direction.y, ray.direction.z };
+    float ori[3] = { ray.origin.x, ray.origin.y, ray.origin.z };
+    float bmin[3] = { box.min.x, box.min.y, box.min.z };
+    float bmax[3] = { box.max.x, box.max.y, box.max.z };
+
+    for (int i = 0; i < 3; ++i) 
+    {
+        if (abs(dir[i]) < 1e-6f) 
+        { 
+            if (ori[i] < bmin[i] || ori[i] > bmax[i]) 
+                return false;
+        }
+        else 
+        {
+            float invDir = 1.0f / dir[i];
+            float t1 = (bmin[i] - ori[i]) * invDir;
+            float t2 = (bmax[i] - ori[i]) * invDir;
+            if (t1 > t2) 
+                std::swap(t1, t2);
+
+            tmin = std::max(tmin, t1);
+            tmax = std::min(tmax, t2);
+
+            if (tmin > tmax) 
+                return false;
+        }
+    }
+    return tmax > 0;
+}
+
+bool RayIntersectTriangle(const Ray& ray, const Triangle& tri, float& dist)
+{
+    const float EPSILON = 0.0000001f;
+    Vec3f edge1 = tri.v[1] - tri.v[0];
+    Vec3f edge2 = tri.v[2] - tri.v[0];
+
+    Vec3f h = ray.direction.Cross(edge2);
+    float det = ray.direction.Dot(edge1, h);
+
+    if (det > -EPSILON && det < EPSILON)
+        return false;
+
+    float inv_det = 1.0f / det;
+    Vec3f s = ray.origin - tri.v[0];
+    float u = inv_det * s.Dot(h);
+
+    if (u < 0.0f || u > 1.0f)
+        return false;
+
+    Vec3f q = s.Cross(edge1);
+    float v = inv_det * ray.direction.Dot(q);
+
+    if (v < 0.0f || u + v > 1.0f)
+        return false;
+
+    dist = inv_det * edge2.Dot(q);
+
+    return dist > EPSILON;
+}
+
+void ExpandBBox(BoundingBox& box, const Vec3f& p) 
+{
+    box.min.x = std::min(box.min.x, p.x);
+    box.min.y = std::min(box.min.y, p.y);
+    box.min.z = std::min(box.min.z, p.z);
+    box.max.x = std::max(box.max.x, p.x);
+    box.max.y = std::max(box.max.y, p.y);
+    box.max.z = std::max(box.max.z, p.z);
+}
+
+BVHNode* BuildBVH(std::vector<Triangle>& tris) 
+{
+    BVHNode* node = new BVHNode();
+
+    node->bbox = BoundingBox();
+
+    for (const auto& tri : tris) 
+    {
+        ExpandBBox(node->bbox, tri.v[0]);
+        ExpandBBox(node->bbox, tri.v[1]);
+        ExpandBBox(node->bbox, tri.v[2]);
+    }
+
+    if (tris.size() <= 8) 
+    {
+        node->isLeaf = true;
+        node->triangles = std::move(tris);
+        return node;
+    }
+
+    Vec3f size = node->bbox.max - node->bbox.min;
+    int axis = 0;
+    if (size.y > size.x) axis = 1;
+    if (size.z > (axis == 1 ? size.y : size.x)) axis = 2;
+
+    std::sort(tris.begin(), tris.end(), [axis](const Triangle& a, const Triangle& b) 
+    {
+        if (axis == 0) return a.center.x < b.center.x;
+        if (axis == 1) return a.center.y < b.center.y;
+        return a.center.z < b.center.z;
+    });
+
+    size_t mid = tris.size() / 2;
+    std::vector<Triangle> leftTris(tris.begin(), tris.begin() + mid);
+    std::vector<Triangle> rightTris(tris.begin() + mid, tris.end());
+
+    node->left = BuildBVH(leftTris);
+    node->right = BuildBVH(rightTris);
+
+    return node;
+}
+
+void DeleteBVH(BVHNode* node) 
+{
+    if (!node) return;
+    if (node->left) DeleteBVH(node->left);
+    if (node->right) DeleteBVH(node->right);
+    delete node;
+}
+
+void RayIntersectBVH(BVHNode* node, const Ray& ray, int& count)
+{
+    if (!RayIntersectsBox(ray, node->bbox)) 
+        return;
+
+    if (node->isLeaf) 
+    {
+        for (const auto& tri : node->triangles) 
+        {
+            float dist;
+            if (RayIntersectTriangle(ray, tri, dist)) 
+            {
+                if (dist > 0.0001f) 
+                    count++;
+            }
+        }
+    }
+    else 
+    {
+        RayIntersectBVH(node->left, ray, count);
+        RayIntersectBVH(node->right, ray, count);
+    }
+}
+
+void GPUSoftBodyComponent::PlacePointMesh(BoundingBox BBox, Vertex* vertices, uint32_t* indices, int pointCount, float density)
+{
+    float invDensity = 1 / density;
+
+    std::vector<Triangle> meshTriangles;
+    for (int i = 0; i < pointCount; i += 3)
+    {
+        meshTriangles.push_back({ vertices[indices[i]].position, vertices[indices[i + 1]].position, vertices[indices[i + 2]].position });
+    }
+
+    BVHNode* root = BuildBVH(meshTriangles);
+
+    for (float currY = BBox.min.y; currY <= BBox.max.y; currY += invDensity)
+    {
+        for (float currZ = BBox.min.z; currZ <= BBox.max.z; currZ += invDensity)
+        {
+            for (float currX = BBox.min.x; currX <= BBox.max.x; currX += invDensity)
+            {
+
+                Vec3f rayDir = { static_cast <float> (rand()), static_cast <float> (rand()), static_cast <float>(rand())};
+                rayDir.Normalize();
+                Vec3f pos = { currX, currY, currZ };
+
+                Ray ray = { pos , rayDir};
+
+                int intersect = 0;
+                RayIntersectBVH(root, ray, intersect);
+
+                if (intersect % 2 != 0)
+                {
+                    SBParticleData data = { };
+                    data.position = pos;
+                    data.originalPos = pos;
+                    data.velocity = { 0 , 0 , 0 };
+                    data.connectionsCount = 0;
+                    m_particles.push_back(data);
+                }
+            }
+        }
+    }
+
+    DeleteBVH(root);
 }

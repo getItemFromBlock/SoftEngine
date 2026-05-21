@@ -25,14 +25,14 @@ bool BaseShader::Load(ResourceManager* resourceManager)
 {
     UNUSED(resourceManager);
     
-    if (!File::Exist(p_path))
+    if (!File::Exists(p_path))
     {
         PrintError("Failed to read shader source from file: %s", p_path.c_str());
         return false;
     }
 
     std::filesystem::path compiledPath = GetCompiledPath();
-    if (File::Exist(compiledPath) && File::GetLastWriteTime(compiledPath) > File::GetLastWriteTime(p_path))
+    if (File::Exists(compiledPath) && File::GetLastWriteTime(compiledPath) > File::GetLastWriteTime(p_path))
     {
         File file(compiledPath);
         if (!file.ReadAllText(p_content))
@@ -89,7 +89,7 @@ std::filesystem::path BaseShader::GetCompiledPath() const
 {
     std::filesystem::path cachePath = ResourceManager::GetCompiledCacheDir();
 
-    return cachePath / (std::to_string(p_uuid) + ".compiled");
+    return cachePath / (std::to_string(std::filesystem::hash_value(p_path)) + ".compiled");
 }
 
 bool Shader::Load(ResourceManager* resourceManager)
@@ -98,7 +98,7 @@ bool Shader::Load(ResourceManager* resourceManager)
     
     auto ResolvePath = [&](const std::string& subPath) -> std::string {
         if (subPath.empty()) return "";
-        if (File::Exist(subPath)) return subPath;
+        if (File::Exists(subPath)) return subPath;
         return (p_path.parent_path() / subPath).generic_string();
     };
     
@@ -118,7 +118,7 @@ bool Shader::Load(ResourceManager* resourceManager)
             return false;
         }
         
-        if (File::Exist(resolvedPath))
+        if (File::Exists(resolvedPath))
         {
             m_vertexShader = resourceManager->Load<VertexShader>(resolvedPath, multithread);
             if (!m_vertexShader) {
@@ -137,7 +137,7 @@ bool Shader::Load(ResourceManager* resourceManager)
             return false;
         }
         
-        if (File::Exist(resolvedPath))
+        if (File::Exists(resolvedPath))
         {
             m_fragmentShader = resourceManager->Load<FragmentShader>(resolvedPath, multithread);
             if (!m_fragmentShader) {
@@ -156,7 +156,7 @@ bool Shader::Load(ResourceManager* resourceManager)
             return false;
         }
         
-        if (File::Exist(resolvedPath))
+        if (File::Exists(resolvedPath))
         {
             m_computeShader = resourceManager->Load<ComputeShader>(resolvedPath, multithread);
             if (!m_computeShader) {
