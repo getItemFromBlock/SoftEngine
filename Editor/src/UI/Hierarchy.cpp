@@ -89,7 +89,7 @@ void Hierarchy::DisplayObject(GameObject* object, uint64_t& index, bool display)
                 continue;
             sel.second = false;
         }
-        EOnObjectSelected.Invoke(object->GetUUID());
+        EOnObjectSelected.Invoke(selected ? object->GetUUID() : Core::UUID(-1));
     }
     if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
     {
