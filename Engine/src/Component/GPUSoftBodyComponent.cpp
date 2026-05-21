@@ -309,8 +309,8 @@ void GPUSoftBodyComponent::OnDestroy()
         
         if (*buffer)
         {
-            //(*buffer)->Cleanup(); 
-            //buffer->reset();
+            (*buffer)->Cleanup(); 
+            buffer->reset();
         }
         mesh->Unload();
         compute0->reset();
@@ -394,8 +394,8 @@ void GPUSoftBodyComponent::CreateParticleBuffers()
 
     renderer->WaitForGPU();
 
-    //if (m_particleBuffer)
-    //    m_particleBuffer->Cleanup();
+    if (m_particleBuffer)
+        m_particleBuffer->Cleanup();
     
     if (m_particles.empty())
         InitializeParticleData(m_particles, m_connections);
