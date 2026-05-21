@@ -22,19 +22,17 @@ namespace ProceduralSoftBody
     {
         struct General
         {
-            Vec2i particleAmount = Vec2i(9, 9);
             float damping = 2.0f;
             float strength = 300.0f;
             uint32_t connectionStrength = 1;
             float dtScale = 1.0f;
-            bool paused = true;
+            bool paused = false;
         } general;
 
         struct SphereData
         {
             Vec3f position = Vec3f(0, 2.0f, 0);
             float radius = 1.0f;
-            bool animate = true;
         } sphereData;
     };
 
@@ -165,6 +163,9 @@ public:
     ProceduralSoftBody::PBodySettings &GetSettings() { return m_particleSettings; }
 
     SafePtr<Material> GetMaterial() const { return m_material; }
+
+    nlohmann::json Serialize() const override;
+    void Deserialize(const nlohmann::json& json) override;
 private:
     void CreateParticleBuffers();
     void CreateSkinnedMesh(ProceduralSoftBody::CPUChunkData &chunkData);

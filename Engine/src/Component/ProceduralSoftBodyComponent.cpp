@@ -7,6 +7,7 @@
 
 #include "Resource/Mesh.h"
 #include "Scene/GameObject.h"
+#include "Scene/SceneSerializer.h"
 #include "Utils/Color.h"
 #include "Utils/Random.h"
 #include "Utils/Memory.h"
@@ -17,12 +18,12 @@
 #define MAX_CHUNK_BUFFER_SIZE 0x10
 #define MAX_CHUNK_BUFFER_COUNT 0x40
 #define CHUNK_SIZE 4.0f
+static const Vec2i particleAmount = Vec2i(9, 9);
 
 using namespace ProceduralSoftBody;
 
 void ProceduralSoftBodyComponent::Describe(ClassDescriptor& d)
 {
-    d.AddVec2i("Block Size", m_particleSettings.general.particleAmount).SetRangeInt(3, 1024);
     d.AddProperty("Connections Amount", PropertyType::Int, &m_particleSettings.general.connectionStrength)
         .SetRangeInt(2, 256);
     d.AddFloat("Damping", m_particleSettings.general.damping).SetRangeFloat(0, 65536);
@@ -463,6 +464,52 @@ void ProceduralSoftBodyComponent::OnDestroy()
     }
 }
 
+nlohmann::json ProceduralSoftBodyComponent::Serialize() const
+{
+    const PBodySettings& settings = const_cast<ProceduralSoftBodyComponent*>(this)->GetSettings();
+    return {
+        {"drawDebug", m_drawDebug},
+        {"settings", {
+            {"general", {
+                {"damping", settings.general.damping},
+                {"strength", settings.general.strength},
+                {"connectionStrength", settings.general.connectionStrength},
+                {"dtScale", settings.general.dtScale},
+                {"paused", settings.general.paused}
+            }},
+            {"sphere", {
+                {"position", SceneSerializer::ToJson(settings.sphereData.position)},
+                {"radius", settings.sphereData.radius}
+            }}
+        }}
+    };
+}
+
+void ProceduralSoftBodyComponent::Deserialize(const nlohmann::json& json)
+{
+    PBodySettings& settings = GetSettings();
+    const nlohmann::json settingsData = json.contains("settings") ? json["settings"] : nlohmann::json::object();
+
+    if (settingsData.contains("general"))
+    {
+        const nlohmann::json& general = settingsData["general"];
+        settings.general.damping = general.value("damping", settings.general.damping);
+        settings.general.strength = general.value("strength", settings.general.strength);
+        settings.general.connectionStrength = general.value("connectionStrength", settings.general.connectionStrength);
+        settings.general.dtScale = general.value("dtScale", settings.general.dtScale);
+        settings.general.paused = general.value("paused", settings.general.paused);
+    }
+    if (settingsData.contains("sphere"))
+    {
+        const nlohmann::json& shape = settingsData["sphere"];
+        if (shape.contains("position"))
+            SceneSerializer::FromJson(shape["position"], settings.sphereData.position);
+        settings.sphereData.radius = shape.value("radius", settings.sphereData.radius);
+    }
+
+    m_drawDebug = json.value("drawDebug", m_drawDebug);
+}
+
 void ProceduralSoftBodyComponent::CreateParticleBuffers()
 {
     auto renderer = Engine::Get()->GetRenderer();
@@ -489,24 +536,23 @@ void ProceduralSoftBodyComponent::CreateSkinnedMesh(CPUChunkData &data)
 {
     data.mesh = new Mesh("internal");
 
-    const Vec2i amount = m_particleSettings.general.particleAmount;
-    const float posDelta = 1.0f / std::max(amount.x, amount.y);
+    const float posDelta = 1.0f / std::max(particleAmount.x, particleAmount.y);
     std::vector<WeightedVertex> vertices;
     std::vector<uint32_t> indices;
 
-    for (int32_t i = 0; i <= amount.x; i++)
+    for (int32_t i = 0; i <= particleAmount.x; i++)
     {
-        float posX = (i + 0.5f) / amount.x * CHUNK_SIZE;
+        float posX = (i + 0.5f) / particleAmount.x * CHUNK_SIZE;
 
-        for (int32_t j = 0; j <= amount.y; j++)
+        for (int32_t j = 0; j <= particleAmount.y; j++)
         {
-            const float posZ = (j + 0.5f) / amount.y * CHUNK_SIZE;
+            const float posZ = (j + 0.5f) / particleAmount.y * CHUNK_SIZE;
             const float height = GetHeightAt(posX + data.iPos.x * CHUNK_SIZE, posZ + data.iPos.y * CHUNK_SIZE);
             const Vec3f pos = Vec3f(posX, height, posZ);
 
             WeightedVertex v = {};
             v.position = pos;
-            v.texCoord = Vec2f((float)(i) / amount.x, (float)(j) / amount.y);
+            v.texCoord = Vec2f((float)(i) / particleAmount.x, (float)(j) / particleAmount.y);
             v.normal = GetNormalAt(pos + Vec3f(data.iPos.x, 0, data.iPos.y) * CHUNK_SIZE, posDelta);
 
             // Temporarily stores particle index in the indices for later use
@@ -515,10 +561,10 @@ void ProceduralSoftBodyComponent::CreateSkinnedMesh(CPUChunkData &data)
         }
     }
 
-    const int stride = amount.x + 1;
-    for (int32_t j = 0; j < amount.x; j++)
+    const int stride = particleAmount.x + 1;
+    for (int32_t j = 0; j < particleAmount.x; j++)
     {
-        for (int32_t k = 0; k < amount.y; k++)
+        for (int32_t k = 0; k < particleAmount.y; k++)
         {
             indices.push_back(j * stride + k);
             indices.push_back(j * stride + k + 1);
@@ -538,7 +584,6 @@ void ProceduralSoftBodyComponent::CreateSkinnedMesh(CPUChunkData &data)
 
 void ProceduralSoftBodyComponent::MapMeshToParticles(CPUChunkData &data, std::vector<WeightedVertex> &vertices)
 {
-    const Vec2i amount = m_particleSettings.general.particleAmount;
     const PreChunkData *maps[9];
 
     uint32_t counter = 0;
@@ -557,14 +602,14 @@ void ProceduralSoftBodyComponent::MapMeshToParticles(CPUChunkData &data, std::ve
     {
         Vec3f pos = vertices[i].position;
         Vec2i iPos = Vec2i(vertices[i].indices.x, vertices[i].indices.y);
-        int chunk = ((iPos.x + amount.x) / amount.x) * 3 + ((iPos.y + amount.y) / amount.y);
+        int chunk = ((iPos.x + particleAmount.x) / particleAmount.x) * 3 + ((iPos.y + particleAmount.y) / particleAmount.y);
 
-        int sx = (iPos.x + amount.x) % amount.x;
-        int sz = (iPos.y + amount.y) % amount.y;
+        int sx = (iPos.x + particleAmount.x) % particleAmount.x;
+        int sz = (iPos.y + particleAmount.y) % particleAmount.y;
 
-        Vec3i pPos = Vec3i(sx, maps[chunk]->heightMap[sx * amount.y + sz], sz);
+        Vec3i pPos = Vec3i(sx, maps[chunk]->heightMap[sx * particleAmount.y + sz], sz);
         vertices[i].normal = pos;
-        vertices[i].position = Vec3f(vertices[i].position.y - (pPos.y * CHUNK_SIZE / std::max(amount.x, amount.y)), maps[chunk]->positionsMap.at(pPos), chunk == 4 ? -1 : (chunk < 4 ? chunk : chunk - 1));
+        vertices[i].position = Vec3f(vertices[i].position.y - (pPos.y * CHUNK_SIZE / std::max(particleAmount.x, particleAmount.y)), maps[chunk]->positionsMap.at(pPos), chunk == 4 ? -1 : (chunk < 4 ? chunk : chunk - 1));
 
         for (uint32_t j = 0; j < 4; j++)
         {
@@ -583,29 +628,29 @@ void ProceduralSoftBodyComponent::MapMeshToParticles(CPUChunkData &data, std::ve
             if (dx < 0)
             {
                 nx = -1;
-                dx += amount.x;
+                dx += particleAmount.x;
             }
-            else if (dx >= amount.x)
+            else if (dx >= particleAmount.x)
             {
                 nx = 1;
-                dx -= amount.x;
+                dx -= particleAmount.x;
             }
             if (dz < 0)
             {
                 nz = -1;
-                dz += amount.y;
+                dz += particleAmount.y;
             }
-            else if (dz >= amount.y)
+            else if (dz >= particleAmount.y)
             {
                 nz = 1;
-                dz -= amount.y;
+                dz -= particleAmount.y;
             }
 
             int id = (nx + 1) * 3 + (nz + 1);
-            int heightVal = maps[id]->heightMap[dx * amount.y + dz];
+            int heightVal = maps[id]->heightMap[dx * particleAmount.y + dz];
             vertices[i].neightbor[j] = id == 4 ? -1 : (id < 4 ? id : id - 1);
             vertices[i].indices[j] = maps[id]->positionsMap.at(Vec3i(dx, heightVal, dz));
-            vertices[i].tangent[j] = GetHeightAt(((float)(dx) / amount.x + data.iPos.x + nx) * CHUNK_SIZE, ((float)(dz) / amount.y + data.iPos.y + nz) * CHUNK_SIZE) - (heightVal * CHUNK_SIZE / std::max(amount.x, amount.y));
+            vertices[i].tangent[j] = GetHeightAt(((float)(dx) / particleAmount.x + data.iPos.x + nx) * CHUNK_SIZE, ((float)(dz) / particleAmount.y + data.iPos.y + nz) * CHUNK_SIZE) - (heightVal * CHUNK_SIZE / std::max(particleAmount.x, particleAmount.y));
         }
     }
 }
@@ -645,28 +690,27 @@ void ProceduralSoftBodyComponent::InitializeParticleData(   std::vector<PSBParti
                     const Vec3i p = Vec3i(l, m, n) + particleID.first;
                     if (!data.positionsMap.contains(p))
                     {
-                        const Vec2i amount = m_particleSettings.general.particleAmount;
                         Vec2i otherChunk;
                         Vec3i otherP = p;
                         if (p.x < 0)
                         {
                             otherChunk.x--;
-                            otherP.x += amount.x;
+                            otherP.x += particleAmount.x;
                         }
-                        else if (p.x >= amount.x)
+                        else if (p.x >= particleAmount.x)
                         {
                             otherChunk.x++;
-                            otherP.x -= amount.x;
+                            otherP.x -= particleAmount.x;
                         }
                         if (p.z < 0)
                         {
                             otherChunk.y--;
-                            otherP.z += amount.y;
+                            otherP.z += particleAmount.y;
                         }
-                        else if (p.z >= amount.y)
+                        else if (p.z >= particleAmount.y)
                         {
                             otherChunk.y++;
-                            otherP.z -= amount.y;
+                            otherP.z -= particleAmount.y;
                         }
 
                         if (otherP == p)
@@ -759,17 +803,16 @@ void ProceduralSoftBodyComponent::PreGenChunk(const Vec2i &chunkID)
     if (m_preChunkData.contains(chunkID))
         return;
 
-    const Vec2i amount = m_particleSettings.general.particleAmount;
-    const float heightDelta = CHUNK_SIZE / std::max(amount.x, amount.y);
+    const float heightDelta = CHUNK_SIZE / std::max(particleAmount.x, particleAmount.y);
 
     PreChunkData chunkData;
 
-    for (int32_t i = 0; i < amount.x; i++)
+    for (int32_t i = 0; i < particleAmount.x; i++)
     {
-        float posX = (i + 0.5f) / amount.x * CHUNK_SIZE;
-        for (int32_t k = 0; k < amount.y; k++)
+        float posX = (i + 0.5f) / particleAmount.x * CHUNK_SIZE;
+        for (int32_t k = 0; k < particleAmount.y; k++)
         {
-            const float posZ = (k + 0.5f) / amount.y * CHUNK_SIZE;
+            const float posZ = (k + 0.5f) / particleAmount.y * CHUNK_SIZE;
             const float height = GetHeightAt(posX + chunkID.x * CHUNK_SIZE, posZ + chunkID.y * CHUNK_SIZE) + (heightDelta / 3);
 
             int j = 0;

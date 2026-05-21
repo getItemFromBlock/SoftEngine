@@ -84,7 +84,7 @@ target("Editor")
     add_headerfiles("Editor/src/**.h", "Editor/src/**.hpp")
     add_includedirs("Editor/src",  "Engine/src")
     
-    add_packages("imgui", "galaxymath", "stb")
+    add_packages("imgui", "galaxymath", "stb", "nlohmann_json")
 target_end()
 
 includes("Tests/*.lua")

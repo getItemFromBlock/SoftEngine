@@ -29,6 +29,8 @@ public:
 
     void SerializeData(Vec4f dataOut[4]) const;
     
+    nlohmann::json Serialize() const override;
+    void Deserialize(const nlohmann::json& data) override;
 private:
     friend class SceneSerializer;
 

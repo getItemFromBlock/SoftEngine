@@ -23,10 +23,10 @@ struct BodySettings
         Vec2i boneCount = Vec2i(4, 4);
         Vec2i surfacePoints = Vec2i(8, 8);
         Vec2f surfaceHeightBounds = Vec2f(-0.3f, 0.3f);
-        float density = 2.0f;
+        float density = 5.0f;
         float damping = 2.0f;
         float strength = 100.0f;
-        uint32_t connectionStrength = 1.5;
+        uint32_t connectionStrength = 2;
     } general;
 
     struct Shape
@@ -89,21 +89,23 @@ public:
     
     std::vector<SafePtr<Material>> GetMaterial() const { return m_materials; }
     SafePtr<Mesh> GetMesh() const { return m_mesh; }
-
+    
+    nlohmann::json Serialize() const override;
+    void Deserialize(const nlohmann::json& json) override;
 private:
     void CreateParticleBuffers();
     void CreateSkinnedMesh(std::vector<WeightedVertex> &vertices, std::vector<uint32_t> &indices);
     void MapMeshToParticles(std::vector<WeightedVertex> &vertices);
     void InitializeParticleData(std::vector<SBParticleData> &particles, std::vector<ConnectionData> &connections);
     // Pwease dwo not caww at wuntiwe, i am a sweepy method OwO
-    void InitializeParticleDataFromModel(float density, float maxDistToConnect);
+    void InitializeParticleDataFromModel(float density, uint32_t maxDistToConnect);
     void InitializeMaterialsFromModel(SafePtr<Model> inputModel);
 
     // Generation from meshes methods
 
     void PlacePointMesh(BoundingBox BBox, Vertex* vertices, uint32_t* indices, int pointCount, float density);
 
-    void GenerateConnection(const BoundingBox& BBox, const float& maxDistToConnect);
+    void GenerateConnection(const BoundingBox& BBox, uint32_t maxDistToConnect);
 
     void Recreate();
 
@@ -112,7 +114,6 @@ private:
 
     SafePtr<Model>  m_initializerModel;
     std::vector<SafePtr<Material>> m_materials;
-
 
     std::unique_ptr<ComputeDispatch> m_simulationCompute0;
     std::unique_ptr<ComputeDispatch> m_simulationCompute1;
