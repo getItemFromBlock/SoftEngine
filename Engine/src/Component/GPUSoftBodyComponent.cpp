@@ -34,7 +34,7 @@ void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
 
     d.AddProperty("Density", PropertyType::Float, &m_particleSettings.general.density);
 
-    auto &res3 = d.AddInt("Solid Layers", m_particleSettings.general.solidLayers).SetRangeInt(1, 1024);
+    auto &res3 = d.AddInt("Solid Layers", m_particleSettings.general.solidLayers).SetRangeInt(0, 1024);
     res3.onModified = [this](void)
         {
             m_needsRecreation = true;
@@ -296,6 +296,7 @@ void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
 
 void GPUSoftBodyComponent::OnDestroy()
 {
+    return;
     auto renderer = Engine::Get()->GetRenderer();
 
     std::shared_ptr buffer   = std::make_shared<std::unique_ptr<VulkanBuffer>>(std::move(m_particleBuffer));
@@ -371,7 +372,7 @@ void GPUSoftBodyComponent::Deserialize(const nlohmann::json& json)
         settings.shape.type = static_cast<BodySettings::Shape::Type>(shape.value("type", static_cast<int>(settings.shape.type)));
         settings.shape.scale = shape.value("scale", settings.shape.scale);
     }
-
+    
     SetDrawDebug(json.value("drawDebug", GetDrawDebug()));
     SafePtr<Model> initializerModel = SceneSerializer::LoadResource<Model>(
         Engine::Get()->GetResourceManager(),
@@ -924,7 +925,7 @@ void GPUSoftBodyComponent::GenerateConnection(const BoundingBox& BBox, uint32_t 
         m_particles[i].connectionsOffset = static_cast<uint32_t>(m_connections.size());
 
         // Debug condion, not meant to remain on released project
-        if (m_particles[i].position.y <= BBox.min.y + 0.2f) 
+        if (m_particleSettings.general.solidLayers > 0 && m_particles[i].position.y <= BBox.min.y + 0.2f) 
         {
             m_particles[i].connectionsCount = 0;
             continue;

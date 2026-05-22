@@ -313,6 +313,8 @@ void Scene::RemoveComponent(Core::UUID compId)
     }
 }
 
+std::vector < std::shared_ptr<IComponent>> deez;
+
 void Scene::RemoveAllComponents(GameObject* gameObject)
 {
     if (!gameObject)
@@ -322,6 +324,12 @@ void Scene::RemoveAllComponents(GameObject* gameObject)
 
     for (auto& componentList : m_components | std::views::values)
     {
+        for (auto &p : componentList)
+        {
+            deez.push_back(std::move(p));
+        }
+        componentList.clear();
+        continue;
         std::erase_if(componentList,
                       [gameObject](const std::shared_ptr<IComponent>& component)
                       {

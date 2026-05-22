@@ -80,6 +80,8 @@ public:
     BodySettings& GetSettings() { return m_particleSettings; }
     
     void CreateFromModel(SafePtr<Model> inputModel);
+    const VulkanBuffer *GetParticleBuffer() const { return m_particleBuffer.get(); }
+    uint32_t GetParticleCount() const { return m_totalParticleCount; }
 
     bool IsLoadedFromModel() const { return m_loadedFromModel; }
     SafePtr<Model> GetInitializerModel() const { return m_initializerModel; }

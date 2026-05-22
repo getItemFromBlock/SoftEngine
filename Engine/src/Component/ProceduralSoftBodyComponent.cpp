@@ -5,6 +5,7 @@
 #include "Render/Vulkan/VulkanRenderer.h"
 #include "Render/Vulkan/VulkanVertexBuffer.h"
 
+#include "GPUSoftBodyComponent.h"
 #include "Resource/Mesh.h"
 #include "Scene/GameObject.h"
 #include "Scene/SceneSerializer.h"
@@ -58,7 +59,7 @@ void ProceduralSoftBodyComponent::OnCreate()
 
     auto computeShader0 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/softbody0.shader");
     auto computeShader1 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/softbody1.shader");
-    //auto computeshader2 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/collision0.shader");
+    auto computeshader2 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/collision0.shader");
     auto instancingShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/sb_instancing.shader");
     auto skinnedShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/sb_skinning.shader");
 
@@ -93,6 +94,11 @@ void ProceduralSoftBodyComponent::OnCreate()
             m_simulationCompute1 = computeShader1->CreateDispatch(renderer);
         });
 
+    computeshader2->EOnSentToGPU.Bind([this, computeshader2, renderer]()
+        {
+            m_collisionCompute0 = computeshader2->CreateDispatch(renderer);
+        });
+
     CreateParticleBuffers();
 
     for (int i = -5; i <= 5; i++)
@@ -106,7 +112,7 @@ void ProceduralSoftBodyComponent::OnCreate()
 
 void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
 {
-    if (!m_simulationCompute0 || !m_simulationCompute1 || !m_particleBuffer.GetSize())
+    if (!m_simulationCompute0 || !m_simulationCompute1 || !m_collisionCompute0 || !m_particleBuffer.GetSize())
         return;
 
     HandleCopyRequests();
@@ -180,8 +186,20 @@ void ProceduralSoftBodyComponent::HandleCopyRequests()
 
 void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
 {
-    if (!m_simulationCompute0 || !m_simulationCompute1 || !m_particleBuffer.GetSize())
+    if (!m_simulationCompute0 || !m_simulationCompute1 || !m_collisionCompute0 || !m_particleBuffer.GetSize())
         return;
+
+    if (m_shouldDetectStuff && !m_hasDetectedStuff)
+    {
+        m_hasDetectedStuff = true;
+        balls.clear();
+        const auto &ligma = Engine::Get()->GetSceneHolder()->GetCurrentScene();
+        for (const auto &obj : ligma->GetGameObjects())
+        {
+            balls.append_range(Engine::Get()->GetSceneHolder()->GetCurrentScene()->GetComponents<GPUSoftBodyComponent>(obj.second.get()));
+        }
+        int deez = 0;
+    }
 
     Vec3f cameraPos = Engine::Get()->GetSceneHolder()->GetCurrentScene()->GetCameraData().position;
 
@@ -203,6 +221,7 @@ void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
 
     VulkanMaterial* mat0 = m_simulationCompute0->GetMaterial();
     VulkanMaterial* mat1 = m_simulationCompute1->GetMaterial();
+    VulkanMaterial* mat2 = m_collisionCompute0->GetMaterial();
 
     const Vec3f gravity = GetGameObject()->GetTransform()->GetWorldRotation().GetInverse() * Vec3f(0, 9.81f, 0);
     const Vec3f spherePos = m_particleSettings.sphereData.position;
@@ -224,6 +243,7 @@ void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
     uint32_t    count = 0;
     uint32_t    particleCount = 0;
     std::vector<uint32_t>   particleCounts;
+    std::vector<uint32_t>   chunkCounts;
     uint8_t *ptr = reinterpret_cast<uint8_t*>(m_chunkDataBuffer.GetMappedBuffer());
    
     for (auto &chunk : m_chunks)
@@ -267,6 +287,7 @@ void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
             m_chunkBufferOffset++;
 
             particleCounts.push_back(particleCount);
+            chunkCounts.push_back(count);
             count = 0;
             particleCount = 0;
         }
@@ -277,6 +298,7 @@ void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
         std::memcpy(ptr + m_chunkBufferOffset * m_chunkSize + sizeof(GPUCommonData), tempData, sizeof(GPUChunkData) * count);
         m_chunkBufferOffset++;
         particleCounts.push_back(particleCount);
+        chunkCounts.push_back(count);
     }
 
     m_chunkDataBuffer.FlushData(0, m_chunkBufferOffset * m_chunkSize);
@@ -326,6 +348,57 @@ void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                          0, 0, nullptr, 1, &barrier0, 0, nullptr);
+
+    if (m_shouldDetectStuff && balls.size() > 0)
+    {
+        mat2->BindForCompute(cmd, renderer->GetFrameIndex());
+
+        mat2->SetStorageBuffer( 0, 0, m_particleBuffer.GetBuffer(), 0,
+            m_particleBuffer.GetSize(), renderer);
+        mat2->SetStorageBuffer( 0, 1, balls[0]->GetParticleBuffer()->GetBuffer(), 0,
+            balls[0]->GetParticleBuffer()->GetSize(), renderer);
+        mat2->SetStorageBuffer( 0, 2, m_surfacePointsBuffer.GetBuffer(), 0,
+            m_surfacePointsBuffer.GetSize(), renderer);
+        mat2->SetStorageBuffer( 0, 3, m_chunkDataBuffer.GetBuffer(), 0,
+            m_chunkSize * chunkCounts.size(), renderer);
+
+        //for (size_t j = 0; j < 1; j++)
+        {
+
+            struct PushData
+            {
+                Vec3f pos;
+                uint32_t bufferOffset;
+	            uint32_t particleCount;
+            };
+
+            for (uint32_t i = 0; i < chunkCounts.size(); i++)
+            {
+                PushData p;
+                p.pos = balls[0]->GetGameObject()->GetTransform()->GetWorldPosition();
+                p.bufferOffset = i;
+                p.particleCount = balls[0]->GetParticleCount();
+                mat2->SetPushConstants(renderer, &p, sizeof(PushData), 0);
+                const uint32_t block_size = particleAmount.x * particleAmount.y;
+                //uint32_t groups = (chunkCounts[i] * particleAmount.x * particleAmount.y + block_size-1) / block_size;
+                mat2->DispatchCompute(renderer, chunkCounts[i], 1, 1);
+            }
+        }
+
+        VkBufferMemoryBarrier barrier2{};
+        barrier2.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barrier2.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        barrier2.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barrier2.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier2.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier2.buffer = m_particleBuffer.GetBuffer();
+        barrier2.size = VK_WHOLE_SIZE;
+
+        vkCmdPipelineBarrier(cmd,
+                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                             0, 0, nullptr, 1, &barrier2, 0, nullptr);
+    }
 
     mat1->BindForCompute(cmd, renderer->GetFrameIndex());
 
@@ -770,7 +843,13 @@ void ProceduralSoftBodyComponent::CreateChunkAt(Vec2i pos)
     m_particleBuffer.UpdateData(particles.data(), newChunkP.offset, totalSizeP);
     m_connectionBuffer.UpdateData(connections0.data(), newChunkC.offset, totalSizeC);
     m_connectionBufferL.UpdateData(connections1.data(), newChunkL.offset, totalSizeL);
-    m_surfacePointsBuffer.UpdateData(chunkData.heightMap.data(), newChunkS.offset, totalSizeS);
+    std::vector<uint32_t> stuff;
+    stuff.resize(chunkData.heightMap.size());
+    for (size_t i = 0; i < stuff.size(); i++)
+    {
+        stuff[i] = chunkData.positionsMap.at(Vec3i(i / particleAmount.x, chunkData.heightMap[i], i % particleAmount.x));
+    }
+    m_surfacePointsBuffer.UpdateData(stuff.data(), newChunkS.offset, totalSizeS);
     
     CopyRequest cr = {};
     cr.offsetP = newChunkP.offset;

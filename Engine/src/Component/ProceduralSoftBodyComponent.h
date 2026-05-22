@@ -222,6 +222,7 @@ private:
     bool m_shouldDetectStuff = false;
 
     bool m_hasDetectedStuff = false;
+    std::vector<SafePtr<GPUSoftBodyComponent>> balls;
 
     ProceduralSoftBody::PBodySettings m_particleSettings;
 };
