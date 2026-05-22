@@ -113,6 +113,7 @@ private:
 
 private:
     bool m_loadedFromModel = false;
+    bool m_isRecreating = false;
 
     SafePtr<Model>  m_initializerModel;
     std::vector<SafePtr<Material>> m_materials;

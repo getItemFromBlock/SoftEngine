@@ -19,53 +19,57 @@ uint32_t GPUSoftBodyComponent::seedCounter = 0;
 
 void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
 {
-    if (m_needsRecreation)
+    if (m_needsRecreation || m_needRecreateFromModel || m_isRecreating)
         return; 
-
-    auto &res = d.AddVec3i("Block Size", m_particleSettings.general.particleAmount).SetRangeInt(3, 1024);
-    res.onModified = [this](void)
-        {
-            m_needsRecreation = true;
-        };
-
-    auto &res2 = d.AddProperty("Connections Amount", PropertyType::Int, &m_particleSettings.general.connectionStrength)
-        .SetRangeInt(2, 256);
-    res2.onModified = [this](void)
-        {
-            m_needsRecreation = true;
-        };
-
-    d.AddProperty("Density", PropertyType::Float, &m_particleSettings.general.density);
-
-    auto &res3 = d.AddInt("Solid Layers", m_particleSettings.general.solidLayers).SetRangeInt(0, 1024);
-    res3.onModified = [this](void)
-        {
-            m_needsRecreation = true;
-        };
-
-    d.AddFloat("Damping", m_particleSettings.general.damping).SetRangeFloat(0, 65536);
-
-    d.AddFloat("Connection Strength", m_particleSettings.general.strength).SetRangeFloat(0, 65536);
-
-    if (!m_needRecreateFromModel)
+    
+    if (m_initializerModel.getPtr() != nullptr)
     {
-        auto &res6 = d.AddProperty("Model", PropertyType::Model, &m_initializerModel);
-        res6.setter = [this](void* newValue)
+        if (m_initializerModel->IsLoaded())
         {
-            m_initializerModel = *(SafePtr<Model>*)newValue;
-            m_initializerModel->EOnLoaded += [this](){
-                m_needRecreateFromModel = true;
+            auto &res = d.AddVec3i("Block Size", m_particleSettings.general.particleAmount).SetRangeInt(3, 1024);
+            res.onModified = [this](void)
+                {
+                    m_needsRecreation = true;
+                };
+
+            auto &res2 = d.AddProperty("Connections Amount", PropertyType::Int, &m_particleSettings.general.connectionStrength)
+                .SetRangeInt(2, 256);
+            res2.onModified = [this](void)
+                {
+                    m_needsRecreation = true;
+                };
+
+            d.AddProperty("Density", PropertyType::Float, &m_particleSettings.general.density);
+
+            auto &res3 = d.AddInt("Solid Layers", m_particleSettings.general.solidLayers).SetRangeInt(0, 1024);
+            res3.onModified = [this](void)
+                {
+                    m_needsRecreation = true;
+                };
+
+            d.AddFloat("Damping", m_particleSettings.general.damping).SetRangeFloat(0, 65536);
+
+            d.AddFloat("Connection Strength", m_particleSettings.general.strength).SetRangeFloat(0, 65536);
+
+
+            d.AddBool("Debug", m_drawDebug);
+
+            d.AddButton("Reset")
+            .onModified = [this](void)
+            {
+                m_needsRecreation = true;
             };
-        };
+        }
     }
 
-    d.AddBool("Debug", m_drawDebug);
-
-    d.AddButton("Reset")
-        .onModified = [this](void)
-        {
-            m_needsRecreation = true;
+    auto &res6 = d.AddProperty("Model", PropertyType::Model, &m_initializerModel);
+    res6.setter = [this](void* newValue)
+    {
+        m_initializerModel = *(SafePtr<Model>*)newValue;
+        m_initializerModel->EOnLoaded += [this](){
+            m_needRecreateFromModel = true;
         };
+    };
 }
 
 void GPUSoftBodyComponent::CreateFromModel(SafePtr<Model> inputModel)
@@ -78,11 +82,13 @@ void GPUSoftBodyComponent::CreateFromModel(SafePtr<Model> inputModel)
 }
 
 void GPUSoftBodyComponent::Recreate()
-{/*
-    InitializeParticleDataFromModel(m_particleSettings.general.density, (float)m_particleSettings.general.connectionStrength);
-    CreateParticleBuffers();*/
-
+{
+    if (m_isRecreating)
+        return;
+    
+    m_isRecreating = true;
     CreateFromModel(m_initializerModel);
+    m_isRecreating = false;
 }
 
 void GPUSoftBodyComponent::OnCreate()
@@ -269,6 +275,8 @@ void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
     if (!m_mesh || !m_mesh->IsLoaded() || !m_mesh->HasBeenSent()) 
         return;
     if (!m_particleBuffer || !m_defaultMaterial) 
+        return;
+    if (m_needsRecreation || m_needRecreateFromModel)
         return;
 
     auto* rqm = Engine::Get()->GetRenderer()->GetRenderQueueManager();
