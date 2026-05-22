@@ -201,6 +201,8 @@ void Scene::DestroyGameObject(GameObject* gameObject)
 
 void Scene::Clear()
 {
+    //Engine::Get()->GetRenderer()->GetRenderQueueManager()->ClearAll();
+    m_lightManager->RemoveAllLights();
     SafePtr<GameObject> root = GetRootObject();
     if (!root)
         return;

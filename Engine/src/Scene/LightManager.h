@@ -14,6 +14,7 @@ public:
     LightManager(Scene* scene) : m_scene(scene) {}
     
     void SendLights(Material* material) const;
+    void RemoveAllLights();
 private:
     friend LightComponent;
     

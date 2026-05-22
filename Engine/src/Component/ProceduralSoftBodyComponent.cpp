@@ -28,7 +28,7 @@ using namespace ProceduralSoftBody;
 void ProceduralSoftBodyComponent::Describe(ClassDescriptor& d)
 {
     d.AddFloat("Damping", m_particleSettings.general.damping).SetRangeFloat(0, 65536);
-    d.AddFloat("Connection Strength", m_particleSettings.general.strength).SetRangeFloat(0, 65536);
+    d.AddFloat("Connection strength", m_particleSettings.general.strength).SetRangeFloat(0, 65536);
     d.AddVec3f("Sphere pos", m_particleSettings.sphereData.position);
     d.AddFloat("Sphere radius", m_particleSettings.sphereData.radius);
 
@@ -36,7 +36,7 @@ void ProceduralSoftBodyComponent::Describe(ClassDescriptor& d)
     d.AddFloat("Deltatime", m_particleSettings.general.dtScale).SetRangeFloat(0, 65536);
 
     d.AddBool("Debug", m_drawDebug);
-    d.AddBool("Should Collide", m_shouldDetectStuff);
+    d.AddBool("Collide with others", m_shouldDetectStuff);
 }
 
 void ProceduralSoftBodyComponent::OnCreate()
@@ -198,7 +198,6 @@ void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
         {
             balls.append_range(Engine::Get()->GetSceneHolder()->GetCurrentScene()->GetComponents<GPUSoftBodyComponent>(obj.second.get()));
         }
-        int deez = 0;
     }
 
     Vec3f cameraPos = Engine::Get()->GetSceneHolder()->GetCurrentScene()->GetCameraData().position;
@@ -369,7 +368,7 @@ void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
             {
                 Vec3f pos;
                 uint32_t bufferOffset;
-	            uint32_t particleCount;
+                uint32_t particleCount;
             };
 
             for (uint32_t i = 0; i < chunkCounts.size(); i++)

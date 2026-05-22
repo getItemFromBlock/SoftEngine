@@ -53,3 +53,8 @@ void LightManager::RemoveLight(LightComponent* light)
     }
 }
 
+void LightManager::RemoveAllLights()
+{
+    m_lights.clear();
+}
+
