@@ -101,9 +101,9 @@ void ProceduralSoftBodyComponent::OnCreate()
 
     CreateParticleBuffers();
 
-    for (int i = -5; i <= 5; i++)
+    for (int i = -5; i < 5; i++)
     {
-        for (int j = -5; j <= 5; j++)
+        for (int j = -5; j < 5; j++)
         {
             CreateChunkAt(Vec2i(i, j));
         }
@@ -125,6 +125,36 @@ void ProceduralSoftBodyComponent::HandleCopyRequests()
 
     if (!copyRequests.empty())
     {
+        VkBufferMemoryBarrier barriers[4] = {};
+        barriers[0].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barriers[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barriers[0].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barriers[0].buffer = m_particleBuffer.GetBuffer();
+        barriers[0].size = VK_WHOLE_SIZE;
+
+        barriers[1].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barriers[1].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barriers[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barriers[1].buffer = m_connectionBuffer.GetBuffer();
+        barriers[1].size = VK_WHOLE_SIZE;
+
+        barriers[2].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barriers[2].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barriers[2].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barriers[2].buffer = m_connectionBufferL.GetBuffer();
+        barriers[2].size = VK_WHOLE_SIZE;
+
+        barriers[3].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barriers[3].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barriers[3].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barriers[3].buffer = m_surfacePointsBuffer.GetBuffer();
+        barriers[3].size = VK_WHOLE_SIZE;
+
+        vkCmdPipelineBarrier(cmd,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            0, 0, nullptr, 4, barriers, 0, nullptr);
+
         const size_t stride = copyRequests.size();
         VkBufferCopy *regions = reinterpret_cast<VkBufferCopy *>(malloc(sizeof(VkBufferCopy) * stride * 4));
         for (uint32_t i = 0; i < copyRequests.size(); i++)
@@ -149,30 +179,17 @@ void ProceduralSoftBodyComponent::HandleCopyRequests()
         vkCmdCopyBuffer(cmd, m_connectionBufferL.GetStagingBuffer(), m_connectionBufferL.GetBuffer(), (uint32_t)copyRequests.size(), regions + stride * 2);
         vkCmdCopyBuffer(cmd, m_surfacePointsBuffer.GetStagingBuffer(), m_surfacePointsBuffer.GetBuffer(), (uint32_t)copyRequests.size(), regions + stride * 3);
 
-        VkBufferMemoryBarrier barriers[4] = {};
-        barriers[0].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
         barriers[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        barriers[0].buffer = m_particleBuffer.GetBuffer();
-        barriers[0].size = VK_WHOLE_SIZE;
 
-        barriers[1].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
         barriers[1].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        barriers[1].buffer = m_connectionBuffer.GetBuffer();
-        barriers[1].size = VK_WHOLE_SIZE;
 
-        barriers[2].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
         barriers[2].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barriers[2].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        barriers[2].buffer = m_connectionBufferL.GetBuffer();
-        barriers[2].size = VK_WHOLE_SIZE;
 
-        barriers[3].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
         barriers[3].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barriers[3].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        barriers[3].buffer = m_surfacePointsBuffer.GetBuffer();
-        barriers[3].size = VK_WHOLE_SIZE;
 
         vkCmdPipelineBarrier(cmd,
             VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -200,23 +217,76 @@ void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
         }
     }
 
-    Vec3f cameraPos = Engine::Get()->GetSceneHolder()->GetCurrentScene()->GetCameraData().position;
-
-    /*
-    for (auto &chunk : m_chunks)
+    Vec2i sPos = GetChunkPos(m_particleSettings.sphereData.position);
+    for (int i = -4; i <= 4; i++)
     {
-        Vec3f delta = chunk.second.localPosition - cameraPos;
-        delta.y = 0;
-        if (delta.Length() > 10.0f)
+        for (int j = -4; j <= 4; j++)
         {
-            DeleteChunk(chunk.second.iPos);
+            Vec3f delta = Vec3f((i + sPos.x) * CHUNK_SIZE, 0, (j + sPos.y) * CHUNK_SIZE) + Vec3f(CHUNK_SIZE / 2) - m_particleSettings.sphereData.position;
+            delta.y = 0;
+            if (!m_chunks.contains(Vec2i(i, j) + sPos) && delta.Length() < CHUNK_SIZE * 5.0f)
+                CreateChunkAt(Vec2i(i, j) + sPos);
         }
     }
-    */
-    auto renderer = Engine::Get()->GetRenderer();
-    VkCommandBuffer cmd = renderer->GetCommandBuffer();
 
     HandleCopyRequests();
+
+    if (!meshesToDelete.empty())
+    {
+        bool canClear = true;
+        for (auto &mesh : meshesToDelete)
+        {
+            if (!mesh.ptr)
+                continue;
+            if (mesh.counter < 10)
+            {
+                canClear = false;
+                mesh.counter++;
+                continue;
+            }
+            delete mesh.ptr;
+            mesh.ptr = nullptr;
+        }
+        if (canClear)
+            meshesToDelete.clear();
+    }
+    if (!buffersToDelete.empty())
+    {
+        bool canClear = true;
+        for (auto &buf : buffersToDelete)
+        {
+            if (buf.id == (uint32_t)(-1))
+                continue;
+            if (buf.counter < 10)
+            {
+                canClear = false;
+                buf.counter++;
+                continue;
+            }
+            FreeChunk(buf.id, buf.page);
+            buf.id = -1;
+        }
+        if (canClear)
+            buffersToDelete.clear();
+    }
+
+    std::vector<Vec2i> tempChunksToDelete;
+    for (auto &chunk : m_chunks)
+    {
+        ASSERT(chunk.first == chunk.second.iPos);
+        Vec3f delta = chunk.second.localPosition + Vec3f(CHUNK_SIZE / 2) - m_particleSettings.sphereData.position;
+        delta.y = 0;
+        if (delta.Length() > CHUNK_SIZE * 7.0f)
+            tempChunksToDelete.push_back(chunk.first);
+    }
+    for (size_t i = 0; i < tempChunksToDelete.size(); i++)
+    {
+        DeleteChunk(tempChunksToDelete[i]);
+    }
+    tempChunksToDelete.clear();
+    
+    auto renderer = Engine::Get()->GetRenderer();
+    VkCommandBuffer cmd = renderer->GetCommandBuffer();
 
     VulkanMaterial* mat0 = m_simulationCompute0->GetMaterial();
     VulkanMaterial* mat1 = m_simulationCompute1->GetMaterial();
@@ -300,7 +370,7 @@ void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
         chunkCounts.push_back(count);
     }
 
-    m_chunkDataBuffer.FlushData(0, m_chunkBufferOffset * m_chunkSize);
+    m_chunkDataBuffer.FlushData(0, Memory::align(m_chunkBufferOffset * m_chunkSize, m_atomicBufferAlignement));
     m_chunkDataBuffer.CopyDataToDevice(cmd, 0, m_chunkBufferOffset * m_chunkSize);
 
     VkBufferMemoryBarrier barrier = {};
@@ -817,7 +887,7 @@ void ProceduralSoftBodyComponent::CreateChunkAt(Vec2i pos)
     const BufferChunk newChunkL = AllocChunk(totalSizeL, 2);
     const BufferChunk newChunkS = AllocChunk(totalSizeS, 3);
 
-    CPUChunkData data;
+    CPUChunkData data = {};
     data.pId = newChunkP.id;
     data.cId = newChunkC.id;
     data.lId = newChunkL.id;
@@ -903,18 +973,22 @@ void ProceduralSoftBodyComponent::DeleteChunk(Vec2i iPos)
 {
     ASSERT(m_chunks.contains(iPos));
     const auto &chunk = m_chunks.at(iPos);
-    delete chunk.mesh;
-    FreeChunk(chunk.pId, 0);
-    FreeChunk(chunk.cId, 1);
-    FreeChunk(chunk.lId, 2);
+    MeshHolder h;
+    h.counter = 0;
+    h.ptr = chunk.mesh;
+    meshesToDelete.push_back(h);
+    buffersToDelete.push_back({chunk.pId, 0, 0});
+    buffersToDelete.push_back({chunk.cId, 1, 0});
+    buffersToDelete.push_back({chunk.lId, 2, 0});
+    buffersToDelete.push_back({chunk.sId, 3, 0});
     m_chunks.erase(iPos);
 }
 
 Vec2i ProceduralSoftBodyComponent::GetChunkPos(Vec3f pos)
 {
     const float x = pos.x / CHUNK_SIZE;
-    const float y = pos.y / CHUNK_SIZE;
-    return Vec2i((int)std::floor(x), (int)std::floor(y));
+    const float z = pos.z / CHUNK_SIZE;
+    return Vec2i((int)std::floor(x), (int)std::floor(z));
 }
 
 float ProceduralSoftBodyComponent::GetHeightAt(float posX, float posZ)
@@ -937,25 +1011,25 @@ BufferChunk ProceduralSoftBodyComponent::AllocChunk(uint32_t size, uint32_t page
 {
     ASSERT(page < 4);
     size = (uint32_t)Memory::align(size, m_atomicBufferAlignement);
-    for (auto &chunk : m_memChunks[page])
+    for (auto chunk = m_memChunks[page].begin(); chunk != m_memChunks[page].end(); chunk++)
     {
-        if (!chunk.occupied && chunk.size >= size)
+        if (!chunk->occupied && chunk->size >= size)
         {
-            chunk.occupied = true;
-            chunk.id = m_globalChunkCount[page]++;
-
-            if (chunk.size >= size + m_atomicBufferAlignement)
+            chunk->occupied = 1;
+            chunk->id = m_globalChunkCount[page]++;
+            
+            if (chunk->size >= size + m_atomicBufferAlignement)
             {
                 BufferChunk newChunk;
-                newChunk.offset = chunk.offset + chunk.size;
-                newChunk.size = chunk.size - size;
+                newChunk.offset = chunk->offset + size;
+                newChunk.size = chunk->size - size;
                 ASSERT(Memory::align(newChunk.size, m_atomicBufferAlignement) == newChunk.size);
                 newChunk.occupied = 0;
-                newChunk.id = m_globalChunkCount[page]++;
-                m_memChunks[page].push_back(newChunk);
-                chunk.size = size;
+                newChunk.id = -1;
+                m_memChunks[page].insert(std::next(chunk), newChunk);
+                chunk->size = size;
             }
-            return chunk;
+            return *chunk;
         }
     }
 
@@ -1005,17 +1079,19 @@ void ProceduralSoftBodyComponent::FreeChunk(uint32_t id, uint32_t page)
         if (chunk->id == id)
         {
             ASSERT(chunk->occupied);
-            chunk->occupied = false;
-
-            const auto prev = std::prev(chunk);
-            if (prev != m_memChunks[page].begin() && !prev->occupied)
+            chunk->occupied = 0;
+            if (chunk != m_memChunks[page].begin())
             {
-                prev->size += chunk->size;
-                m_memChunks[page].erase(chunk);
-                chunk = prev;
+                auto prev = std::prev(chunk);
+                if (!prev->occupied)
+                {
+                    prev->size += chunk->size;
+                    m_memChunks[page].erase(chunk);
+                    chunk = prev;
+                }
             }
 
-            const auto next = std::next(chunk);
+            auto next = std::next(chunk);
             if (next == m_memChunks[page].end())
             {
                 m_globalChunkOffset[page] -= chunk->size;

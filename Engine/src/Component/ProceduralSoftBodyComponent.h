@@ -6,6 +6,7 @@
 #include "Render/Vulkan/VulkanMappedBuffer.h"
 
 #include "Resource/ComputeShader.h"
+#include "GPUSoftBodyComponent.h"
 
 #include "Utils/Random.h"
 
@@ -222,6 +223,19 @@ private:
     bool m_shouldDetectStuff = false;
 
     bool m_hasDetectedStuff = false;
+    struct MeshHolder
+    {
+        Mesh *ptr;
+        size_t counter;
+    };
+    std::vector<MeshHolder> meshesToDelete;
+    struct ChunkBufHolder
+    {
+        uint32_t id;
+        uint32_t page;
+        size_t counter;
+    };
+    std::vector<ChunkBufHolder> buffersToDelete;
     std::vector<SafePtr<GPUSoftBodyComponent>> balls;
 
     ProceduralSoftBody::PBodySettings m_particleSettings;

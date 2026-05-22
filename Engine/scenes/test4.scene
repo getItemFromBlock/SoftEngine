@@ -1,0 +1,87 @@
+{
+    "root": {
+        "children": [
+            {
+                "children": [],
+                "components": [
+                    {
+                        "data": {
+                            "localPosition": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "localRotationEuler": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "localScale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "enabled": true,
+                        "type": "TransformComponent",
+                        "uuid": 5507348573964576798
+                    },
+                    {
+                        "data": {
+                            "drawDebug": false,
+                            "settings": {
+                                "general": {
+                                    "damping": 4.0,
+                                    "dtScale": 1.0,
+                                    "paused": false,
+                                    "strength": 50.0
+                                },
+                                "sphere": {
+                                    "position": [
+                                        0.0,
+                                        2.759999990463257,
+                                        0.0
+                                    ],
+                                    "radius": 1.0
+                                }
+                            },
+                            "shouldDetectStuff": false
+                        },
+                        "enabled": true,
+                        "type": "ProceduralSoftBodyComponent",
+                        "uuid": 14589697289865024093
+                    }
+                ],
+                "name": "GameObject",
+                "uuid": 10196133129089587986
+            }
+        ],
+        "components": [
+            {
+                "data": {
+                    "localPosition": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "localRotationEuler": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "localScale": [
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                },
+                "enabled": true,
+                "type": "TransformComponent",
+                "uuid": 15558967550520624639
+            }
+        ],
+        "name": "Root",
+        "uuid": 263031754353394012
+    },
+    "version": 1
+}
