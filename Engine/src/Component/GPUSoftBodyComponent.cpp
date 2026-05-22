@@ -19,6 +19,9 @@ uint32_t GPUSoftBodyComponent::seedCounter = 0;
 
 void GPUSoftBodyComponent::Describe(ClassDescriptor& d)
 {
+    if (m_needsRecreation)
+        return; 
+
     auto &res = d.AddVec3i("Block Size", m_particleSettings.general.particleAmount).SetRangeInt(3, 1024);
     res.onModified = [this](void)
         {
@@ -75,9 +78,11 @@ void GPUSoftBodyComponent::CreateFromModel(SafePtr<Model> inputModel)
 }
 
 void GPUSoftBodyComponent::Recreate()
-{
+{/*
     InitializeParticleDataFromModel(m_particleSettings.general.density, (float)m_particleSettings.general.connectionStrength);
-    CreateParticleBuffers();
+    CreateParticleBuffers();*/
+
+    CreateFromModel(m_initializerModel);
 }
 
 void GPUSoftBodyComponent::OnCreate()
@@ -859,8 +864,7 @@ void GPUSoftBodyComponent::InitializeMaterialsFromModel(SafePtr<Model> inputMode
         return;
     }
 
-    if (!uniqueSeed)
-        uniqueSeed = ++seedCounter;
+    uniqueSeed = ++seedCounter;
 
     const auto& materials = inputModel->GetMaterials();
     for (SafePtr<Material> mat : materials)
