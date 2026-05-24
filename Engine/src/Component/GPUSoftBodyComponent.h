@@ -127,6 +127,7 @@ private:
     // Size of GPU buffer section reserved for particle connections, located right after particle data in memory
     VkDeviceSize CBufSizeAligned;
     uint32_t m_totalParticleCount = 0;
+    uint32_t m_totalConnectionCount = 0;
 
     std::shared_ptr<Mesh> m_mesh;
     SafePtr<Mesh> m_billboardMesh;

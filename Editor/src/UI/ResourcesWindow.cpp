@@ -12,6 +12,9 @@ void ResourcesWindow::OnRender()
         ImGui::Text("Thread Pool usage: %.2f%%", ThreadPool::GetUsage() * 100.0f);
         ImGui::Text("Triangle Count: %llu", engine->GetRenderer()->GetTriangleCount());
         ImGui::Text("Vertex Count: %llu", engine->GetRenderer()->GetVertexCount());
+        ImGui::Text("Softbody Chunk Count: %llu", engine->GetRenderer()->GetChunkCount());
+        ImGui::Text("Softbody Particles Count: %llu", engine->GetRenderer()->GetParticleCount());
+        ImGui::Text("Softbody Connections Count: %llu", engine->GetRenderer()->GetConnectionCount());
 
         if (ImGui::CollapsingHeader("Resources"))
         {

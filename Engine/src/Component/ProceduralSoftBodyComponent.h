@@ -105,6 +105,7 @@ namespace ProceduralSoftBody
         uint32_t globalOffsetL;
         uint32_t globalOffsetS;
         uint32_t particleCount;
+        uint32_t connectionCount;
         uint32_t neighbors[8];
     };
 

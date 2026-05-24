@@ -59,6 +59,7 @@ public:
     void SendPushConstants(void* data, uint32_t size, Shader* shader, PushConstant pushConstant) const;
     void BindVertexBuffers(VulkanVertexBuffer* vertexBuffer, VulkanIndexBuffer* indexBuffer) const;
     void DrawVertex(VulkanVertexBuffer* vertexBuffer, const VulkanIndexBuffer* indexBuffer);
+    void IncrementParticleCount(uint64_t chunkCount, uint64_t particleCount, uint64_t connectionCount);
     void DrawVertexSubMesh(VulkanIndexBuffer* _indexBuffer, uint32_t startIndex, uint32_t indexCount);
     void DrawInstanced(VulkanIndexBuffer* indexBuffer, VulkanVertexBuffer* vertexShader, VulkanBuffer* instanceBuffer, uint32_t instanceCount);
     void DrawInstanced(VulkanIndexBuffer* indexBuffer, VulkanVertexBuffer* vertexShader, uint32_t instanceCount);
@@ -105,6 +106,9 @@ public:
     RenderQueueManager* GetRenderQueueManager() const { return m_renderQueueManager.get(); }
     uint64_t GetTriangleCount() const { return p_triangleCount; }
     uint64_t GetVertexCount() const { return p_vertexCount; }
+    uint64_t GetChunkCount() const { return p_chunkCount; }
+    uint64_t GetParticleCount() const { return p_particleCount; }
+    uint64_t GetConnectionCount() const { return p_connectionCount; }
 
     LineRenderer* GetLineRenderer() { return &m_lineRenderer; }
     SkyboxRenderer* GetSkyboxRenderer() { return &m_skyboxRenderer; }
@@ -127,6 +131,9 @@ private:
     std::unique_ptr<RenderQueueManager> m_renderQueueManager;
     uint64_t p_triangleCount = 0;
     uint64_t p_vertexCount = 0;
+    uint64_t p_chunkCount = 0;
+    uint64_t p_particleCount = 0;
+    uint64_t p_connectionCount = 0;
     
     Window* m_window = nullptr;
     bool m_framebufferResized = false;

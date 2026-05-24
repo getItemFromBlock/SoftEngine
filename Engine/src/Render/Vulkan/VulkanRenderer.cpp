@@ -201,6 +201,9 @@ bool VulkanRenderer::BeginFrame()
     
     p_triangleCount = 0;
     p_vertexCount = 0;
+    p_chunkCount = 0;
+    p_particleCount = 0;
+    p_connectionCount = 0;
     m_imageIndex = 0;
     m_blittedToSwapchain = false;
     
@@ -228,6 +231,13 @@ bool VulkanRenderer::BeginFrame()
     mutex.lock();
 
     return true;
+}
+
+void VulkanRenderer::IncrementParticleCount(uint64_t chunkCount, uint64_t particleCount, uint64_t connectionCount)
+{
+    p_chunkCount += chunkCount;
+    p_particleCount += particleCount;
+    p_connectionCount += connectionCount;
 }
 
 void VulkanRenderer::DrawFrame()

@@ -279,8 +279,10 @@ void GPUSoftBodyComponent::OnRender(VulkanRenderer* renderer)
     if (m_needsRecreation || m_needRecreateFromModel)
         return;
 
-    auto* rqm = Engine::Get()->GetRenderer()->GetRenderQueueManager();
+    auto* rqm = renderer->GetRenderQueueManager();
     auto* queue = rqm->GetOpaqueQueue();
+
+    renderer->IncrementParticleCount(0, m_totalParticleCount, m_totalConnectionCount);
 
     const Mat4 transform = GetGameObject()->GetTransform()->GetWorldMatrix();
 
@@ -811,6 +813,7 @@ void GPUSoftBodyComponent::InitializeParticleData(std::vector<SBParticleData> &p
         }
     }
     m_totalParticleCount = uint32_t(particles.size());
+    m_totalConnectionCount = uint32_t(connections.size());
 }
 
 void GPUSoftBodyComponent::ApplySettings()
@@ -858,6 +861,7 @@ void GPUSoftBodyComponent::InitializeParticleDataFromModel(float density, uint32
     GenerateConnection(globalBBox, maxDistToConnect);
 
     m_totalParticleCount = uint32_t(m_particles.size());
+    m_totalConnectionCount = uint32_t(m_connections.size());
 }
 
 void GPUSoftBodyComponent::InitializeMaterialsFromModel(SafePtr<Model> inputModel)
@@ -980,6 +984,7 @@ void GPUSoftBodyComponent::GenerateConnection(const BoundingBox& BBox, uint32_t 
     }
 
     m_totalParticleCount = static_cast<uint32_t>(m_particles.size());
+    m_totalConnectionCount = static_cast<uint32_t>(m_connections.size());
 }
 
 struct Ray

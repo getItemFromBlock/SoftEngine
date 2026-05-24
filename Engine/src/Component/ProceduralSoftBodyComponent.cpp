@@ -13,14 +13,14 @@
 #include "Utils/Random.h"
 #include "Utils/Memory.h"
 
-#define MAX_PARTICLE_COUNT 0x100000
-#define MAX_CONNECTION_COUNT 0x1000000
-#define MAX_CONNECTIONL_COUNT 0x100000
+#define MAX_PARTICLE_COUNT 0x200000
+#define MAX_CONNECTION_COUNT 0x2000000
+#define MAX_CONNECTIONL_COUNT 0x200000
 #define MAX_SURFACE_CHUNK_COUNT 0x400
 #define MAX_CHUNK_BUFFER_SIZE 0x10
 #define MAX_CHUNK_BUFFER_COUNT 0x40
-#define CHUNK_SIZE 4.0f
-static const Vec2i particleAmount = Vec2i(9, 9);
+#define CHUNK_SIZE 8.0f
+static const Vec2i particleAmount = Vec2i(18, 18);
 static const uint32_t connectionStrength = 2;
 
 using namespace ProceduralSoftBody;
@@ -510,13 +510,19 @@ void ProceduralSoftBodyComponent::OnRender(VulkanRenderer* renderer)
     auto* queue = rqm->GetOpaqueQueue();
 
     const Vec3f position = p_gameObject->GetTransform()->GetWorldPosition();
-
+    
+    uint64_t cCount = 0;
+    uint64_t pCount = 0;
+    uint64_t cnCount = 0;
     for (const auto& chunk : m_chunks)
     {
         const CPUChunkData &source = chunk.second;
         RenderCommand::ChunkRenderData data;
         data.chunkPos = source.localPosition + position;
         data.offset = source.globalOffsetP;
+        cCount++;
+        pCount += source.particleCount;
+        cnCount += source.connectionCount;
         uint32_t index = 0;
         for (int i = -1; i < 2; i++)
         {
@@ -557,6 +563,7 @@ void ProceduralSoftBodyComponent::OnRender(VulkanRenderer* renderer)
         }
     }
 
+    renderer->IncrementParticleCount(cCount, pCount, cnCount);
     Mat4 worldMat = Mat4::CreateTranslationMatrix(m_particleSettings.sphereData.position + position) * Mat4::CreateScaleMatrix(Vec3f(m_particleSettings.sphereData.radius));
     queue->SubmitMeshRenderer(worldMat, m_sphereMesh.getPtr(), m_sphereMaterial);
 }
@@ -899,6 +906,7 @@ void ProceduralSoftBodyComponent::CreateChunkAt(Vec2i pos)
     data.globalOffsetS = newChunkS.offset / sizeof(uint32_t);
     data.localPosition = Vec3f(pos.x * CHUNK_SIZE, 0.0f, pos.y * CHUNK_SIZE);
     data.particleCount = (uint32_t)particles.size();
+    data.connectionCount = (uint32_t)(connections0.size() + connections1.size());
     // Sanity checks
     ASSERT(data.globalOffsetP * sizeof(PSBParticleData) == newChunkP.offset);
     ASSERT(data.globalOffsetC * sizeof(PConnectionData0) == newChunkC.offset);
