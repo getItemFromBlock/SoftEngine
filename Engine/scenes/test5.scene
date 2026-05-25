@@ -1,0 +1,65 @@
+{
+    "root": {
+        "children": [
+            {
+                "children": [],
+                "components": [
+                    {
+                        "data": {
+                            "localPosition": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "localRotationEuler": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "localScale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "enabled": true,
+                        "type": "TransformComponent",
+                        "uuid": 1957722515852637857
+                    },
+                    {
+                        "data": {
+                            "drawDebug": false,
+                            "settings": {
+                                "general": {
+                                    "damping": 4.0,
+                                    "dtScale": 1.0,
+                                    "isDynamic": true,
+                                    "paused": false,
+                                    "strength": 50.0
+                                },
+                                "sphere": {
+                                    "position": [
+                                        0.0,
+                                        8.020000457763672,
+                                        0.0
+                                    ],
+                                    "radius": 3.0
+                                }
+                            },
+                            "shouldDetectStuff": false
+                        },
+                        "enabled": true,
+                        "type": "ProceduralSoftBodyComponent",
+                        "uuid": 5765629383612152528
+                    }
+                ],
+                "name": "GameObject",
+                "uuid": 10196133129089587986
+            }
+        ],
+        "components": [],
+        "name": "Root",
+        "uuid": 4218118850100075743
+    },
+    "version": 1
+}

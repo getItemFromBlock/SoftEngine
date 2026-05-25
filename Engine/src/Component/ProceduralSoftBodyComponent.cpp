@@ -13,12 +13,13 @@
 #include "Utils/Random.h"
 #include "Utils/Memory.h"
 
-#define MAX_PARTICLE_COUNT 0x80000
-#define MAX_CONNECTION_COUNT 0x2000000
-#define MAX_CONNECTIONL_COUNT 0x400000
+#define MAX_PARTICLE_COUNT 0x100000
+#define MAX_CONNECTION_COUNT 0x8000000
+#define MAX_CONNECTIONL_COUNT 0x1000000
 #define MAX_SURFACE_CHUNK_COUNT 0x400
 #define MAX_CHUNK_BUFFER_SIZE 0x10
 #define MAX_CHUNK_BUFFER_COUNT 0x40
+#define MAX_COLLISION_RESULTS 0x3000
 #define CHUNK_SIZE 8.0f
 static const Vec2i particleAmount = Vec2i(18, 18);
 static const uint32_t connectionStrength = 2;
@@ -33,6 +34,7 @@ void ProceduralSoftBodyComponent::Describe(ClassDescriptor& d)
     d.AddFloat("Sphere radius", m_particleSettings.sphereData.radius);
 
     d.AddBool("Paused", m_particleSettings.general.paused);
+    d.AddBool("Is Dynamic", m_particleSettings.general.isDynamic);
     d.AddFloat("Deltatime", m_particleSettings.general.dtScale).SetRangeFloat(0, 65536);
 
     d.AddBool("Debug", m_drawDebug);
@@ -60,6 +62,7 @@ void ProceduralSoftBodyComponent::OnCreate()
     auto computeShader0 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/softbody0.shader");
     auto computeShader1 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/softbody1.shader");
     auto computeshader2 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/collision0.shader");
+    auto computeshader3 = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/collision1.shader");
     auto instancingShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/sb_instancing.shader");
     auto skinnedShader = resourceManager->Load<Shader>(RESOURCE_PATH"/shaders/PSoftbodyCompute/sb_skinning.shader");
 
@@ -99,6 +102,11 @@ void ProceduralSoftBodyComponent::OnCreate()
             m_collisionCompute0 = computeshader2->CreateDispatch(renderer);
         });
 
+    computeshader3->EOnSentToGPU.Bind([this, computeshader3, renderer]()
+        {
+            m_collisionCompute1 = computeshader3->CreateDispatch(renderer);
+        });
+
     CreateParticleBuffers();
 
     for (int i = -6; i < 6; i++)
@@ -112,7 +120,7 @@ void ProceduralSoftBodyComponent::OnCreate()
 
 void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
 {
-    if (!m_simulationCompute0 || !m_simulationCompute1 || !m_collisionCompute0 || !m_particleBuffer.GetSize())
+    if (!m_simulationCompute0 || !m_simulationCompute1 || !m_collisionCompute0 || !m_collisionCompute1 || !m_particleBuffer.GetSize())
         return;
 
     HandleCopyRequests();
@@ -203,7 +211,7 @@ void ProceduralSoftBodyComponent::HandleCopyRequests()
 
 void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
 {
-    if (!m_simulationCompute0 || !m_simulationCompute1 || !m_collisionCompute0 || !m_particleBuffer.GetSize())
+    if (!m_simulationCompute0 || !m_simulationCompute1 || !m_collisionCompute0 || !m_collisionCompute1 || !m_particleBuffer.GetSize())
         return;
 
     if (m_shouldDetectStuff && !m_hasDetectedStuff)
@@ -288,16 +296,66 @@ void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
     auto renderer = Engine::Get()->GetRenderer();
     VkCommandBuffer cmd = renderer->GetCommandBuffer();
 
+    const bool  isDynamic = m_particleSettings.general.isDynamic;
     VulkanMaterial* mat0 = m_simulationCompute0->GetMaterial();
-    VulkanMaterial* mat1 = m_simulationCompute1->GetMaterial();
+    VulkanMaterial* mat1 = isDynamic ? m_collisionCompute1->GetMaterial() : m_simulationCompute1->GetMaterial();
     VulkanMaterial* mat2 = m_collisionCompute0->GetMaterial();
 
     const Vec3f gravity = GetGameObject()->GetTransform()->GetWorldRotation().GetInverse() * Vec3f(0, 9.81f, 0);
-    const Vec3f spherePos = m_particleSettings.sphereData.position;
     const float sphereRad = m_particleSettings.sphereData.radius;
     const float dt = m_particleSettings.general.paused ? 0 : std::min(deltaTime * m_particleSettings.general.dtScale, 1 / 60.0f);
     const float damping = m_particleSettings.general.damping;
     const float strength = m_particleSettings.general.strength;
+
+    if (isDynamic && m_accResults > 0)
+    {
+        m_collisionResultBuffer.InvalidateData(0, Memory::align(m_accResults * sizeof(Vec4f), m_atomicBufferAlignement));
+        const Vec4f *results = reinterpret_cast<const Vec4f*>(m_collisionResultBuffer.GetMappedBuffer());
+        Vec4f total;
+        for (uint32_t i = 0; i < m_accResults; i++)
+        {
+            total += results[i];
+        }
+        //total = total / m_accResults;
+        //PrintLog("Result: (%.2f %.2f %.2f)", total.x, total.y, total.z);
+        renderer->ReportOutputForce(total);
+        m_accResults = 0;
+
+        m_particleSettings.sphereData.velocity -= gravity * dt;
+        m_particleSettings.sphereData.velocity -= total * dt * 2.5f;
+
+        Camera* editorCamera = p_gameObject->GetScene()->GetEditorCamera();
+        auto *transform = editorCamera->GetTransform();
+        Input& input = Engine::Get()->GetWindow()->GetInput();
+        Vec3f iVel;
+        if (input.IsKeyDown(Key::T)) 
+            iVel += transform->GetForward() * 5.0f * dt;
+        if (input.IsKeyDown(Key::V)) 
+            iVel -= transform->GetForward() * 5.0f * dt;
+        if (input.IsKeyDown(Key::F)) 
+            iVel -= transform->GetRight() * 5.0f * dt;
+        if (input.IsKeyDown(Key::G)) 
+            iVel += transform->GetRight() * 5.0f * dt;
+        if (input.IsKeyPressed(Key::SPACE) && total.y < -2.5f && m_particleSettings.sphereData.velocity.y < 1.0f) 
+            iVel += Vec3f::Up() * 12.0f;
+        m_particleSettings.sphereData.velocity += iVel;
+
+        m_particleSettings.sphereData.position += m_particleSettings.sphereData.velocity * dt;
+
+        if (m_particleSettings.sphereData.position.y < 0)
+        {
+            m_particleSettings.sphereData.position.y = 0;
+            m_particleSettings.sphereData.velocity.y = 0;
+        }
+
+        transform->SetLocalPosition(m_particleSettings.sphereData.position - transform->GetForward() * 12.0f);
+    }
+    else
+    {
+        m_particleSettings.sphereData.velocity = Vec3f();
+    }
+
+    const Vec3f spherePos = m_particleSettings.sphereData.position;
 
     GPUCommonData   commonData;
     commonData.spherePos = spherePos;
@@ -434,7 +492,7 @@ void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
         //for (size_t j = 0; j < 1; j++)
         {
 
-            struct PushData
+            struct PushData0
             {
                 Vec3f pos;
                 uint32_t bufferOffset;
@@ -443,11 +501,11 @@ void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
 
             for (uint32_t i = 0; i < chunkCounts.size(); i++)
             {
-                PushData p;
+                PushData0 p;
                 p.pos = balls[0]->GetGameObject()->GetTransform()->GetWorldPosition();
                 p.bufferOffset = i;
                 p.particleCount = balls[0]->GetParticleCount();
-                mat2->SetPushConstants(renderer, &p, sizeof(PushData), 0);
+                mat2->SetPushConstants(renderer, &p, sizeof(PushData0), 0);
                 const uint32_t block_size = particleAmount.x * particleAmount.y;
                 //uint32_t groups = (chunkCounts[i] * particleAmount.x * particleAmount.y + block_size-1) / block_size;
                 mat2->DispatchCompute(renderer, chunkCounts[i], 1, 1);
@@ -475,16 +533,73 @@ void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
         m_particleBuffer.GetSize(), renderer);
     mat1->SetStorageBuffer( 0, 3, m_chunkDataBuffer.GetBuffer(), 0,
         m_chunkSize * particleCounts.size(), renderer);
+    if (isDynamic)
+    {
+        mat1->SetStorageBuffer( 0, 1, m_collisionResultBuffer.GetBuffer(), 0,
+            sizeof(Vec4f) * MAX_COLLISION_RESULTS, renderer);
+    }
 
+    uint32_t counter = 0;
     for (uint32_t i = 0; i < particleCounts.size(); i++)
     {
-        mat1->SetPushConstants(renderer, &i, sizeof(uint32_t), 0);
+        struct PushData1
+        {
+            uint32_t bufferOffset;
+            uint32_t outForceOffset;
+        };
+        PushData1 p;
+        p.bufferOffset = i;
+        if (isDynamic)
+        {
+            p.outForceOffset = counter;
+            mat1->SetPushConstants(renderer, &p, sizeof(PushData1), 0);
+        }
+        else
+        {
+            mat1->SetPushConstants(renderer, &p, sizeof(uint32_t), 0);
+        }
 
         uint32_t groups = (particleCounts[i] + 63) / 64;
         mat1->DispatchCompute(renderer, groups, 1, 1);
+        counter += groups;
+        ASSERT(counter < MAX_COLLISION_RESULTS);
+    }
+    m_accResults = counter;
+
+    if (isDynamic)
+    {
+        VkBufferMemoryBarrier barrier2 = {};
+        barrier2.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barrier2.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        barrier2.dstAccessMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        barrier2.buffer = m_collisionResultBuffer.GetBuffer();
+        barrier2.size = VK_WHOLE_SIZE;
+
+        vkCmdPipelineBarrier(cmd,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            0, 0, nullptr, 1, &barrier2, 0, nullptr);
+
+        VkBufferCopy copyRegion = {};
+        copyRegion.size = m_accResults * sizeof(Vec4f);
+        copyRegion.srcOffset = 0;
+        copyRegion.dstOffset = 0;
+        vkCmdCopyBuffer(cmd, m_collisionResultBuffer.GetBuffer(), m_collisionResultBuffer.GetStagingBuffer(), 1, &copyRegion);
+
+        VkBufferMemoryBarrier barrier3 = {};
+        barrier3.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barrier3.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier3.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+        barrier3.buffer = m_collisionResultBuffer.GetStagingBuffer();
+        barrier3.size = VK_WHOLE_SIZE;
+
+        vkCmdPipelineBarrier(cmd,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_HOST_BIT,
+            0, 0, nullptr, 1, &barrier3, 0, nullptr);
     }
 
-    VkBufferMemoryBarrier barrier1{};
+    VkBufferMemoryBarrier barrier1 = {};
     barrier1.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
     barrier1.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     barrier1.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
@@ -601,7 +716,8 @@ nlohmann::json ProceduralSoftBodyComponent::Serialize() const
                 {"damping", settings.general.damping},
                 {"strength", settings.general.strength},
                 {"dtScale", settings.general.dtScale},
-                {"paused", settings.general.paused}
+                {"paused", settings.general.paused},
+                {"isDynamic", settings.general.isDynamic}
             }},
             {"sphere", {
                 {"position", SceneSerializer::ToJson(settings.sphereData.position)},
@@ -623,6 +739,7 @@ void ProceduralSoftBodyComponent::Deserialize(const nlohmann::json& json)
         settings.general.strength = general.value("strength", settings.general.strength);
         settings.general.dtScale = general.value("dtScale", settings.general.dtScale);
         settings.general.paused = general.value("paused", settings.general.paused);
+        settings.general.isDynamic = general.value("isDynamic", settings.general.isDynamic);
     }
     if (settingsData.contains("sphere"))
     {
@@ -657,6 +774,8 @@ void ProceduralSoftBodyComponent::CreateParticleBuffers()
     //m_chunkSize = (uint32_t)Memory::align(sizeof(GPUCommonData) + sizeof(GPUChunkData) * MAX_CHUNK_BUFFER_SIZE, m_atomicBufferAlignement);
     m_chunkSize = (uint32_t)(sizeof(GPUCommonData) + sizeof(GPUChunkData) * MAX_CHUNK_BUFFER_SIZE);
     m_chunkDataBuffer.Initialize(device, m_chunkSize * MAX_CHUNK_BUFFER_COUNT, false);
+
+    m_collisionResultBuffer.Initialize(device, sizeof(Vec4f) * MAX_COLLISION_RESULTS, false, true);
     
     m_chunkBufferOffset = 0;
 }
@@ -1003,7 +1122,7 @@ Vec2i ProceduralSoftBodyComponent::GetChunkPos(Vec3f pos)
 
 float ProceduralSoftBodyComponent::GetHeightAt(float posX, float posZ)
 {
-    return 1.2f + sinf(posX * 0.4687435f + 0.76543f * posZ) * 0.2f + cosf(posX * 0.61354313f - 0.2684354f * posZ) * 0.15f + sinf(-posX * 1.23384643f + 1.4687351f * posZ) * 0.1f;
+    return 2.8f + sinf(posX * 0.08687435f + 0.146543f * posZ) * 0.9f + cosf(posX * 0.21354313f - 0.2684354f * posZ) * 0.15f + sinf(-posX * 0.63384643f + 0.9687351f * posZ) * 0.1f;
 }
 
 Vec3f ProceduralSoftBodyComponent::GetNormalAt(const Vec3f &pos, float dt)

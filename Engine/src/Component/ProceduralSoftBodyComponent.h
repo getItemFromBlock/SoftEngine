@@ -27,11 +27,13 @@ namespace ProceduralSoftBody
             float strength = 50.0f;
             float dtScale = 1.0f;
             bool paused = false;
+            bool isDynamic = false;
         } general;
 
         struct SphereData
         {
             Vec3f position = Vec3f(0, 2.0f, 0);
+            Vec3f velocity;
             float radius = 1.0f;
         } sphereData;
     };
@@ -194,12 +196,14 @@ private:
     std::unique_ptr<ComputeDispatch> m_simulationCompute0;
     std::unique_ptr<ComputeDispatch> m_simulationCompute1;
     std::unique_ptr<ComputeDispatch> m_collisionCompute0;
+    std::unique_ptr<ComputeDispatch> m_collisionCompute1;
 
     VulkanMappedBuffer m_particleBuffer;
     VulkanMappedBuffer m_connectionBuffer;
     VulkanMappedBuffer m_connectionBufferL;
     VulkanMappedBuffer m_surfacePointsBuffer;
     VulkanMappedBuffer m_chunkDataBuffer;
+    VulkanMappedBuffer m_collisionResultBuffer;
 
     VkDeviceSize    m_atomicBufferAlignement;
     uint32_t        m_chunkBufferOffset;
@@ -224,6 +228,7 @@ private:
     bool m_shouldDetectStuff = false;
 
     bool m_hasDetectedStuff = false;
+    uint32_t m_accResults = 0;
     struct MeshHolder
     {
         Mesh *ptr;

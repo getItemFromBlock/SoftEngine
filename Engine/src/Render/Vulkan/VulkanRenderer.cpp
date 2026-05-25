@@ -206,6 +206,7 @@ bool VulkanRenderer::BeginFrame()
     p_connectionCount = 0;
     p_totalMemory = 0;
     p_usedMemory = 0;
+    p_outputForce = Vec3f();
     m_imageIndex = 0;
     m_blittedToSwapchain = false;
     
@@ -246,6 +247,11 @@ void VulkanRenderer::ReportMemoryUsage(uint64_t totalMemory, uint64_t usedMemory
 {
     p_totalMemory += totalMemory;
     p_usedMemory += usedMemory;
+}
+
+void VulkanRenderer::ReportOutputForce(const Vec3f &force)
+{
+    p_outputForce += force;
 }
 
 void VulkanRenderer::DrawFrame()

@@ -17,6 +17,8 @@ void ResourcesWindow::OnRender()
         ImGui::Text("Softbody Connections Count: %llu", engine->GetRenderer()->GetConnectionCount());
         ImGui::Text("Softbody Total Memory: %llu", engine->GetRenderer()->GetTotalMemory());
         ImGui::Text("Softbody Used Memory: %llu", engine->GetRenderer()->GetUsedMemory());
+        Vec3f force = engine->GetRenderer()->GetOutputForce();
+        ImGui::Text("Output Force: (%.2f %.2f %.2f)", force.x, force.y, force.z);
 
         if (ImGui::CollapsingHeader("Resources"))
         {

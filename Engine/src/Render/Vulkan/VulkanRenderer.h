@@ -61,6 +61,7 @@ public:
     void DrawVertex(VulkanVertexBuffer* vertexBuffer, const VulkanIndexBuffer* indexBuffer);
     void IncrementParticleCount(uint64_t chunkCount, uint64_t particleCount, uint64_t connectionCount);
     void ReportMemoryUsage(uint64_t totalMemory, uint64_t usedMemory);
+    void ReportOutputForce(const Vec3f &force);
     void DrawVertexSubMesh(VulkanIndexBuffer* _indexBuffer, uint32_t startIndex, uint32_t indexCount);
     void DrawInstanced(VulkanIndexBuffer* indexBuffer, VulkanVertexBuffer* vertexShader, VulkanBuffer* instanceBuffer, uint32_t instanceCount);
     void DrawInstanced(VulkanIndexBuffer* indexBuffer, VulkanVertexBuffer* vertexShader, uint32_t instanceCount);
@@ -112,6 +113,7 @@ public:
     uint64_t GetConnectionCount() const { return p_connectionCount; }
     uint64_t GetTotalMemory() const { return p_totalMemory; }
     uint64_t GetUsedMemory() const { return p_usedMemory; }
+    Vec3f    GetOutputForce() const { return p_outputForce; }
 
     LineRenderer* GetLineRenderer() { return &m_lineRenderer; }
     SkyboxRenderer* GetSkyboxRenderer() { return &m_skyboxRenderer; }
@@ -139,6 +141,7 @@ private:
     uint64_t p_connectionCount = 0;
     uint64_t p_totalMemory = 0;
     uint64_t p_usedMemory = 0;
+    Vec3f p_outputForce;
     
     Window* m_window = nullptr;
     bool m_framebufferResized = false;
