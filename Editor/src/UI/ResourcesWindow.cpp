@@ -15,6 +15,8 @@ void ResourcesWindow::OnRender()
         ImGui::Text("Softbody Chunk Count: %llu", engine->GetRenderer()->GetChunkCount());
         ImGui::Text("Softbody Particles Count: %llu", engine->GetRenderer()->GetParticleCount());
         ImGui::Text("Softbody Connections Count: %llu", engine->GetRenderer()->GetConnectionCount());
+        ImGui::Text("Softbody Total Memory: %llu", engine->GetRenderer()->GetTotalMemory());
+        ImGui::Text("Softbody Used Memory: %llu", engine->GetRenderer()->GetUsedMemory());
 
         if (ImGui::CollapsingHeader("Resources"))
         {

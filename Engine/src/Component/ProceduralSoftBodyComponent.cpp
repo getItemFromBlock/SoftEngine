@@ -13,9 +13,9 @@
 #include "Utils/Random.h"
 #include "Utils/Memory.h"
 
-#define MAX_PARTICLE_COUNT 0x200000
+#define MAX_PARTICLE_COUNT 0x80000
 #define MAX_CONNECTION_COUNT 0x2000000
-#define MAX_CONNECTIONL_COUNT 0x200000
+#define MAX_CONNECTIONL_COUNT 0x400000
 #define MAX_SURFACE_CHUNK_COUNT 0x400
 #define MAX_CHUNK_BUFFER_SIZE 0x10
 #define MAX_CHUNK_BUFFER_COUNT 0x40
@@ -101,9 +101,9 @@ void ProceduralSoftBodyComponent::OnCreate()
 
     CreateParticleBuffers();
 
-    for (int i = -5; i < 5; i++)
+    for (int i = -6; i < 6; i++)
     {
-        for (int j = -5; j < 5; j++)
+        for (int j = -6; j < 6; j++)
         {
             CreateChunkAt(Vec2i(i, j));
         }
@@ -218,13 +218,13 @@ void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
     }
 
     Vec2i sPos = GetChunkPos(m_particleSettings.sphereData.position);
-    for (int i = -4; i <= 4; i++)
+    for (int i = -8; i <= 8; i++)
     {
-        for (int j = -4; j <= 4; j++)
+        for (int j = -8; j <= 8; j++)
         {
             Vec3f delta = Vec3f((i + sPos.x) * CHUNK_SIZE, 0, (j + sPos.y) * CHUNK_SIZE) + Vec3f(CHUNK_SIZE / 2) - m_particleSettings.sphereData.position;
             delta.y = 0;
-            if (!m_chunks.contains(Vec2i(i, j) + sPos) && delta.Length() < CHUNK_SIZE * 5.0f)
+            if (!m_chunks.contains(Vec2i(i, j) + sPos) && delta.Length() < CHUNK_SIZE * 8.5f)
                 CreateChunkAt(Vec2i(i, j) + sPos);
         }
     }
@@ -276,7 +276,7 @@ void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
         ASSERT(chunk.first == chunk.second.iPos);
         Vec3f delta = chunk.second.localPosition + Vec3f(CHUNK_SIZE / 2) - m_particleSettings.sphereData.position;
         delta.y = 0;
-        if (delta.Length() > CHUNK_SIZE * 7.0f)
+        if (delta.Length() > CHUNK_SIZE * 10.0f)
             tempChunksToDelete.push_back(chunk.first);
     }
     for (size_t i = 0; i < tempChunksToDelete.size(); i++)
@@ -564,6 +564,7 @@ void ProceduralSoftBodyComponent::OnRender(VulkanRenderer* renderer)
     }
 
     renderer->IncrementParticleCount(cCount, pCount, cnCount);
+    renderer->ReportMemoryUsage(m_totalMemory, m_usedMemory);
     Mat4 worldMat = Mat4::CreateTranslationMatrix(m_particleSettings.sphereData.position + position) * Mat4::CreateScaleMatrix(Vec3f(m_particleSettings.sphereData.radius));
     queue->SubmitMeshRenderer(worldMat, m_sphereMesh.getPtr(), m_sphereMaterial);
 }
@@ -651,6 +652,7 @@ void ProceduralSoftBodyComponent::CreateParticleBuffers()
     m_connectionBuffer.Initialize(device, alignedSizeC);
     m_connectionBufferL.Initialize(device, alignedSizeL);
     m_surfacePointsBuffer.Initialize(device, alignedSizeS);
+    m_totalMemory = alignedSizeP + alignedSizeC + alignedSizeL + alignedSizeS;
 
     //m_chunkSize = (uint32_t)Memory::align(sizeof(GPUCommonData) + sizeof(GPUChunkData) * MAX_CHUNK_BUFFER_SIZE, m_atomicBufferAlignement);
     m_chunkSize = (uint32_t)(sizeof(GPUCommonData) + sizeof(GPUChunkData) * MAX_CHUNK_BUFFER_SIZE);
@@ -1023,6 +1025,7 @@ BufferChunk ProceduralSoftBodyComponent::AllocChunk(uint32_t size, uint32_t page
     {
         if (!chunk->occupied && chunk->size >= size)
         {
+            m_usedMemory += chunk->size;
             chunk->occupied = 1;
             chunk->id = m_globalChunkCount[page]++;
             
@@ -1034,6 +1037,7 @@ BufferChunk ProceduralSoftBodyComponent::AllocChunk(uint32_t size, uint32_t page
                 ASSERT(Memory::align(newChunk.size, m_atomicBufferAlignement) == newChunk.size);
                 newChunk.occupied = 0;
                 newChunk.id = -1;
+                m_usedMemory -= newChunk.size;
                 m_memChunks[page].insert(std::next(chunk), newChunk);
                 chunk->size = size;
             }
@@ -1069,6 +1073,7 @@ BufferChunk ProceduralSoftBodyComponent::AllocChunk(uint32_t size, uint32_t page
         newChunk.id = m_globalChunkCount[page]++;
         m_memChunks[page].push_back(newChunk);
         m_globalChunkOffset[page] += size;
+        m_usedMemory += size;
     }
     else
     {
@@ -1088,6 +1093,7 @@ void ProceduralSoftBodyComponent::FreeChunk(uint32_t id, uint32_t page)
         {
             ASSERT(chunk->occupied);
             chunk->occupied = 0;
+            m_usedMemory -= chunk->size;
             if (chunk != m_memChunks[page].begin())
             {
                 auto prev = std::prev(chunk);

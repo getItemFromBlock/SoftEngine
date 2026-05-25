@@ -239,5 +239,8 @@ private:
     std::vector<ChunkBufHolder> buffersToDelete;
     std::vector<SafePtr<GPUSoftBodyComponent>> balls;
 
+    uint64_t m_totalMemory = 0;
+    uint64_t m_usedMemory = 0;
+
     ProceduralSoftBody::PBodySettings m_particleSettings;
 };

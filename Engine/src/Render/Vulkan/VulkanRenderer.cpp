@@ -204,6 +204,8 @@ bool VulkanRenderer::BeginFrame()
     p_chunkCount = 0;
     p_particleCount = 0;
     p_connectionCount = 0;
+    p_totalMemory = 0;
+    p_usedMemory = 0;
     m_imageIndex = 0;
     m_blittedToSwapchain = false;
     
@@ -238,6 +240,12 @@ void VulkanRenderer::IncrementParticleCount(uint64_t chunkCount, uint64_t partic
     p_chunkCount += chunkCount;
     p_particleCount += particleCount;
     p_connectionCount += connectionCount;
+}
+
+void VulkanRenderer::ReportMemoryUsage(uint64_t totalMemory, uint64_t usedMemory)
+{
+    p_totalMemory += totalMemory;
+    p_usedMemory += usedMemory;
 }
 
 void VulkanRenderer::DrawFrame()
