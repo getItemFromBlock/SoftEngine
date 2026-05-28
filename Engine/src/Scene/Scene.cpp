@@ -203,6 +203,7 @@ void Scene::Clear()
 {
     //Engine::Get()->GetRenderer()->GetRenderQueueManager()->ClearAll();
     m_lightManager->RemoveAllLights();
+    LockMouseCursor(false);
     SafePtr<GameObject> root = GetRootObject();
     if (!root)
         return;
@@ -347,6 +348,9 @@ void Scene::RemoveAllComponents(GameObject* gameObject)
 
 void Scene::UpdateEditorCamera(float deltaTime) const
 {
+    if (m_cursorLocked)
+        return;
+
     static float speed = 10.f;
     static Vec2f startClickPos;
     static Vec2f prevMousePos = Vec2f::Zero();
@@ -434,4 +438,14 @@ void Scene::UpdateEditorCamera(float deltaTime) const
     transform->Rotate(Vec3f::Right(), -mouseY, Space::Local);
 
     transform->OnUpdate(deltaTime);
+}
+
+bool Scene::LockMouseCursor(bool lock)
+{
+    bool result = m_cursorLocked != lock;
+    m_cursorLocked = lock;
+    if (result)
+        Engine::Get()->GetWindow()->SetMouseCursorMode(lock ? CursorMode::Disabled : CursorMode::Normal);
+
+    return result;
 }

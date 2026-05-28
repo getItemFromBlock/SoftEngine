@@ -162,6 +162,7 @@ public:
 
     void Describe(ClassDescriptor &d) override;
     void OnCreate() override;
+    void OnStart() override;
     void OnGameUpdate(float deltaTime) override;
     void OnUpdate(float deltaTime) override;
     void OnRender(VulkanRenderer *renderer) override;
@@ -246,6 +247,9 @@ private:
 
     uint64_t m_totalMemory = 0;
     uint64_t m_usedMemory = 0;
+
+    float m_cameraDist = 12.0f;
+    Vec2f m_prevMousePos;
 
     ProceduralSoftBody::PBodySettings m_particleSettings;
 };

@@ -85,7 +85,8 @@ public:
     LightManager* GetLightManager() const { return m_lightManager.get(); }
     
     void UpdateEditorCamera(float deltaTime) const;
-private:
+    bool LockMouseCursor(bool lock);
+    bool IsCursorLocked() { return m_cursorLocked; }
 private:
     friend GameObject;
 
@@ -96,6 +97,7 @@ private:
     std::unique_ptr<LightManager> m_lightManager;
     std::unique_ptr<Camera> m_editorCamera;
     CameraData m_editorCameraData;
+    bool m_cursorLocked = false;
     
     mutable std::recursive_mutex m_gameObjectsMutex;
     mutable std::recursive_mutex m_componentsMutex;

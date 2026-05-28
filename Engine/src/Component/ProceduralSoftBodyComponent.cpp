@@ -118,6 +118,12 @@ void ProceduralSoftBodyComponent::OnCreate()
     }
 }
 
+void ProceduralSoftBodyComponent::OnStart()
+{
+    m_prevMousePos = Engine::Get()->GetWindow()->GetMouseCursorPosition();
+    p_gameObject->GetScene()->LockMouseCursor(true);
+}
+
 void ProceduralSoftBodyComponent::OnUpdate(float deltaTime)
 {
     if (!m_simulationCompute0 || !m_simulationCompute1 || !m_collisionCompute0 || !m_collisionCompute1 || !m_particleBuffer.GetSize())
@@ -324,21 +330,56 @@ void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
         m_particleSettings.sphereData.velocity -= gravity * dt;
         m_particleSettings.sphereData.velocity -= total * dt * 2.5f;
 
+        Input& input = Engine::Get()->GetWindow()->GetInput();
+        if (input.IsKeyPressed(Key::ESCAPE))
+        {
+            bool locked = p_gameObject->GetScene()->IsCursorLocked();
+            if (!locked)
+                m_prevMousePos = Engine::Get()->GetWindow()->GetMouseCursorPosition();
+            p_gameObject->GetScene()->LockMouseCursor(!locked);
+        }
+
         Camera* editorCamera = p_gameObject->GetScene()->GetEditorCamera();
         auto *transform = editorCamera->GetTransform();
-        Input& input = Engine::Get()->GetWindow()->GetInput();
-        Vec3f iVel;
-        if (input.IsKeyDown(Key::T)) 
-            iVel += transform->GetForward() * 5.0f * dt;
-        if (input.IsKeyDown(Key::V)) 
-            iVel -= transform->GetForward() * 5.0f * dt;
-        if (input.IsKeyDown(Key::F)) 
-            iVel -= transform->GetRight() * 5.0f * dt;
-        if (input.IsKeyDown(Key::G)) 
-            iVel += transform->GetRight() * 5.0f * dt;
-        if (input.IsKeyPressed(Key::SPACE) && total.y < -2.5f && m_particleSettings.sphereData.velocity.y < 1.0f) 
-            iVel += Vec3f::Up() * 12.0f;
-        m_particleSettings.sphereData.velocity += iVel;
+        if (p_gameObject->GetScene()->IsCursorLocked())
+        {
+            Vec3f iVel;
+            if (input.IsKeyDown(Key::W)) 
+                iVel += transform->GetForward() * 5.0f * dt;
+            if (input.IsKeyDown(Key::S)) 
+                iVel -= transform->GetForward() * 5.0f * dt;
+            if (input.IsKeyDown(Key::A)) 
+                iVel -= transform->GetRight() * 5.0f * dt;
+            if (input.IsKeyDown(Key::D)) 
+                iVel += transform->GetRight() * 5.0f * dt;
+            if (input.IsKeyPressed(Key::SPACE) && total.y < -2.5f && m_particleSettings.sphereData.velocity.y < 1.0f) 
+                iVel += Vec3f::Up() * 12.0f;
+            m_particleSettings.sphereData.velocity += iVel;
+
+            const float scroll = input.GetScrollY();
+            if (scroll != 0.f)
+            {
+                constexpr float scrollSensitivity = 1.0f;
+                constexpr float minDist = 5.0f;
+                constexpr float maxDist = 30.f;
+                m_cameraDist = std::clamp(m_cameraDist - scroll * scrollSensitivity, minDist, maxDist);
+            }
+
+            const Vec2f mousePos = Engine::Get()->GetWindow()->GetMouseCursorPosition();
+            const Vec2f delta = mousePos - m_prevMousePos;
+
+            constexpr float freeLookSensitivity = 0.25f;
+
+            float mouseX = delta.x * freeLookSensitivity;
+            float mouseY = delta.y * freeLookSensitivity;
+
+            m_prevMousePos = mousePos;
+
+            //if (transform->GetUp().y < 0) mouseX *= -1;
+
+            transform->Rotate(Vec3f::Up(), -mouseX, Space::World);
+            transform->Rotate(Vec3f::Right(), -mouseY, Space::Local);
+        }
 
         m_particleSettings.sphereData.position += m_particleSettings.sphereData.velocity * dt;
 
@@ -348,7 +389,8 @@ void ProceduralSoftBodyComponent::OnGameUpdate(float deltaTime)
             m_particleSettings.sphereData.velocity.y = 0;
         }
 
-        transform->SetLocalPosition(m_particleSettings.sphereData.position - transform->GetForward() * 12.0f);
+        transform->SetLocalPosition(m_particleSettings.sphereData.position - transform->GetForward() * m_cameraDist);
+        transform->OnUpdate(deltaTime);
     }
     else
     {
